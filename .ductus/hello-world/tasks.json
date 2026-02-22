@@ -1,50 +1,48 @@
 [
   {
     "id": "calculator-core-ops",
-    "summary": "Implement core calculator math operations (add, subtract, multiply, divide).",
-    "description": "Add a calculator module with four basic binary operations: add, subtract, multiply, and divide. Each function should accept two numeric arguments and return a number. Handle division by zero by returning a defined value or throwing a clear error. Use plain functions or a small API suitable for the rest of the codebase.",
-    "objective": "Deliver a minimal, correct set of math operations that the rest of the calculator (or callers) can rely on.",
+    "summary": "Implement core calculator math operations: add, subtract, multiply, divide.",
+    "description": "Implement four basic arithmetic functions that accept two numeric operands and return the result. Support integers and floats. Division must handle division-by-zero by returning a defined value or throwing a clear error. Functions should be pure and side-effect free.",
+    "objective": "Provide reliable, testable implementations of add, subtract, multiply, and divide for use by the calculator.",
     "requirements": [
-      "Implement add(a, b) returning a + b.",
-      "Implement subtract(a, b) returning a - b.",
-      "Implement multiply(a, b) returning a * b.",
-      "Implement divide(a, b) with explicit handling when b is 0 (e.g. throw or return NaN/Infinity).",
-      "All operations accept and return numbers (or document type coercion)."
+      "Add: return first operand + second operand",
+      "Subtract: return first operand - second operand",
+      "Multiply: return first operand * second operand",
+      "Divide: return first / second; define behavior for divisor zero"
     ],
     "constraints": [
-      "No external math libraries required; use language primitives only.",
-      "Keep functions pure and side-effect free where possible.",
-      "API must be easy to test in isolation."
+      "Pure functions only; no I/O or global state",
+      "Use language-native number types; document precision limits if relevant"
     ]
   },
   {
-    "id": "calculator-api-surface",
-    "summary": "Expose calculator operations via a single public API or module.",
-    "description": "Define the public surface for the calculator: either a single object/namespace exporting add, subtract, multiply, divide, or a module that re-exports these functions. Document usage (e.g. JSDoc or README) and ensure the API is consistent with the rest of the project's patterns (e.g. ESM vs CJS, naming).",
-    "objective": "Provide a clear, stable entry point for consumers of the calculator (UI, CLI, or other services).",
+    "id": "calculator-api-or-entrypoint",
+    "summary": "Expose calculator operations via a single API or entrypoint (e.g. evaluate or compute).",
+    "description": "Define a public API (e.g. evaluate(operation, a, b) or compute(expression)) that routes to the core math functions. Document accepted operations and argument types. Ensure invalid inputs are rejected with clear errors.",
+    "objective": "Provide one clear entrypoint for callers to perform calculator operations.",
     "requirements": [
-      "Single entry point (e.g. index.ts or calculator.ts) exporting all operations.",
-      "Public API documented (signatures and behavior, including division-by-zero).",
-      "Naming and module style aligned with existing codebase conventions."
+      "Single public entrypoint that dispatches to add/subtract/multiply/divide",
+      "Accept operation name or code and two operands",
+      "Return numeric result or throw/return error for invalid operation or inputs"
     ],
     "constraints": [
-      "No breaking changes to existing public APIs unless explicitly in scope.",
-      "Minimal surface area; avoid exposing internal helpers unless needed."
+      "API must not expose implementation details",
+      "Input validation before calling core ops"
     ]
   },
   {
     "id": "calculator-tests",
-    "summary": "Add unit tests for all calculator math functions and edge cases.",
-    "description": "Write tests for add, subtract, multiply, and divide using the project's test runner and conventions. Cover normal cases (positive/negative integers and decimals), zero operands, and division by zero. Ensure tests are deterministic and fast.",
-    "objective": "Verify correctness and document expected behavior of the calculator, including edge cases.",
+    "summary": "Add unit tests for all calculator operations and edge cases.",
+    "description": "Write tests for add, subtract, multiply, divide and the public API. Cover normal cases, negatives, zeros, and division by zero. Assert expected return values or error type/message.",
+    "objective": "Ensure calculator behavior is correct and regression-safe.",
     "requirements": [
-      "Tests for add, subtract, multiply, divide with at least two cases each (e.g. positive, negative, zero).",
-      "Explicit test(s) for divide(x, 0) documenting chosen behavior.",
-      "Tests run via the project's existing test command and pass in CI."
+      "Test each core operation with at least two valid cases",
+      "Test division by zero behavior",
+      "Test API with valid and invalid inputs"
     ],
     "constraints": [
-      "Use existing test framework and patterns; no new test runtime unless justified.",
-      "No flaky or environment-dependent assertions."
+      "Tests must be automated and repeatable",
+      "Use project's existing test framework and conventions"
     ]
   }
 ]
