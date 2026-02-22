@@ -24,7 +24,7 @@ export async function convertPlanToTasks(plan: string): Promise<Task[]> {
 
       const raw = await runAgentWithStream({
         args,
-        spinnerText: 'Running architect...',
+        spinnerText: 'Running planner agent to break down plan into tasks...',
       })
 
       return TaskListSchema.parse(JSON.parse(extractJsonArray(raw)))
