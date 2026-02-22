@@ -1,0 +1,93 @@
+[
+  {
+    "id": "lisp-lexer",
+    "summary": "Implement a Lisp lexer that tokenizes source into parens, symbols, numbers, strings, and comments.",
+    "description": "Build a tokenizer that consumes raw Lisp source code and produces a stream of tokens. Handle opening and closing parentheses, symbols (identifiers), integer and floating-point numbers, double-quoted strings with escape sequences, and line/semicolon comments. Whitespace between tokens must be skipped. Token types and their string values must be exposed for the parser. No parsing or AST construction; output is a list or iterable of token objects with at least type and value (and optionally source location for later error reporting).",
+    "objective": "Produce a reliable, complete lexer so that all valid Lisp surface syntax can be represented as a token stream for the parser.",
+    "requirements": [
+      "Tokenize parentheses ( and ) as distinct token types",
+      "Tokenize symbols (identifiers) allowing typical Lisp character rules",
+      "Tokenize integer and floating-point numeric literals",
+      "Tokenize double-quoted strings and support common escape sequences",
+      "Skip whitespace and support line and block comments",
+      "Expose token type and value (and optional location) for each token"
+    ],
+    "constraints": [
+      "Lexer must be deterministic and not depend on parser state",
+      "Do not interpret or evaluate expressions; only tokenize",
+      "Design token shape to support future source-location reporting"
+    ]
+  },
+  {
+    "id": "lisp-ast-types",
+    "summary": "Define Lisp AST node types and S-expression data structures for the parser output.",
+    "description": "Introduce typed data structures (or interfaces) representing the result of parsing: atoms (symbol, number, string, boolean, nil) and compound S-expressions (lists). The AST must unambiguously represent the structure of parsed Lisp code so that an evaluator or other consumers can traverse it. Document the chosen representation (e.g. discriminated union on node kind). Empty list and nil should be representable. No parsing logic in this task; only type definitions and possibly factory helpers.",
+    "objective": "Establish the canonical AST shape for parsed Lisp so the parser and downstream stages share a single, clear contract.",
+    "requirements": [
+      "Define types for atomic values: symbol, number, string, boolean, nil",
+      "Define type for list/cell (S-expression) linking to child nodes",
+      "Support empty list and distinguish nil where applicable",
+      "Use a single root type (e.g. SExpr or AstNode) that can be atom or list",
+      "Document the AST schema for engineers"
+    ],
+    "constraints": [
+      "AST must be a tree; no cycles in the type definition",
+      "Types must be suitable for the host language (e.g. TypeScript interfaces or sum types)",
+      "Do not include evaluation or execution logic"
+    ]
+  },
+  {
+    "id": "lisp-parser",
+    "summary": "Implement a Lisp parser that turns a token stream into an AST using recursive descent.",
+    "description": "Consume the token stream produced by the lexer and build an AST conforming to the defined AST types. Use recursive descent: on open paren, parse a list by repeatedly parsing expressions until a closing paren. Atoms (symbol, number, string, etc.) are parsed when the current token is not a paren. Handle top-level as a sequence of zero or more S-expressions. Parser must assume tokens are already produced by the lexer; do not re-lex. Output is a parse result containing either the root AST node(s) or a parse error. Integrate with the lexer and AST types from previous tasks.",
+    "objective": "Correctly transform a well-formed token stream into a well-formed AST that reflects the structure of the Lisp source.",
+    "requirements": [
+      "Parse lists (possibly empty) as nested S-expressions",
+      "Parse atoms (symbol, number, string) and map them to AST node types",
+      "Support multiple top-level expressions (e.g. list of roots)",
+      "Use recursive descent; single pass over the token stream",
+      "Return a result type that can represent success (AST) or failure (error)"
+    ],
+    "constraints": [
+      "Parser must not modify the token stream; consume by reading only",
+      "Do not evaluate or execute expressions; only build AST",
+      "Reuse only the agreed token and AST types from the project"
+    ]
+  },
+  {
+    "id": "lisp-parse-errors",
+    "summary": "Add parse-error reporting with source location and clear messages for invalid input.",
+    "description": "When the parser encounters invalid input (unexpected token, premature end of input, extra closing paren), it must produce a parse error that includes at least: a short message describing the problem, and the source location (e.g. line and column or offset) when available. If the lexer supplies location on tokens, propagate it so that the error can point to the offending span. Optionally support multiple diagnostics per run. Document expected messages for cases like unmatched closing paren, unexpected EOF in list, and invalid atom. Engineers should be able to reproduce errors from the message and location.",
+    "objective": "Provide actionable, localized parse errors so users can fix invalid Lisp source quickly.",
+    "requirements": [
+      "Define a parse error type with message and source location (line/column or offset)",
+      "Report unexpected token with the token type and location",
+      "Report unexpected end of input when a list is not closed",
+      "Report extra or unmatched closing parenthesis with location",
+      "Use token or lexer location when available for error spans"
+    ],
+    "constraints": [
+      "Do not throw uncaught exceptions as the primary API; return structured errors",
+      "Location format must be consistent and documented",
+      "Error reporting must not require executing or evaluating the program"
+    ]
+  },
+  {
+    "id": "lisp-parse-api",
+    "summary": "Expose a public parse(source) API and integrate the Lisp parser into the project.",
+    "description": "Provide the main entry point for parsing Lisp: a function that accepts raw source code (string) and returns either the parsed AST (or list of top-level forms) or a structured parse error. Internally this must run the lexer, then the parser, and map results to the public return type. Document the function signature, return type, and behavior for empty input and invalid input. Ensure the parser and lexer are wired and exported so that downstream features (e.g. eval, format, or tooling) can depend on this API. Add minimal tests or examples that call the public API.",
+    "objective": "Deliver a single, stable API so that callers can parse Lisp source without touching lexer or parser internals.",
+    "requirements": [
+      "Implement parse(source: string) returning success (AST) or failure (parse error)",
+      "Run lexer then parser internally; do not require callers to tokenize",
+      "Document public API: parameters, return type, and error shape",
+      "Export the parse function and public AST/error types from the project entry",
+      "Include at least one test or example that parses valid and invalid source via the API"
+    ],
+    "constraints": [
+      "Public API must not expose lexer or parser implementation details",
+      "Return type must be a single discriminated result (e.g. { ok, ast } | { ok: false, error })",
+      "Follow existing project structure and conventions for exports and tests"
+    ]
+  }
+]

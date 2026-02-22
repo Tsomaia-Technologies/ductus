@@ -1,0 +1,69 @@
+[
+  {
+    "id": "calculator-core-operations",
+    "summary": "Implement add, subtract, multiply, and divide with typed inputs and return values.",
+    "description": "Implement the four basic arithmetic operations as pure functions (or a small calculator API). Each function should accept two numeric operands and return a number. Define clear function signatures and use a single module or class so the calculator is easy to discover and maintain. Document expected types (e.g. number only) and behavior for normal cases.",
+    "objective": "Deliver a minimal, correct implementation of the four basic calculator operations with consistent interfaces.",
+    "requirements": [
+      "Implement add(a, b) returning a + b",
+      "Implement subtract(a, b) returning a - b",
+      "Implement multiply(a, b) returning a * b",
+      "Implement divide(a, b) returning a / b",
+      "All operations accept two numeric arguments and return a number"
+    ],
+    "constraints": [
+      "Use existing project language and style (e.g. TypeScript/JavaScript or project default)",
+      "No external math libraries for basic arithmetic",
+      "Keep functions pure and side-effect free where possible"
+    ]
+  },
+  {
+    "id": "calculator-edge-cases",
+    "summary": "Handle division by zero, invalid inputs, and optional extras (e.g. modulo).",
+    "description": "Add robust handling for edge cases: division by zero (return a sentinel value, throw, or return Infinity/NaN per project convention), non-numeric or missing inputs (validate and throw or return a consistent error). Optionally add modulo and/or power if specified in product scope. Document behavior in code or specs.",
+    "objective": "Make the calculator safe and predictable for invalid or boundary inputs and extend with agreed extra operations.",
+    "requirements": [
+      "Define and implement behavior for divide(x, 0)",
+      "Validate or document behavior for non-numeric or missing arguments",
+      "Document chosen strategy (throw vs return NaN/Infinity/error result)"
+    ],
+    "constraints": [
+      "Do not change existing correct behavior of core operations",
+      "Follow project error-handling and validation patterns",
+      "Avoid breaking changes to existing function signatures unless agreed"
+    ]
+  },
+  {
+    "id": "calculator-unit-tests",
+    "summary": "Add unit tests for all operations and edge cases to prevent regressions.",
+    "description": "Create unit tests for add, subtract, multiply, and divide using the project’s test framework. Cover happy path (positive, negative, zero, decimals), division by zero, and invalid inputs. Tests should be deterministic and fast. Aim for clear test names that describe scenario and expected outcome.",
+    "objective": "Achieve reliable, automated verification of calculator behavior and document expected behavior via tests.",
+    "requirements": [
+      "Test each of add, subtract, multiply, divide with at least two valid cases",
+      "Test divide by zero and document expected outcome",
+      "Test or document behavior for invalid/missing inputs",
+      "All tests must pass in CI or local run"
+    ],
+    "constraints": [
+      "Use the project’s chosen test runner and assertions",
+      "No flaky tests; no external or network dependencies",
+      "Keep tests in the same repo and runnable with the standard test command"
+    ]
+  },
+  {
+    "id": "calculator-api-export",
+    "summary": "Expose calculator via module or API and document usage for consumers.",
+    "description": "Export the calculator functions (or a single calculator object/class) from the appropriate module or entry point so other parts of the application can import and use them. Add minimal usage documentation (e.g. README section or JSDoc) describing how to call each operation and how errors or edge cases are represented.",
+    "objective": "Make the calculator usable by the rest of the codebase and clearly documented.",
+    "requirements": [
+      "Export all calculator operations from a public module or entry",
+      "Provide usage examples or JSDoc for each exported operation",
+      "Document error/edge-case behavior where it affects callers"
+    ],
+    "constraints": [
+      "Follow project structure and naming for public API surface",
+      "Do not export internal helpers unless they are part of the public contract",
+      "Documentation must stay in sync with implementation (e.g. same repo)"
+    ]
+  }
+]
