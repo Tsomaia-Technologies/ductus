@@ -17,7 +17,8 @@ export async function convertPlanToTasks(plan: string): Promise<Task[]> {
       const args = [
         '--mode', 'plan',
         '--model', model,
-        '--output-format', 'text',
+        '--output-format', 'stream-json',
+        '--stream-partial-output',
         '--print', content,
       ]
 

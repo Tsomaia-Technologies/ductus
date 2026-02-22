@@ -1,48 +1,63 @@
 [
   {
-    "id": "calculator-core-ops",
-    "summary": "Implement core calculator math operations: add, subtract, multiply, divide.",
-    "description": "Implement four basic arithmetic functions that accept two numeric operands and return the result. Support integers and floats. Division must handle division-by-zero by returning a defined value or throwing a clear error. Functions should be pure and side-effect free.",
-    "objective": "Provide reliable, testable implementations of add, subtract, multiply, and divide for use by the calculator.",
+    "id": "calculator-api-types",
+    "summary": "Define calculator math API, function signatures, and shared types for all operations.",
+    "description": "Create the public contract for the calculator: function names, parameter types (e.g. numbers or big decimals), return types, and any shared types or enums (e.g. operation kind). Document expected behavior and error semantics so implementers and tests stay aligned.",
+    "objective": "Establish a clear, typed API and shared types so all calculator operations and callers use a consistent interface.",
     "requirements": [
-      "Add: return first operand + second operand",
-      "Subtract: return first operand - second operand",
-      "Multiply: return first operand * second operand",
-      "Divide: return first / second; define behavior for divisor zero"
+      "Public function signatures for add, subtract, multiply, divide",
+      "Shared types for operands and result (e.g. number or decimal)",
+      "Documentation of parameter order and return shape"
     ],
     "constraints": [
-      "Pure functions only; no I/O or global state",
-      "Use language-native number types; document precision limits if relevant"
+      "API must be language- and runtime-appropriate for the codebase",
+      "No implementation logic in this task; types/signatures only"
     ]
   },
   {
-    "id": "calculator-api-or-entrypoint",
-    "summary": "Expose calculator operations via a single API or entrypoint (e.g. evaluate or compute).",
-    "description": "Define a public API (e.g. evaluate(operation, a, b) or compute(expression)) that routes to the core math functions. Document accepted operations and argument types. Ensure invalid inputs are rejected with clear errors.",
-    "objective": "Provide one clear entrypoint for callers to perform calculator operations.",
+    "id": "calculator-basic-ops",
+    "summary": "Implement add, subtract, multiply, and divide with correct numeric behavior.",
+    "description": "Implement the four basic arithmetic operations using the agreed API. Use the language’s standard numeric types or chosen decimal type. Ensure correct handling of signs and integer vs floating-point behavior as specified in the API.",
+    "objective": "Deliver working add, subtract, multiply, and divide that match the defined API and behave correctly for normal inputs.",
     "requirements": [
-      "Single public entrypoint that dispatches to add/subtract/multiply/divide",
-      "Accept operation name or code and two operands",
-      "Return numeric result or throw/return error for invalid operation or inputs"
+      "Implement add with correct numeric semantics",
+      "Implement subtract with correct numeric semantics",
+      "Implement multiply with correct numeric semantics",
+      "Implement divide with correct numeric semantics"
     ],
     "constraints": [
-      "API must not expose implementation details",
-      "Input validation before calling core ops"
+      "Must conform to the API and types defined in calculator-api-types",
+      "No UI or I/O in this task; pure math functions only"
+    ]
+  },
+  {
+    "id": "calculator-error-handling",
+    "summary": "Add error handling for invalid inputs and edge cases (e.g. division by zero).",
+    "description": "Handle invalid or unsafe cases: division by zero, non-numeric or out-of-range inputs if applicable, and any other edge cases documented in the API. Define whether errors are thrown, returned as results, or logged, and keep behavior consistent across operations.",
+    "objective": "Make the calculator safe and predictable for invalid or edge-case inputs without crashing or returning incorrect results.",
+    "requirements": [
+      "Division by zero is handled and does not crash or return incorrect value",
+      "Invalid or unsupported inputs are handled in a defined way",
+      "Error behavior is documented and consistent"
+    ],
+    "constraints": [
+      "Error strategy (exceptions vs result types) must match project conventions",
+      "No silent wrong results; failures must be explicit"
     ]
   },
   {
     "id": "calculator-tests",
-    "summary": "Add unit tests for all calculator operations and edge cases.",
-    "description": "Write tests for add, subtract, multiply, divide and the public API. Cover normal cases, negatives, zeros, and division by zero. Assert expected return values or error type/message.",
-    "objective": "Ensure calculator behavior is correct and regression-safe.",
+    "summary": "Add unit tests for all calculator operations and error cases.",
+    "description": "Write automated tests for add, subtract, multiply, and divide: normal cases, zero, negatives, and boundary values. Include tests for error handling (e.g. division by zero, invalid input). Tests must be runnable via the project’s test runner and stay green.",
+    "objective": "Verify correctness and error behavior of the calculator and prevent regressions.",
     "requirements": [
-      "Test each core operation with at least two valid cases",
-      "Test division by zero behavior",
-      "Test API with valid and invalid inputs"
+      "Tests for each operation with typical and edge inputs",
+      "Tests for defined error cases (e.g. division by zero)",
+      "Tests executable by the project’s test command and passing"
     ],
     "constraints": [
-      "Tests must be automated and repeatable",
-      "Use project's existing test framework and conventions"
+      "Use the project’s existing test framework and conventions",
+      "No production logic in test files; tests only"
     ]
   }
 ]
