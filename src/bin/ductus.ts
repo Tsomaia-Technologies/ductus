@@ -4,10 +4,11 @@ import * as path from 'path'
 import { Command } from 'commander'
 import { ejectPrompts } from '../load-prompts'
 import { convertPlanToTasks } from '../lambdas/convertPlanToTasks'
-import { runEngineer } from '../lambdas/runEngineer'
+import { runImplementationEngineer } from '../lambdas/runImplementationEngineer'
 import { runReviewer } from '../lambdas/runReviewer'
 import { getHeadRef, getDiff } from '../git'
 import type { Approval, Rejection } from '../schema'
+import { runRemediationEngineer } from '../lambdas/runRemediationEngineer'
 
 const program = new Command()
 
@@ -85,11 +86,18 @@ program
 
         const beforeRef = await getHeadRef(cwd)
 
-        await runEngineer(
-          task,
-          result?.decision === 'rejected' ? result : undefined,
-          cwd,
-        )
+        if (result?.decision === 'rejected') {
+          await runRemediationEngineer(
+            task,
+            result,
+            cwd,
+          )
+        } else {
+          await runImplementationEngineer(
+            task,
+            cwd,
+          )
+        }
 
         const diff = await getDiff(beforeRef, cwd)
         result = await runReviewer(task, diff, cwd)

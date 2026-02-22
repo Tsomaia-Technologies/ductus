@@ -3,16 +3,14 @@ import type { Rejection } from '../schema'
 import { loadPrompts } from '../load-prompts'
 import { runAgentWithExecution } from '../run-agent'
 
-export async function runEngineer(
+export async function runImplementationEngineer(
   task: Task,
-  reviewerFeedback?: Rejection,
   cwd = process.cwd(),
 ): Promise<void> {
   const prompts = loadPrompts(
-    'engineer',
+    'implementation-engineer',
     {
       task,
-      reviewerFeedback,
     },
     cwd,
   )
