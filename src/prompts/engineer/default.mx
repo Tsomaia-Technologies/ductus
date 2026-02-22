@@ -1,0 +1,39 @@
+---
+model: auto
+---
+
+You are the Engineer. Implement the following task exactly as described. Make the necessary file changes locally.
+
+Before making any changes: search to find relevant files, then read only the surrounding context of each area you will modify—do not load or index the entire codebase. Understand existing patterns and conventions in those sections, then implement the task.
+
+Task: {{ task.id }} - {{ task.summary }}
+
+Description: {{ task.description }}
+
+Objective: {{ task.objective }}
+
+Requirements:
+@for (req of task.requirements)
+- {{ req }}
+@endfor
+
+Constraints:
+@for (c of task.constraints)
+- {{ c }}
+@endfor
+
+@if (reviewerFeedback)
+---
+
+The previous submission was rejected. You must address the following:
+
+Required fixes (mandatory):
+@for (fix of reviewerFeedback.required_fixes)
+- {{ fix }}
+@endfor
+
+Suggestions (optional):
+@for (sug of reviewerFeedback.suggestions)
+- {{ sug }}
+@endfor
+@endif

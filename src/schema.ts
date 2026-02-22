@@ -101,3 +101,9 @@ export const RejectionSchema = z.object({
 })
 export type Rejection = z.infer<typeof RejectionSchema>
 export const RejectionJSON = toJsonSchema(RejectionSchema)
+
+export const ReviewResultSchema = z.discriminatedUnion('decision', [
+  ApprovalSchema,
+  RejectionSchema,
+])
+export type ReviewResult = z.infer<typeof ReviewResultSchema>

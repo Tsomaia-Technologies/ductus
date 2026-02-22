@@ -21,7 +21,7 @@ function findMxFiles(dir: string): string[] {
 }
 
 function getPackagePromptsRoot(): string {
-  return path.join(__dirname, '..', 'prompts')
+  return path.join(__dirname, '..', 'src', 'prompts')
 }
 
 /**

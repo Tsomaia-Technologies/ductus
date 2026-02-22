@@ -93,3 +93,19 @@ export async function runAgentWithStream(
 
   return Buffer.concat(rawChunks).toString('utf-8')
 }
+
+/**
+ * Runs the agent with stdio inherit so the user sees all output (tool calls, edits) in real time.
+ * Used for Engineer phase where we do not need to capture or parse output.
+ * Returns when the process exits; throws on non-zero exit.
+ */
+export async function runAgentWithExecution(options: {
+  args: string[]
+}): Promise<void> {
+  const { args } = options
+  await execa('agent', args, {
+    stdout: 'inherit',
+    stderr: 'inherit',
+    stdin: 'inherit',
+  })
+}
