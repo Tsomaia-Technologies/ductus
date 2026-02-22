@@ -1,4 +1,4 @@
-import { PlannerHeadersSchema, Task, TaskListSchema, TaskSchemaJSON } from '../schema'
+import { ArchitectHeadersSchema, Task, TaskListSchema, TaskSchemaJSON } from '../schema'
 import { extractJsonArray } from '../utils'
 import { loadPrompts } from '../load-prompts'
 import { runAgentWithStream } from '../run-agent'
@@ -13,7 +13,7 @@ export async function convertPlanToTasks(plan: string): Promise<Task[]> {
   while (i < maxTrials) {
     try {
       const { data, content } = prompts[i % prompts.length]
-      const { model } = PlannerHeadersSchema.parse(data)
+      const { model } = ArchitectHeadersSchema.parse(data)
       const args = [
         '--mode', 'plan',
         '--model', model,
@@ -24,7 +24,7 @@ export async function convertPlanToTasks(plan: string): Promise<Task[]> {
 
       const raw = await runAgentWithStream({
         args,
-        spinnerText: 'Running planner agent to break down plan into tasks...',
+        spinnerText: 'Running architect agent to break down plan into tasks...',
       })
 
       return TaskListSchema.parse(JSON.parse(extractJsonArray(raw)))

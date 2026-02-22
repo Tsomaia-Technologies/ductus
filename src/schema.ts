@@ -1,7 +1,7 @@
 import { z } from 'zod/v3'
 import { toJsonSchema } from './utils'
 
-export const PlannerHeadersSchema = z.object({
+export const ArchitectHeadersSchema = z.object({
   model: z.enum(['auto']).default('auto'),
 })
 
