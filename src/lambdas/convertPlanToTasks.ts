@@ -6,7 +6,7 @@ import { runAgentWithStream } from '../run-agent'
 export async function convertPlanToTasks(plan: string): Promise<Task[]> {
   let i = 0
 
-  const prompts = loadPrompts('planner', { plan, schema: TaskSchemaJSON })
+  const prompts = loadPrompts('architect', { plan, schema: TaskSchemaJSON })
 
   const maxTrials = Math.max(prompts.length, 5)
 

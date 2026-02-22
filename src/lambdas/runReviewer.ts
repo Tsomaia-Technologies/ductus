@@ -30,15 +30,11 @@ export async function runReviewer(
       const model = (data as { model?: string })?.model ?? 'auto'
 
       const args = [
-        '--mode',
-        'plan',
-        '--model',
-        model,
-        '--output-format',
-        'stream-json',
+        '--mode', 'plan',
+        '--model', model,
+        '--output-format', 'stream-json',
         '--stream-partial-output',
-        '--print',
-        content,
+        '--print', content,
       ]
 
       const raw = await runAgentWithStream({

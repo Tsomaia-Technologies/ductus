@@ -2,6 +2,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { Command } from 'commander'
+import { ejectPrompts } from '../load-prompts'
 import { convertPlanToTasks } from '../lambdas/convertPlanToTasks'
 import { runEngineer } from '../lambdas/runEngineer'
 import { runReviewer } from '../lambdas/runReviewer'
@@ -15,6 +16,18 @@ program
   .description(
     'Agent-to-agent coordination orchestrator for autonomous task execution',
   )
+
+program
+  .command('eject')
+  .description('Eject prompts from package to .ductus/prompts')
+  .option('--overwrite', 'Overwrite existing prompts (default: only add missing)')
+  .action((opts: { overwrite?: boolean }) => {
+    ejectPrompts(process.cwd(), { overwrite: opts.overwrite })
+  })
+
+program
+  .command('run')
+  .description('Run plan to tasks, then Engineer and Reviewer per task')
   .argument('<feature>', 'feature name')
   .requiredOption('-p, --plan <path>', 'path to the plan file')
   .option(
@@ -22,10 +35,10 @@ program
     'max Engineer retries per task when Reviewer rejects',
     '2',
   )
-  .action(async (feature: string, options: { plan: string; maxRetries: string }) => {
-    const planPath = options.plan
-    const maxRetries = Math.max(0, parseInt(options.maxRetries, 10) || 2)
+  .action(async (feature: string, options: { plan: string; maxRetries?: string }) => {
     const cwd = process.cwd()
+    const planPath = options.plan
+    const maxRetries = Math.max(0, parseInt(options.maxRetries ?? '2', 10) || 2)
     const featureDir = path.join(cwd, '.ductus', feature)
 
     fs.mkdirSync(featureDir, { recursive: true })

@@ -25,41 +25,65 @@ function getPackagePromptsRoot(): string {
 }
 
 /**
- * Ejects prompts from the package into .ductus/prompts if the target is empty or missing.
+ * Ejects prompts from the package into .ductus/prompts.
+ * Scans package prompts root for subdirs with .mx files.
+ * Without overwrite: copies only if target does not exist or has no .mx files.
+ * With overwrite: always copies, overwriting existing.
  */
-function ejectPromptsIfNeeded(folderName: string, cwd: string): void {
-  const targetDir = path.join(cwd, '.ductus', 'prompts', folderName)
-  const sourceDir = path.join(getPackagePromptsRoot(), folderName)
+export function ejectPrompts(
+  cwd = process.cwd(),
+  options?: { overwrite?: boolean },
+): void {
+  const overwrite = options?.overwrite ?? false
+  const sourceRoot = getPackagePromptsRoot()
+  const targetRoot = path.join(cwd, '.ductus', 'prompts')
 
-  const hasPrompts = (dir: string) => findMxFiles(dir).length > 0
-  const targetHasPrompts = fs.existsSync(targetDir) && hasPrompts(targetDir)
-
-  if (targetHasPrompts) return
-
-  if (!fs.existsSync(sourceDir) || !hasPrompts(sourceDir)) {
-    throw new Error(
-      `No prompts found. Expected prompts at ${sourceDir} or ${targetDir}`,
-    )
+  if (!fs.existsSync(sourceRoot)) {
+    throw new Error(`No prompts source found at ${sourceRoot}`)
   }
 
-  fs.mkdirSync(path.dirname(targetDir), { recursive: true })
-  fs.cpSync(sourceDir, targetDir, { recursive: true })
+  const hasPrompts = (dir: string) => findMxFiles(dir).length > 0
+  const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const folderName = entry.name
+    const sourceDir = path.join(sourceRoot, folderName)
+    const targetDir = path.join(targetRoot, folderName)
+
+    if (!hasPrompts(sourceDir)) continue
+
+    const targetHasPrompts = fs.existsSync(targetDir) && hasPrompts(targetDir)
+    if (targetHasPrompts && !overwrite) continue
+
+    fs.mkdirSync(path.dirname(targetDir), { recursive: true })
+    if (overwrite && fs.existsSync(targetDir)) {
+      fs.rmSync(targetDir, { recursive: true })
+    }
+    fs.cpSync(sourceDir, targetDir, { recursive: true })
+  }
 }
 
 /**
- * Loads .mx prompt files from .ductus/prompts/<folderName>/ (or ejects from package if needed),
+ * Loads .mx prompt files from .ductus/prompts/<folderName>/,
  * renders each with Moxite using the provided context, parses frontmatter with gray-matter,
  * and returns the list of gray-matter objects.
+ * Throws if prompts are missing; run "ductus eject" first.
  */
 export function loadPrompts<T extends Record<string, unknown>>(
   folderName: string,
   context: T,
   cwd = process.cwd(),
 ): GrayMatterFile[] {
-  ejectPromptsIfNeeded(folderName, cwd)
-
   const basePath = path.join(cwd, '.ductus', 'prompts', folderName)
+  const sourceDir = path.join(getPackagePromptsRoot(), folderName)
   const mxFiles = findMxFiles(basePath)
+
+  if (mxFiles.length === 0) {
+    throw new Error(
+      `No prompts found for "${folderName}". Run "ductus eject" first. Expected prompts at ${basePath} or ${sourceDir}`,
+    )
+  }
 
   const resolver: FileResolver = (requestPath: string, fromPath?: string) => {
     const dir = fromPath ? path.dirname(fromPath) : basePath
