@@ -127,7 +127,7 @@ describe('loadPrompts', () => {
 
   describe('nested .mx files', () => {
     it('finds .mx files in subdirectories', () => {
-      const result = loadPrompts('planner', { schema: '{}', plan: 'x' }, tempDir)
+      const result = loadPrompts('architect', { schema: '{}', plan: 'x' }, tempDir)
 
       expect(result.length).toBeGreaterThan(0)
     })
