@@ -7,7 +7,6 @@ export async function convertPlanToTasks(plan: string): Promise<Task[]> {
   let i = 0
 
   const prompts = loadPrompts('planner', { plan, schema: TaskSchemaJSON })
-  console.log(`Found ${prompts.length} planner prompts`)
 
   const maxTrials = Math.max(prompts.length, 5)
 
