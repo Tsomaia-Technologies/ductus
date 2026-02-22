@@ -6,6 +6,7 @@ import { runAgentWithExecution } from '../run-agent'
 export async function runRemediationEngineer(
   task: Task,
   rejection: Rejection,
+  diff: string,
   cwd = process.cwd(),
 ): Promise<void> {
   const prompts = loadPrompts(
@@ -13,6 +14,7 @@ export async function runRemediationEngineer(
     {
       task,
       rejection,
+      diff,
     },
     cwd,
   )

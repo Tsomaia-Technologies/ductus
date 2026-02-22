@@ -87,9 +87,11 @@ program
         const beforeRef = await getHeadRef(cwd)
 
         if (result?.decision === 'rejected') {
+          const diffOfRejected = await getDiff(beforeRef, cwd)
           await runRemediationEngineer(
             task,
             result,
+            diffOfRejected,
             cwd,
           )
         } else {

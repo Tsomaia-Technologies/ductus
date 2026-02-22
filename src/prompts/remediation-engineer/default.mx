@@ -9,25 +9,45 @@ CRITICAL RULES FOR REMEDIATION:
 2. Focus ONLY on fixing the specific issues listed in the Reviewer Feedback below.
 3. Do not output a summary. Once the files are saved, conclude your turn.
 
-🛑 REVIEWER FEEDBACK 🛑
+---
+TASK DETAILS:
+Task: {{ task.id }} - {{ task.summary }}
+
+Description: {{ task.description }}
+
+Objective: {{ task.objective }}
+
+Requirements:
+@for (req of task.requirements)
+- {{ req }}
+@endfor
+
+Constraints:
+@for (c of task.constraints)
+- {{ c }}
+@endfor
+
+---
+REVIEWER FEEDBACK:
 Reason for Rejection:
-{{ reviewerFeedback.rejection_reason }}
+{{ rejection.rejection_reason }}
 
 Required Fixes:
-@for (fix of reviewerFeedback.required_fixes)
+@for (fix of rejection.required_fixes)
 - {{ fix }}
 @endfor
 
-@if (reviewerFeedback.suggestions && reviewerFeedback.suggestions.length > 0)
+@if (rejection.suggestions and rejection.suggestions.length > 0)
 Suggestions:
-@for (sug of reviewerFeedback.suggestions)
+@for (sug of rejection.suggestions)
 - {{ sug }}
 @endfor
 @endif
 
 ---
-🔍 PREVIOUS CHANGES (Git Diff) 🔍
+PREVIOUS CHANGES (Git Diff):
 Use this diff to understand exactly what the previous engineer altered before the rejection:
 
 ```diff
 {{ diff }}
+```
