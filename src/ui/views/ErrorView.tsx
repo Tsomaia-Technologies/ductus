@@ -1,7 +1,7 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { useRunContext } from '../context/RunContext'
-import { theme } from '../theme'
+import { useRunContext } from '../context/RunContext.js'
+import { theme } from '../theme.js'
 
 export function ErrorView() {
   const { error, errorContext } = useRunContext()

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { Box, Text } from 'ink'
 import TextInput from 'ink-text-input'
-import { theme } from '../theme'
+import { theme } from '../theme.js'
 
 export type CommitPromptResult = { ignoreHooks: boolean; remember: boolean } | null
 

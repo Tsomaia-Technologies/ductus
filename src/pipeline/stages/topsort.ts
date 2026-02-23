@@ -1,5 +1,5 @@
-import type { PipelineContext, PipelineStage } from '../context'
-import { topSortTasks } from '../../topsort'
+import type { PipelineContext, PipelineStage } from '../context.js'
+import { topSortTasks } from '../../topsort.js'
 
 /**
  * Computes topological order from task dependencies. Throws on cycle or invalid ref.

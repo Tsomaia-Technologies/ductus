@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import type { Task } from './schema'
+import type { Task } from './schema.js'
 
 export type TaskStatus = 'pending' | 'completed' | 'failed'
 

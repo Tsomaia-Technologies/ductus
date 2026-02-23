@@ -1,12 +1,12 @@
 import React from 'react'
-import { Layout } from './components/Layout'
-import { ArchitectView } from './views/ArchitectView'
-import { TaskReviewView } from './views/TaskReviewView'
-import { EngineerView } from './views/EngineerView'
-import { ReviewerView } from './views/ReviewerView'
-import { CompleteView } from './views/CompleteView'
-import { ErrorView } from './views/ErrorView'
-import { useRunContext } from './context/RunContext'
+import { Layout } from './components/Layout.js'
+import { ArchitectView } from './views/ArchitectView.js'
+import { TaskReviewView } from './views/TaskReviewView.js'
+import { EngineerView } from './views/EngineerView.js'
+import { ReviewerView } from './views/ReviewerView.js'
+import { CompleteView } from './views/CompleteView.js'
+import { ErrorView } from './views/ErrorView.js'
+import { useRunContext } from './context/RunContext.js'
 
 function PhaseRouter() {
   const { phase } = useRunContext()

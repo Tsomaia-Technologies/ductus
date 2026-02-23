@@ -1,9 +1,9 @@
-import type { Task } from '../schema'
-import type { EngineerReport } from '../schema'
-import { EngineerReportSchema, EngineerReportSchemaJSON } from '../schema'
-import { loadPrompts } from '../load-prompts'
-import { runAgentWithExecutionAndCapture } from '../run-agent'
-import { extractLastJsonObject } from '../utils'
+import type { Task } from '../schema.js'
+import type { EngineerReport } from '../schema.js'
+import { EngineerReportSchema, EngineerReportSchemaJSON } from '../schema.js'
+import { loadPrompts } from '../load-prompts.js'
+import { runAgentWithExecutionAndCapture } from '../run-agent.js'
+import { extractLastJsonObject } from '../utils.js'
 
 const FALLBACK_REPORT: EngineerReport = {
   files_modified: [],

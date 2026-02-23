@@ -1,10 +1,10 @@
-import { ReviewResultSchema } from '../schema'
-import type { Approval, Rejection } from '../schema'
-import type { Task } from '../schema'
-import { ApprovalSchemaJSON, RejectionJSON } from '../schema'
-import { extractJsonObject } from '../utils'
-import { loadPrompts } from '../load-prompts'
-import { runAgentWithStream } from '../run-agent'
+import { ReviewResultSchema } from '../schema.js'
+import type { Approval, Rejection } from '../schema.js'
+import type { Task } from '../schema.js'
+import { ApprovalSchemaJSON, RejectionJSON } from '../schema.js'
+import { extractJsonObject } from '../utils.js'
+import { loadPrompts } from '../load-prompts.js'
+import { runAgentWithStream } from '../run-agent.js'
 
 export async function runReviewer(
   task: Task,

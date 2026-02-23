@@ -1,4 +1,4 @@
-import type { PipelineContext, PipelineStage } from '../context'
+import type { PipelineContext, PipelineStage } from '../context.js'
 
 /**
  * Sets phase to complete and signals end of pipeline.

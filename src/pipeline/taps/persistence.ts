@@ -1,5 +1,5 @@
-import type { PipelineContext } from '../context'
-import { saveTasksWithStatus } from '../../task-state'
+import type { PipelineContext } from '../context.js'
+import { saveTasksWithStatus } from '../../task-state.js'
 
 /**
  * Returns the persistTasks tap implementation.

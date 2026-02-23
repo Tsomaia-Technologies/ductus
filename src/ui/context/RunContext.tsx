@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
-import type { RunPhase, ErrorContext } from '../../pipeline/context'
-import type { Task } from '../../schema'
+import type { RunPhase, ErrorContext } from '../../pipeline/context.js'
+import type { Task } from '../../schema.js'
+import type { InkTapsRef } from '../../pipeline/taps/ink-taps.js'
 
 export interface RunState {
   phase: RunPhase
@@ -32,8 +33,8 @@ const RunContext = createContext<RunContextValue | null>(null)
 interface RunProviderProps {
   feature: string
   maxRetries: number
-  /** Mutable ref for taps to store task approval resolver */
-  tapsRef: { current: (RunContextValue & { _taskApprovalResolve?: (f: string | null) => void }) | null }
+  /** Mutable ref for taps to store task approval resolver; RunContextValue extends InkTapsRef.current */
+  tapsRef: InkTapsRef
   children: React.ReactNode
 }
 

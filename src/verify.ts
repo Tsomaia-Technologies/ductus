@@ -1,5 +1,5 @@
 import { execa } from 'execa'
-import type { CommandStatus } from './schema'
+import type { CommandStatus } from './schema.js'
 
 export interface CommandResult {
   checkId: string

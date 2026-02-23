@@ -1,5 +1,5 @@
 import * as readline from 'readline'
-import type { Task } from './schema'
+import type { Task } from './schema.js'
 
 /**
  * Displays numbered task summaries and prompts the user to accept or request changes.

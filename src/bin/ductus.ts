@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 import * as path from 'path'
 import { Command } from 'commander'
-import { ejectPrompts } from '../load-prompts'
-import { pipe } from '../pipeline'
+import { ejectPrompts } from '../load-prompts.js'
+import { pipe } from '../pipeline/index.js'
 import {
   initializeStage,
   architectStage,
   topologicalSortStage,
   executeTasksStage,
   finalizeStage,
-} from '../pipeline/stages'
-import { createStubTaps } from '../pipeline/taps'
-import type { PipelineConfig, PipelineState } from '../pipeline/context'
+} from '../pipeline/stages/index.js'
+import { createStubTaps } from '../pipeline/taps/index.js'
+import type { InkTapsRef } from '../pipeline/taps/ink-taps.js'
+import type { PipelineConfig, PipelineState } from '../pipeline/context.js'
 
 const program = new Command()
 
@@ -80,11 +81,11 @@ program
       opts.noUi === true ||
       opts.plain === true
     const useUI = !disableUI
-    const tapsRef = { current: null as any }
+    const tapsRef: InkTapsRef = { current: null }
 
     if (useUI) {
-      const { createInkTaps } = await import('../pipeline/taps/ink-taps')
-      const { runWithInk } = await import('../ui')
+      const { createInkTaps } = await import('../pipeline/taps/ink-taps.js')
+      const { runWithInk } = await import('../ui/index.js')
       const taps = createInkTaps(tapsRef)
       const runPipeline = pipe(
         initializeStage,
@@ -93,7 +94,7 @@ program
         executeTasksStage,
         finalizeStage,
         {
-          onFail: (ctx) => {
+          onFail: (ctx: import('../pipeline/context.js').PipelineContext) => {
             if (ctx.state.tasks.length > 0 && Object.keys(ctx.state.taskStatus).length > 0) {
               taps.persistTasks(ctx)
             }
@@ -117,7 +118,7 @@ program
         executeTasksStage,
         finalizeStage,
         {
-          onFail: (ctx) => {
+          onFail: (ctx: import('../pipeline/context.js').PipelineContext) => {
             if (ctx.state.tasks.length > 0 && Object.keys(ctx.state.taskStatus).length > 0) {
               taps.persistTasks(ctx)
             }

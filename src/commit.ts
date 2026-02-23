@@ -1,6 +1,6 @@
-import { commitChanges } from './git'
-import { readDuctusConfig, writeDuctusConfig } from './ductus-config'
-import { promptCommitFailureRecovery } from './prompt-user'
+import { commitChanges } from './git.js'
+import { readDuctusConfig, writeDuctusConfig } from './ductus-config.js'
+import { promptCommitFailureRecovery } from './prompt-user.js'
 
 /**
  * Commits changes. On failure (e.g. hooks), retries with --no-verify per user preference or config.

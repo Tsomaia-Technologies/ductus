@@ -1,6 +1,6 @@
 import * as path from 'path'
-import type { PipelineContext, PipelineStage } from '../context'
-import { refinePlanToTasks } from '../../lambdas/refinePlanToTasks'
+import type { PipelineContext, PipelineStage } from '../context.js'
+import { refinePlanToTasks } from '../../lambdas/refinePlanToTasks.js'
 const MAX_REFINEMENT_FAILURES = 3
 
 /**

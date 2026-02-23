@@ -1,7 +1,7 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import type { StreamLayout } from '../hooks/useStreamLayout'
-import { theme } from '../theme'
+import type { StreamLayout } from '../hooks/useStreamLayout.js'
+import { theme } from '../theme.js'
 
 const ANSI_REGEX = /\x1b\[[0-9;]*m|\x1b\]8;[^;]*;[^\x1b]*\x1b\\/g
 

@@ -1,7 +1,7 @@
-import { ArchitectHeadersSchema, Task, TaskListSchema, TaskSchemaJSON } from '../schema'
-import { extractJsonArray } from '../utils'
-import { loadPrompts } from '../load-prompts'
-import { runAgentWithStream } from '../run-agent'
+import { ArchitectHeadersSchema, Task, TaskListSchema, TaskSchemaJSON } from '../schema.js'
+import { extractJsonArray } from '../utils.js'
+import { loadPrompts } from '../load-prompts.js'
+import { runAgentWithStream } from '../run-agent.js'
 
 export async function convertPlanToTasks(
   plan: string,

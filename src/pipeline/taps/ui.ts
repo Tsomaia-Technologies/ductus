@@ -1,7 +1,7 @@
-import type { Task } from '../../schema'
-import type { PipelineContext, PipelineTaps, RunPhase } from '../context'
-import { createPersistTap } from './persistence'
-import { promptForTaskApproval } from '../../prompt-user'
+import type { Task } from '../../schema.js'
+import type { PipelineContext, PipelineTaps, RunPhase } from '../context.js'
+import { createPersistTap } from './persistence.js'
+import { promptForTaskApproval } from '../../prompt-user.js'
 
 /**
  * Stub UI taps that bridge the pipeline to existing readline/ora-style output.

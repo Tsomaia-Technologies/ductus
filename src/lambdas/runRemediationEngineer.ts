@@ -1,7 +1,7 @@
-import type { Task } from '../schema'
-import type { Rejection } from '../schema'
-import { loadPrompts } from '../load-prompts'
-import { runAgentWithExecution } from '../run-agent'
+import type { Task } from '../schema.js'
+import type { Rejection } from '../schema.js'
+import { loadPrompts } from '../load-prompts.js'
+import { runAgentWithExecution } from '../run-agent.js'
 
 export async function runRemediationEngineer(
   task: Task,

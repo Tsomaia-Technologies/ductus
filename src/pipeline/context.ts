@@ -1,5 +1,5 @@
-import type { Task, EngineerReport, Approval, Rejection } from '../schema'
-import type { CommandResult } from '../verify'
+import type { Task, EngineerReport, Approval, Rejection } from '../schema.js'
+import type { CommandResult } from '../verify.js'
 
 /**
  * Phase of the orchestration run; used by UI taps to update the display.

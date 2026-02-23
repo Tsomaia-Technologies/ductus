@@ -1,10 +1,10 @@
 import React from 'react'
 import { Box, Text } from 'ink'
 import useStdoutDimensions from 'ink-use-stdout-dimensions'
-import { useRunContext } from '../context/RunContext'
-import { useStreamLayout } from '../hooks/useStreamLayout'
-import { StreamView } from './StreamView'
-import { theme } from '../theme'
+import { useRunContext } from '../context/RunContext.js'
+import { useStreamLayout } from '../hooks/useStreamLayout.js'
+import { StreamView } from './StreamView.js'
+import { theme } from '../theme.js'
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { phase, feature, tasks, currentTaskIndex, streamContent, streamActive, error } =

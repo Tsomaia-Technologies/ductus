@@ -1,11 +1,11 @@
-import type { PipelineContext } from '../context'
-import type { Task } from '../../schema'
-import { runImplementationEngineer } from '../../lambdas/runImplementationEngineer'
-import { runReviewer } from '../../lambdas/runReviewer'
-import { runRemediationEngineer } from '../../lambdas/runRemediationEngineer'
-import { runVerificationCommands } from '../../verify'
-import { commitWithRetryOnFailure } from '../../commit'
-import { getHeadRef, getDiff, revertToRef } from '../../git'
+import type { PipelineContext } from '../context.js'
+import type { Task } from '../../schema.js'
+import { runImplementationEngineer } from '../../lambdas/runImplementationEngineer.js'
+import { runReviewer } from '../../lambdas/runReviewer.js'
+import { runRemediationEngineer } from '../../lambdas/runRemediationEngineer.js'
+import { runVerificationCommands } from '../../verify.js'
+import { commitWithRetryOnFailure } from '../../commit.js'
+import { getHeadRef, getDiff, revertToRef } from '../../git.js'
 
 /**
  * Runs implement -> verify -> review -> (commit | remediate) for a single task.

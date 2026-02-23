@@ -1,17 +1,19 @@
-import type { Task } from '../../schema'
-import type { PipelineContext, PipelineTaps, RunPhase } from '../context'
-import { createPersistTap } from './persistence'
+import type { Task } from '../../schema.js'
+import type { PipelineContext, PipelineTaps, RunPhase } from '../context.js'
+import { createPersistTap } from './persistence.js'
 
+/** Mutable ref for Ink taps; RunProvider may add _taskApprovalResolve for the approval promise. */
 export interface InkTapsRef {
   current: {
     setPhase: (phase: RunPhase) => void
     appendStream: (chunk: string) => void
     setStreamActive: (active: boolean) => void
-    setError: (err: string | null, context?: import('../context').ErrorContext) => void
+    setError: (err: string | null, context?: import('../context.js').ErrorContext) => void
     setTasks: (tasks: Task[]) => void
     setCurrentTask: (index: number, taskId: string | null) => void
     setCurrentAttempt: (n: number) => void
     submitTaskApproval: (feedback: string | null) => void
+    _taskApprovalResolve?: (feedback: string | null) => void
   } | null
 }
 
@@ -35,7 +37,7 @@ export function createInkTaps(ref: InkTapsRef): PipelineTaps {
       ref.current?.setStreamActive(active)
     },
 
-    setError(err: string | null, context?: import('../context').ErrorContext): void {
+    setError(err: string | null, context?: import('../context.js').ErrorContext): void {
       ref.current?.setError(err, context)
     },
 

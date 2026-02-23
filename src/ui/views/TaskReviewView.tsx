@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react'
 import { Box, Text } from 'ink'
 import TextInput from 'ink-text-input'
-import { useRunContext } from '../context/RunContext'
-import { theme } from '../theme'
+import { useRunContext } from '../context/RunContext.js'
+import { theme } from '../theme.js'
 
 export function TaskReviewView() {
   const { tasks, submitTaskApproval } = useRunContext()

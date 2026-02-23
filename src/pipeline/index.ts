@@ -1,6 +1,6 @@
-import type { PipelineContext, PipelineState, ErrorContext } from './context'
-import type { PipelineStage } from './context'
-export type { PipelineStage } from './context'
+import type { PipelineContext, PipelineState, ErrorContext } from './context.js'
+import type { PipelineStage } from './context.js'
+export type { PipelineStage } from './context.js'
 
 export interface PipeOptions {
   /**

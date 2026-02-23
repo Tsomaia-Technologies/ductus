@@ -1,7 +1,10 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { fileURLToPath } from 'url'
 import matter from 'gray-matter'
 import { render, type FileResolver } from '@tsomaiatech/moxite'
+
+const _loadPromptsDir = path.dirname(fileURLToPath(import.meta.url))
 
 type GrayMatterFile = ReturnType<typeof matter>
 
@@ -21,11 +24,11 @@ function findMxFiles(dir: string): string[] {
 }
 
 function getPackagePromptsRoot(): string {
-  return path.join(__dirname, '..', 'src', 'prompts')
+  return path.join(_loadPromptsDir, '..', 'src', 'prompts')
 }
 
 function getPackageConfigPath(): string {
-  return path.join(__dirname, '..', 'src', 'config', 'config.json')
+  return path.join(_loadPromptsDir, '..', 'src', 'config', 'config.json')
 }
 
 /**

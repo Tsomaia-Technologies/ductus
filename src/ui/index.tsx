@@ -1,12 +1,13 @@
 import React from 'react'
 import { render } from 'ink'
-import { RunProvider } from './context/RunContext'
-import { App } from './App'
+import { RunProvider } from './context/RunContext.js'
+import { App } from './App.js'
+import type { InkTapsRef } from '../pipeline/taps/ink-taps.js'
 
 export interface RunWithInkOptions {
   feature: string
   maxRetries: number
-  tapsRef: { current: any }
+  tapsRef: InkTapsRef
   runPipeline: () => Promise<void>
 }
 

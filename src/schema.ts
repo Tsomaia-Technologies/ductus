@@ -1,5 +1,5 @@
 import { z } from 'zod/v3'
-import { toJsonSchema } from './utils'
+import { toJsonSchema } from './utils.js'
 
 export const ArchitectHeadersSchema = z.object({
   model: z.enum(['auto']).default('auto'),

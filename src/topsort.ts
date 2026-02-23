@@ -1,4 +1,4 @@
-import type { Task } from './schema'
+import type { Task } from './schema.js'
 
 /**
  * Topological sort of tasks by dependsOn. Returns task ids in execution order.

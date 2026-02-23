@@ -1,6 +1,6 @@
-import type { Task } from '../../schema'
-import type { PipelineContext, PipelineStage } from '../context'
-import { executeTaskSubPipe, revertBeforeRetry } from './executeTask'
+import type { Task } from '../../schema.js'
+import type { PipelineContext, PipelineStage } from '../context.js'
+import { executeTaskSubPipe, revertBeforeRetry } from './executeTask.js'
 
 /**
  * Iterates over sorted task ids, skips completed, runs executeTaskSubPipe per task.

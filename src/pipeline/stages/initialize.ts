@@ -1,9 +1,9 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import type { PipelineContext, PipelineStage } from '../context'
-import { loadTasksWithStatus } from '../../task-state'
-import { getHeadRef } from '../../git'
-import { convertPlanToTasks } from '../../lambdas/convertPlanToTasks'
+import type { PipelineContext, PipelineStage } from '../context.js'
+import { loadTasksWithStatus } from '../../task-state.js'
+import { getHeadRef } from '../../git.js'
+import { convertPlanToTasks } from '../../lambdas/convertPlanToTasks.js'
 
 /**
  * Sets up directories, reads plan, loads or creates tasks.
