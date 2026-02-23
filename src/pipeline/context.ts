@@ -17,6 +17,7 @@ export type RunPhase =
 
 /**
  * Side-effect interface for pipeline stages.
+ * All functions are required; use createDefaultTaps() for no-op implementations.
  * Taps perform I/O and UI updates without altering core flow.
  */
 export interface PipelineTaps {
@@ -28,35 +29,55 @@ export interface PipelineTaps {
 }
 
 /**
- * Unified state object that flows through the entire pipeline.
+ * Immutable configuration passed at pipeline initialization.
+ * Never modified during execution.
  */
-export interface PipelineContext {
-  /** Input metadata */
+export interface PipelineConfig {
   cwd: string
   feature: string
   planPath: string
   planContent: string
   maxRetries: number
   retryFailed: boolean
+}
 
-  /** Tasks and state recovery */
+/**
+ * Volatile execution state; updated by stages as the pipeline runs.
+ */
+export interface PipelineState {
   tasks: Task[]
   taskStatus: Record<string, 'pending' | 'completed' | 'failed'>
   sortedTaskIds: string[]
-
-  /** Current execution cursor */
   currentTaskId: string | null
   currentAttempt: number
   engineerReport: EngineerReport | null
   lastReviewResult: Approval | Rejection | null
-
-  /** Git state */
   headRefBeforeTask: string | null
   diff: string | null
-
-  /** Verification results (run by tool before Reviewer) */
   commandResults: CommandResult[] | null
+  /** Populated by pipe when a stage throws; allows UI to react before process exits. */
+  lastError: string | null
+}
 
-  /** Side-effect interface */
+/**
+ * Full pipeline context: config (immutable) + state (volatile) + taps (side-effect handlers).
+ */
+export interface PipelineContext {
+  config: PipelineConfig
+  state: PipelineState
   taps: PipelineTaps
+}
+
+/**
+ * Returns no-op implementations for all taps.
+ * Stages can call taps without null-checks; the logic remains clean and predictable.
+ */
+export function createDefaultTaps(): PipelineTaps {
+  return {
+    setPhase: () => {},
+    appendStream: () => {},
+    setStreamActive: () => {},
+    setError: () => {},
+    persistTasks: () => {},
+  }
 }
