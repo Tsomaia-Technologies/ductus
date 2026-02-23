@@ -24,6 +24,47 @@ export function promptForTaskApproval(tasks: Task[]): Promise<string | null> {
 }
 
 /**
+ * Prompts the user when commit fails due to ignored paths. Asks whether to
+ * retry with --force-add, and optionally to remember for future runs.
+ */
+export function promptCommitForceAddRecovery(): Promise<{
+  retryWithForce: boolean
+  remember: boolean
+}> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+
+    const askQ1 = () => {
+      rl.question(
+        'Commit failed (paths ignored by .gitignore). Retry with --force-add? (y/n): ',
+        (q1) => {
+          const yes = /^y(es)?$/i.test(q1?.trim() ?? '')
+          if (!yes) {
+            rl.close()
+            resolve({ retryWithForce: false, remember: false })
+            return
+          }
+          askQ2()
+        },
+      )
+    }
+
+    const askQ2 = () => {
+      rl.question(
+        'Remember this decision for future runs? (y/n): ',
+        (q2) => {
+          rl.close()
+          const remember = /^y(es)?$/i.test(q2?.trim() ?? '')
+          resolve({ retryWithForce: true, remember })
+        },
+      )
+    }
+
+    askQ1()
+  })
+}
+
+/**
  * Prompts the user when commit fails. Asks whether to ignore hooks and retry,
  * and optionally to remember the decision for future runs.
  */

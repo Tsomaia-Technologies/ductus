@@ -27,7 +27,12 @@ export function readDuctusConfig(cwd = process.cwd()): DuctusConfig | null {
  */
 export function writeDuctusConfig(
   cwd: string,
-  options: { commit: { ignoreHooksOnFailure: boolean } },
+  options: {
+    commit: Partial<{
+      ignoreHooksOnFailure: boolean
+      forceAddIgnored: boolean
+    }>
+  },
 ): void {
   const ductusDir = path.join(cwd, '.ductus')
   const configPath = path.join(ductusDir, CONFIG_FILENAME)
