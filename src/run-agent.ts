@@ -1,3 +1,4 @@
+import { StringDecoder } from 'string_decoder'
 import { execa } from 'execa'
 import { log } from './logging.js'
 
@@ -69,8 +70,16 @@ export async function runAgentWithStream(
 
   const subprocess = execa(agentPath, args, {
     stdout: 'pipe',
-    stderr: 'inherit',
+    stderr: 'pipe',
     stdin,
+  })
+
+  const stdoutDecoder = new StringDecoder('utf-8')
+  const stderrDecoder = new StringDecoder('utf-8')
+  subprocess.stderr?.on('data', (chunk: Buffer) => {
+    const str = stderrDecoder.write(chunk)
+    log('AGENT:STDERR', 'Received chunk', str)
+    process.stderr.write(chunk)
   })
 
   const assistantChunks: string[] = []
@@ -79,7 +88,7 @@ export async function runAgentWithStream(
   let firstOutput = true
 
   subprocess.stdout?.on('data', (chunk: Buffer) => {
-    const str = chunk.toString('utf-8')
+    const str = stdoutDecoder.write(chunk)
     log('AGENT:STDOUT', 'Received chunk', str)
     if (useStreamJson) {
       lineBuffer += str
@@ -104,7 +113,7 @@ export async function runAgentWithStream(
         firstOutput = false
         spinner?.succeed('Agent started, streaming output...')
       }
-      write(chunk.toString('utf-8'))
+      write(str)
     }
   })
 
@@ -150,11 +159,18 @@ export async function runAgentWithExecution(options: {
   if (onChunk) {
     const subprocess = execa(agentPath, args, {
       stdout: 'pipe',
-      stderr: 'inherit',
+      stderr: 'pipe',
       stdin,
     })
+    const stdoutDecoder = new StringDecoder('utf-8')
+    const stderrDecoder = new StringDecoder('utf-8')
+    subprocess.stderr?.on('data', (chunk: Buffer) => {
+      const str = stderrDecoder.write(chunk)
+      log('AGENT:STDERR', 'Received chunk', str)
+      process.stderr.write(chunk)
+    })
     subprocess.stdout?.on('data', (chunk: Buffer) => {
-      const str = chunk.toString('utf-8')
+      const str = stdoutDecoder.write(chunk)
       log('AGENT:STDOUT', 'Received chunk', str)
       onChunk(stripAnsi(str))
     })
@@ -203,17 +219,25 @@ export async function runAgentWithExecutionAndCapture(options: {
 
   const subprocess = execa(agentPath, args, {
     stdout: 'pipe',
-    stderr: 'inherit',
+    stderr: 'pipe',
     stdin,
+  })
+
+  const stdoutDecoder = new StringDecoder('utf-8')
+  const stderrDecoder = new StringDecoder('utf-8')
+  subprocess.stderr?.on('data', (chunk: Buffer) => {
+    const str = stderrDecoder.write(chunk)
+    log('AGENT:STDERR', 'Received chunk', str)
+    process.stderr.write(chunk)
   })
 
   const chunks: Buffer[] = []
   subprocess.stdout?.on('data', (chunk: Buffer) => {
-    const str = chunk.toString('utf-8')
+    const str = stdoutDecoder.write(chunk)
     log('AGENT:STDOUT', 'Received chunk', str)
     chunks.push(chunk)
     if (onChunk) {
-      onChunk(stripAnsi(chunk.toString('utf-8')))
+      onChunk(stripAnsi(str))
     } else {
       process.stdout.write(chunk)
     }

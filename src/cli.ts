@@ -13,7 +13,7 @@ import { createStubTaps } from './pipeline/taps/index.js'
 import type { InkTapsRef } from './pipeline/taps/ink-taps.js'
 import type { PipelineConfig, PipelineState } from './pipeline/context.js'
 import { resolvePipelineExtras } from './ductus-config.js'
-import { initLogger, log } from './logging.js'
+import { initLogger, closeLogger, log } from './logging.js'
 import type { PipelineTaps } from './pipeline/context.js'
 
 const program = new Command()
@@ -106,16 +106,14 @@ program
         const original = Reflect.get(target, prop, receiver)
         if (typeof original === 'function') {
           return (...args: unknown[]) => {
-            if (prop === 'appendStream') {
-              log('TOOL:STREAM', 'Chunk', args[0])
-            } else if (prop === 'setPhase') {
+            if (prop === 'setPhase') {
               log('TOOL:PHASE', `Switching to phase: ${args[0]}`)
             } else if (prop === 'persistTasks') {
               log('TOOL:persistTasks', 'Persisting', { taskCount: (args[0] as { state?: { tasks?: unknown[] } })?.state?.tasks?.length })
             } else if (prop === 'promptTaskApproval') {
               log('TOOL:promptTaskApproval', 'Prompting', { taskCount: (args[0] as unknown[])?.length })
             } else {
-              log(`TOOL:${String(prop)}`, '', args.length > 0 ? args : undefined)
+              log(`TOOL:${String(prop)}`, '')
             }
             return (original as (...a: unknown[]) => unknown).apply(target, args)
           }
@@ -139,18 +137,22 @@ program
       },
     )
 
-    if (useUI) {
-      const { runWithInk } = await import('./ui/index.js')
-      await runWithInk({
-        feature,
-        maxRetries,
-        tapsRef,
-        runPipeline: async () => {
-          await runPipeline({ config, state, taps })
-        },
-      })
-    } else {
-      await runPipeline({ config, state, taps })
+    try {
+      if (useUI) {
+        const { runWithInk } = await import('./ui/index.js')
+        await runWithInk({
+          feature,
+          maxRetries,
+          tapsRef,
+          runPipeline: async () => {
+            await runPipeline({ config, state, taps })
+          },
+        })
+      } else {
+        await runPipeline({ config, state, taps })
+      }
+    } finally {
+      closeLogger()
     }
   })
 
