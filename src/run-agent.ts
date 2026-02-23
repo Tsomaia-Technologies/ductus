@@ -18,6 +18,8 @@ export type RunAgentWithStreamOptions = {
   useStreamJson?: boolean
   /** When set, route output here instead of process.stdout; skips ora spinner. Use for Ink UI. */
   onChunk?: (chunk: string) => void
+  /** Stdin mode. Use 'ignore' for non-interactive runs (architect, refinement) to avoid competing with Ink UI. */
+  stdin?: 'inherit' | 'ignore' | 'pipe'
 }
 
 function extractAssistantTextFromStreamJson(line: string): string | null {
@@ -40,7 +42,7 @@ function extractAssistantTextFromStreamJson(line: string): string | null {
 export async function runAgentWithStream(
   options: RunAgentWithStreamOptions,
 ): Promise<string> {
-  const { args, spinnerText = 'Running agent...', useStreamJson = true, onChunk } = options
+  const { args, spinnerText = 'Running agent...', useStreamJson = true, onChunk, stdin = 'inherit' } = options
 
   const write = onChunk
     ? (text: string) => {
@@ -56,7 +58,7 @@ export async function runAgentWithStream(
   const subprocess = execa('agent', args, {
     stdout: 'pipe',
     stderr: 'inherit',
-    stdin: 'inherit',
+    stdin,
   })
 
   const assistantChunks: string[] = []

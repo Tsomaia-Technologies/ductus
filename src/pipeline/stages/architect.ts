@@ -28,9 +28,14 @@ export const architectStage: PipelineStage = async (ctx: PipelineContext) => {
     if (!feedback) break
 
     try {
-      tasks = await refinePlanToTasks(planContent, tasksPath, feedback, cwd, {
-        onChunk: (c) => taps.appendStream(c),
-      })
+      taps.setStreamActive(true)
+      try {
+        tasks = await refinePlanToTasks(planContent, tasksPath, feedback, cwd, {
+          onChunk: (c) => taps.appendStream(c),
+        })
+      } finally {
+        taps.setStreamActive(false)
+      }
       if (tasks.length === 0) {
         consecutiveFailures++
         taps.setError('Architect returned empty task list. Please provide different feedback.')

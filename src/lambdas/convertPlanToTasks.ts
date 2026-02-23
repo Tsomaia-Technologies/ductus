@@ -30,6 +30,7 @@ export async function convertPlanToTasks(
         args,
         spinnerText: 'Running architect agent to break down plan into tasks...',
         onChunk,
+        stdin: 'ignore',
       })
 
       return TaskListSchema.parse(JSON.parse(extractJsonArray(raw)))

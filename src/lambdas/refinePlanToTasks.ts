@@ -37,6 +37,7 @@ export async function refinePlanToTasks(
         args,
         spinnerText: 'Running refinement architect agent...',
         onChunk,
+        stdin: 'ignore',
       })
 
       return TaskListSchema.parse(JSON.parse(extractJsonArray(raw)))
