@@ -67,7 +67,7 @@ export const initializeStage: PipelineStage = async (ctx: PipelineContext) => {
       taps.setStreamActive(false)
     }
     taps.setTasks?.(tasks)
-    taps.appendStream(`Architect identified ${tasks.length} tasks.\n`)
+    taps.appendStream(`\nArchitect identified ${tasks.length} tasks.\n`)
     if (tasks.length === 0) {
       return {
         ...ctx,

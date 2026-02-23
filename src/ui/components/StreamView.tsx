@@ -1,5 +1,6 @@
-import React from 'react'
-import { Box, Text } from 'ink'
+import React, { useRef, useEffect } from 'react'
+import { Box, Text, useStdout } from 'ink'
+import { ScrollView, type ScrollViewRef } from 'ink-scroll-view'
 import type { StreamLayout } from '../hooks/useStreamLayout.js'
 import { theme } from '../theme.js'
 
@@ -15,6 +16,9 @@ function stripAnsi(str: string): string {
 }
 
 export function StreamView({ content, layout }: StreamViewProps) {
+  const scrollRef = useRef<ScrollViewRef>(null)
+  const { stdout } = useStdout()
+
   if (layout.mode === 'hidden') return null
 
   const rawLines = content.split('\n').filter(Boolean)
@@ -23,7 +27,22 @@ export function StreamView({ content, layout }: StreamViewProps) {
       ? rawLines.slice(-layout.tailLines)
       : rawLines.slice(-layout.maxHeight)
   const hasMore = rawLines.length > displayLines.length
-  const text = displayLines.map(stripAnsi).join('\n') || ''
+  const strippedLines = displayLines.map(stripAnsi)
+
+  useEffect(() => {
+    scrollRef.current?.scrollToBottom()
+  }, [content])
+
+  useEffect(() => {
+    const onResize = () => scrollRef.current?.remeasure()
+    stdout.on('resize', onResize)
+    return () => {
+      stdout.off('resize', onResize)
+    }
+  }, [stdout])
+
+  const lineCount = strippedLines.length
+  const boxHeight = Math.min(lineCount + 2, layout.maxHeight + 2)
 
   return (
     <Box
@@ -32,15 +51,26 @@ export function StreamView({ content, layout }: StreamViewProps) {
       borderColor={theme.border.color}
       paddingX={theme.padding.x}
       paddingY={theme.padding.y}
-      height={Math.min(displayLines.length + 2, layout.maxHeight + 2)}
+      height={boxHeight}
       overflow="hidden"
     >
-      {layout.mode === 'tail' && hasMore && (
-        <Text dimColor italic>
-          … last {layout.tailLines} line{layout.tailLines !== 1 ? 's' : ''} · {rawLines.length - layout.tailLines} above
-        </Text>
-      )}
-      <Text dimColor>{text || 'Waiting for output...'}</Text>
+      <ScrollView ref={scrollRef}>
+        {layout.mode === 'tail' && hasMore && (
+          <Text key="__trunc__" dimColor italic>
+            … last {layout.tailLines} line{layout.tailLines !== 1 ? 's' : ''} ·{' '}
+            {rawLines.length - layout.tailLines} above
+          </Text>
+        )}
+        {strippedLines.length === 0 ? (
+          <Text key="__empty__">Waiting for output...</Text>
+        ) : (
+          strippedLines.map((line, i) => (
+            <Text key={`line-${rawLines.length - strippedLines.length + i}`} dimColor>
+              {line}
+            </Text>
+          ))
+        )}
+      </ScrollView>
     </Box>
   )
 }

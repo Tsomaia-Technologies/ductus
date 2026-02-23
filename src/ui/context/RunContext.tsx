@@ -93,7 +93,14 @@ export function RunProvider({ feature, maxRetries, tapsRef, children }: RunProvi
     submitTaskApproval,
   }
 
-  tapsRef.current = value as RunContextValue & { _taskApprovalResolve?: (f: string | null) => void }
+  // Preserve _taskApprovalResolve across re-renders. promptTaskApproval stores the promise
+  // resolver here; overwriting tapsRef.current would lose it and the promise never resolves.
+  const extended = value as RunContextValue & { _taskApprovalResolve?: (f: string | null) => void }
+  const prev = tapsRef.current as typeof extended | null
+  if (prev?._taskApprovalResolve) {
+    extended._taskApprovalResolve = prev._taskApprovalResolve
+  }
+  tapsRef.current = extended
 
   return <RunContext.Provider value={value}>{children}</RunContext.Provider>
 }

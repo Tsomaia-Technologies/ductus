@@ -28,6 +28,7 @@ export const architectStage: PipelineStage = async (ctx: PipelineContext) => {
     if (!feedback) break
 
     try {
+      taps.setPhase('refinement')
       taps.setStreamActive(true)
       try {
         tasks = await refinePlanToTasks(planContent, tasksPath, feedback, cwd, {

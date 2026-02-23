@@ -32,19 +32,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
         )}
       </Box>
 
-      <Box flexDirection="column" flexGrow={1} minHeight={5}>
+      {streamActive && streamLayout.mode !== 'hidden' && (
+        <Box marginBottom={1} flexShrink={0}>
+          <StreamView content={streamContent} layout={streamLayout} />
+        </Box>
+      )}
+
+      <Box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={5}>
         {children}
       </Box>
 
       {error && phase !== 'error' && (
         <Box marginTop={1}>
           <Text color={theme.colors.error}>{error}</Text>
-        </Box>
-      )}
-
-      {streamActive && streamLayout.mode !== 'hidden' && (
-        <Box marginTop={1}>
-          <StreamView content={streamContent} layout={streamLayout} />
         </Box>
       )}
 
