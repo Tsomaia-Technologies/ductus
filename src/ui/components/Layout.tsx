@@ -1,6 +1,6 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import useStdoutDimensions from 'ink-use-stdout-dimensions'
+import { useStdoutDimensions } from '../hooks/useStdoutDimensions.js'
 import { useRunContext } from '../context/RunContext.js'
 import { useStreamLayout } from '../hooks/useStreamLayout.js'
 import { StreamView } from './StreamView.js'
