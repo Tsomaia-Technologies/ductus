@@ -17,7 +17,8 @@
     "dist/",
     "src/prompts/",
     "src/config/",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "ductus",
