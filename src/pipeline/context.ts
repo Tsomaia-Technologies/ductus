@@ -54,6 +54,7 @@ export interface PipelineConfig {
   planContent: string
   maxRetries: number
   retryFailed: boolean
+  forceAddIgnored?: boolean
 }
 
 /**

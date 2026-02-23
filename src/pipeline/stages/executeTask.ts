@@ -68,19 +68,40 @@ export async function executeTaskSubPipe(
     if (result.decision === 'approved') {
       const message = engineerReport?.commitMessage?.trim() || task.summary
       taps.setPhase('commit-prompt')
-      await commitWithRetryOnFailure(message, cwd)
-      taskStatus[taskId] = 'completed'
-      lastCompletedRef = await getHeadRef(cwd)
-      taps.appendStream(
-        `Task ${taskIndex + 1}/${totalTasks} approved and committed.\n`,
-      )
-      taps.persistTasks({
-        ...ctx,
-        state: { ...state, taskStatus, lastCompletedRef },
-      })
-      return {
-        ...ctx,
-        state: { ...state, taskStatus, lastCompletedRef },
+      try {
+        await commitWithRetryOnFailure(message, cwd, {
+          forceAddIgnored: config.forceAddIgnored,
+        })
+        taskStatus[taskId] = 'completed'
+        lastCompletedRef = await getHeadRef(cwd)
+        taps.appendStream(
+          `Task ${taskIndex + 1}/${totalTasks} approved and committed.\n`,
+        )
+        taps.persistTasks({
+          ...ctx,
+          state: { ...state, taskStatus, lastCompletedRef },
+        })
+        return {
+          ...ctx,
+          state: { ...state, taskStatus, lastCompletedRef },
+        }
+      } catch (commitErr) {
+        const errMsg = (commitErr as Error)?.message ?? String(commitErr)
+        taps.setError(
+          `Commit skipped: ${errMsg}. Run with --force-add or commit manually.`,
+        )
+        taps.appendStream(
+          `Task ${taskIndex + 1}/${totalTasks} approved but commit failed. Changes remain in working tree. Continuing.\n`,
+        )
+        taskStatus[taskId] = 'completed'
+        taps.persistTasks({
+          ...ctx,
+          state: { ...state, taskStatus, lastCompletedRef },
+        })
+        return {
+          ...ctx,
+          state: { ...state, taskStatus, lastCompletedRef },
+        }
       }
     }
 

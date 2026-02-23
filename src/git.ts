@@ -1,6 +1,14 @@
 import { execa } from 'execa'
 
 /**
+ * Returns the absolute path to the git repository root. Throws if not in a git repo.
+ */
+export async function getGitRoot(cwd = process.cwd()): Promise<string> {
+  const { stdout } = await execa('git', ['rev-parse', '--show-toplevel'], { cwd })
+  return stdout.trim()
+}
+
+/**
  * Returns the current HEAD commit hash. Throws if not in a git repo.
  */
 export async function getHeadRef(cwd = process.cwd()): Promise<string> {
@@ -30,15 +38,18 @@ export async function revertToRef(ref: string, cwd = process.cwd()): Promise<voi
 }
 
 /**
- * Stages all changes and creates a commit. Optionally skips hooks via --no-verify.
+ * Stages all changes and creates a commit. Runs from the git repo root.
+ * Optionally skips hooks via --no-verify; use force to add ignored paths.
  */
 export async function commitChanges(
   message: string,
   cwd = process.cwd(),
-  options?: { noVerify?: boolean },
+  options?: { noVerify?: boolean; force?: boolean },
 ): Promise<void> {
-  await execa('git', ['add', '--', '.'], { cwd })
+  const root = await getGitRoot(cwd)
+  const addArgs = options?.force ? ['add', '-f', '--', '.'] : ['add', '--', '.']
+  await execa('git', addArgs, { cwd: root })
   const args = ['commit', '-m', message]
   if (options?.noVerify) args.push('--no-verify')
-  await execa('git', args, { cwd })
+  await execa('git', args, { cwd: root })
 }

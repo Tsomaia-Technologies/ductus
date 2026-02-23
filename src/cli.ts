@@ -40,13 +40,15 @@ program
     '2',
   )
   .option('--retry-failed', 'Retry tasks marked failed from a previous run')
+  .option('--force-add', 'Force-add ignored paths when committing (e.g. when running from an ignored dir)')
   .option('--no-ui', 'Disable Ink UI; use plain console (for CI or pipes)')
   .option('--plain', 'Alias for --no-ui')
-  .action(async (feature: string, options: { plan: string; maxRetries?: string; retryFailed?: boolean; noUi?: boolean; plain?: boolean }) => {
+  .action(async (feature: string, options: { plan: string; maxRetries?: string; retryFailed?: boolean; forceAdd?: boolean; noUi?: boolean; plain?: boolean }) => {
     const cwd = process.cwd()
     const planPath = path.resolve(options.plan)
     const maxRetries = Math.max(0, parseInt(options.maxRetries ?? '2', 10) || 2)
     const retryFailed = options.retryFailed ?? false
+    const forceAddIgnored = options.forceAdd ?? false
 
     const config: PipelineConfig = {
       cwd,
@@ -55,6 +57,7 @@ program
       planContent: '', // Initialize stage reads from planPath
       maxRetries,
       retryFailed,
+      forceAddIgnored,
     }
 
     const state: PipelineState = {

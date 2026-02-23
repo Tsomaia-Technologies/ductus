@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 export type DuctusConfig = {
-  commit?: { ignoreHooksOnFailure?: boolean }
+  commit?: { ignoreHooksOnFailure?: boolean; forceAddIgnored?: boolean }
 }
 
 const CONFIG_FILENAME = 'config.json'
