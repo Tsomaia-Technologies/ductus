@@ -1,6 +1,6 @@
 {
   "name": "@tsomaiatech/ductus",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Agent-to-agent coordination orchestrator for autonomous task execution",
   "main": "dist/bin/ductus.js",
   "type": "module",
