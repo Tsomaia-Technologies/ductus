@@ -7,7 +7,7 @@ export interface InkTapsRef {
     setPhase: (phase: RunPhase) => void
     appendStream: (chunk: string) => void
     setStreamActive: (active: boolean) => void
-    setError: (err: string | null) => void
+    setError: (err: string | null, context?: import('../context').ErrorContext) => void
     setTasks: (tasks: Task[]) => void
     setCurrentTask: (index: number, taskId: string | null) => void
     setCurrentAttempt: (n: number) => void
@@ -35,8 +35,8 @@ export function createInkTaps(ref: InkTapsRef): PipelineTaps {
       ref.current?.setStreamActive(active)
     },
 
-    setError(err: string | null): void {
-      ref.current?.setError(err)
+    setError(err: string | null, context?: import('../context').ErrorContext): void {
+      ref.current?.setError(err, context)
     },
 
     persistTasks(ctx: PipelineContext): void {

@@ -36,7 +36,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </Box>
 
-      {error && (
+      {error && phase !== 'error' && (
         <Box marginTop={1}>
           <Text color={theme.colors.error}>{error}</Text>
         </Box>

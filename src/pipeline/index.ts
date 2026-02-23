@@ -1,4 +1,4 @@
-import type { PipelineContext, PipelineState } from './context'
+import type { PipelineContext, PipelineState, ErrorContext } from './context'
 import type { PipelineStage } from './context'
 export type { PipelineStage } from './context'
 
@@ -48,7 +48,15 @@ export function failContext(
     ...ctx,
     state: failedState,
   }
-  failedCtx.taps.setError(message)
+  const taskIndex =
+    ctx.state.currentTaskId != null
+      ? ctx.state.sortedTaskIds.indexOf(ctx.state.currentTaskId)
+      : -1
+  const errorContext: ErrorContext = {}
+  if (ctx.state.currentTaskId != null) errorContext.taskId = ctx.state.currentTaskId
+  if (taskIndex >= 0) errorContext.taskIndex = taskIndex
+  if (ctx.state.currentAttempt >= 0) errorContext.attempt = ctx.state.currentAttempt
+  failedCtx.taps.setError(message, errorContext)
   return failedCtx
 }
 

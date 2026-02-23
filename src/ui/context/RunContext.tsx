@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
-import type { RunPhase } from '../../pipeline/context'
+import type { RunPhase, ErrorContext } from '../../pipeline/context'
 import type { Task } from '../../schema'
 
 export interface RunState {
@@ -13,13 +13,14 @@ export interface RunState {
   streamContent: string
   streamActive: boolean
   error: string | null
+  errorContext: ErrorContext | null
 }
 
 interface RunContextValue extends RunState {
   setPhase: (phase: RunPhase) => void
   appendStream: (chunk: string) => void
   setStreamActive: (active: boolean) => void
-  setError: (err: string | null) => void
+  setError: (err: string | null, context?: ErrorContext) => void
   setTasks: (tasks: Task[]) => void
   setCurrentTask: (index: number, taskId: string | null) => void
   setCurrentAttempt: (n: number) => void
@@ -45,10 +46,14 @@ export function RunProvider({ feature, maxRetries, tapsRef, children }: RunProvi
   const [streamContent, setStreamContent] = useState('')
   const [streamActive, setStreamActiveState] = useState(false)
   const [error, setErrorState] = useState<string | null>(null)
+  const [errorContext, setErrorContextState] = useState<ErrorContext | null>(null)
 
   const setPhase = useCallback((p: RunPhase) => setPhaseState(p), [])
   const setStreamActive = useCallback((active: boolean) => setStreamActiveState(active), [])
-  const setError = useCallback((err: string | null) => setErrorState(err), [])
+  const setError = useCallback((err: string | null, context?: ErrorContext) => {
+    setErrorState(err)
+    setErrorContextState(context ?? null)
+  }, [])
 
   const appendStream = useCallback((chunk: string) => {
     setStreamContent((prev) => prev + chunk)
@@ -76,6 +81,7 @@ export function RunProvider({ feature, maxRetries, tapsRef, children }: RunProvi
     streamContent,
     streamActive,
     error,
+    errorContext,
     setPhase,
     appendStream,
     setStreamActive,

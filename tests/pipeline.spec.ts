@@ -72,7 +72,7 @@ describe('pipeline', () => {
       })
       const failed = failContext(ctx, new Error('oops'))
       expect(failed.state.lastError).toBe('oops')
-      expect(setError).toHaveBeenCalledWith('oops')
+      expect(setError).toHaveBeenCalledWith('oops', expect.any(Object))
     })
 
     it('handles non-Error values', () => {
@@ -132,7 +132,7 @@ describe('pipeline', () => {
         taps: { ...createDefaultTaps(), setError },
       })
       await expect(pipeline(ctx)).rejects.toThrow('stage failed')
-      expect(setError).toHaveBeenCalledWith('stage failed')
+      expect(setError).toHaveBeenCalledWith('stage failed', expect.any(Object))
       expect(onFail).toHaveBeenCalledTimes(1)
       const failedCtx = onFail.mock.calls[0][0]
       expect(failedCtx.state.lastError).toBe('stage failed')

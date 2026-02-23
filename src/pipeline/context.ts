@@ -16,6 +16,15 @@ export type RunPhase =
   | 'error'
 
 /**
+ * Optional context passed when an error occurs; helps ErrorView show where the pipeline failed.
+ */
+export interface ErrorContext {
+  taskId?: string | null
+  taskIndex?: number
+  attempt?: number
+}
+
+/**
  * Side-effect interface for pipeline stages.
  * All functions are required; use createDefaultTaps() for no-op implementations.
  * Taps perform I/O and UI updates without altering core flow.
@@ -24,7 +33,7 @@ export interface PipelineTaps {
   setPhase: (phase: RunPhase) => void
   appendStream: (chunk: string) => void
   setStreamActive: (active: boolean) => void
-  setError: (err: string | null) => void
+  setError: (err: string | null, context?: ErrorContext) => void
   persistTasks: (ctx: PipelineContext) => void
   /** Prompts user to accept tasks or provide feedback. Returns null if accepted, feedback string otherwise. */
   promptTaskApproval: (tasks: Task[]) => Promise<string | null>

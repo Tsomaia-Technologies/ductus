@@ -43,7 +43,7 @@ Copies prompt templates from the package into `.ductus/prompts/` in your project
 
 Run this once before your first `ductus run`, or when you want to pull updated prompts from the package.
 
-### `ductus run <feature> --plan <path> [--max-retries <n>]`
+### `ductus run <feature> --plan <path> [options]`
 
 Runs the full pipeline: plan → tasks → implement → review.
 
@@ -52,6 +52,21 @@ Runs the full pipeline: plan → tasks → implement → review.
 | `feature` | Feature name (e.g. `auth-flow`). Used for the output folder `.ductus/<feature>/`. |
 | `--plan <path>` | Path to the plan file. |
 | `--max-retries <n>` | Max retries per task when the Reviewer rejects (default: 2). |
+| `--no-ui` / `--plain` | Disable the Ink terminal UI; use plain console output (for CI, pipes, or headless runs). |
+
+#### UI modes
+
+By default, `ductus run` uses an **Ink-based terminal UI** with:
+
+- Phase and task progress
+- Streaming agent output in an adaptive panel
+- Human-in-the-loop task approval
+
+For CI, scripts, or piping output, use `--no-ui` or `--plain` to run in **plain mode**:
+
+- Phase changes and progress logged to stdout
+- Agent output streamed directly to stdout
+- No interactive prompts (tasks are auto-accepted; use with care)
 
 ## How It Works
 
@@ -88,6 +103,20 @@ After running `ductus eject`, prompts live in `.ductus/prompts/`:
 ```
 
 Edit the `.mx` files there to tailor behavior. They use [Moxite](https://github.com/Tsomaia-Technologies/moxite) for templating. To reset to package defaults, run `ductus eject --overwrite`.
+
+## UI behavior (Ink mode)
+
+When running without `--no-ui`, the terminal UI adapts to window size:
+
+| Terminal rows | Stream panel |
+|---------------|--------------|
+| ≥ 30 | Full scrollable (18 lines) |
+| 20–29 | Full scrollable (12 lines) |
+| 15–19 | Full scrollable (8 lines) |
+| 12–14 | Tail only (last 2–3 lines) |
+| < 12 | Hidden (stream shown as "Running...") |
+
+On failure, the error view shows the message plus context (task ID, index, attempt) when available.
 
 ## License
 
