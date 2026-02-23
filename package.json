@@ -5,11 +5,12 @@
   "main": "dist/bin/ductus.js",
   "type": "module",
   "bin": {
-    "ductus": "./dist/bin/ductus"
+    "ductus": "./dist/bin/ductus.js"
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/bin/ductus.ts",
+    "dev": "NODE_OPTIONS='--import tsx/esm' tsx src/cli.ts",
+    "dev:watch": "NODE_OPTIONS='--import tsx/esm' tsx watch src/cli.ts",
     "start": "node dist/bin/ductus.js",
     "test": "jest"
   },
