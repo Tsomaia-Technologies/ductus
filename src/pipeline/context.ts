@@ -57,6 +57,10 @@ export interface PipelineState {
   commandResults: CommandResult[] | null
   /** Populated by pipe when a stage throws; allows UI to react before process exits. */
   lastError: string | null
+  /** Git ref after last committed task; used to revert when retrying a failed task. */
+  lastCompletedRef: string | null
+  /** Whether we resumed from existing tasks; skips architect refine loop. */
+  isResume: boolean
 }
 
 /**
@@ -67,6 +71,13 @@ export interface PipelineContext {
   state: PipelineState
   taps: PipelineTaps
 }
+
+/**
+ * A stage receives context and returns updated context.
+ */
+export type PipelineStage = (
+  ctx: PipelineContext,
+) => Promise<PipelineContext>
 
 /**
  * Returns no-op implementations for all taps.

@@ -1,13 +1,6 @@
 import type { PipelineContext, PipelineState } from './context'
-
-/**
- * A stage receives context and returns updated context.
- * Stages receive a shallow copy; prefer returning new state over mutating in place.
- * Side effects go through taps.
- */
-export type PipelineStage = (
-  ctx: PipelineContext,
-) => Promise<PipelineContext>
+import type { PipelineStage } from './context'
+export type { PipelineStage } from './context'
 
 export interface PipeOptions {
   /**

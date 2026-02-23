@@ -35,6 +35,8 @@ function createTestContext(overrides?: Partial<PipelineContext>): PipelineContex
     diff: null,
     commandResults: null,
     lastError: null,
+    lastCompletedRef: null,
+    isResume: false,
   }
   return {
     config,
@@ -175,6 +177,8 @@ describe('pipeline taps', () => {
           diff: null,
           commandResults: null,
           lastError: null,
+          lastCompletedRef: null,
+          isResume: false,
         },
         taps: createDefaultTaps(),
       })
