@@ -19,6 +19,7 @@ const FALLBACK_REPORT: EngineerReport = {
 export async function runImplementationEngineer(
   task: Task,
   cwd = process.cwd(),
+  options?: { onChunk?: (chunk: string) => void },
 ): Promise<EngineerReport> {
   const prompts = loadPrompts(
     'implementation-engineer',
@@ -32,6 +33,7 @@ export async function runImplementationEngineer(
   const raw = await runAgentWithExecutionAndCapture({
     args: ['--force', '--model', model, '--print', content],
     spinnerText: 'Running implementation engineer...',
+    onChunk: options?.onChunk,
   })
 
   try {

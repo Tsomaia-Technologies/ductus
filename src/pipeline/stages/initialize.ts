@@ -39,6 +39,7 @@ export const initializeStage: PipelineStage = async (ctx: PipelineContext) => {
     taps.appendStream('Resuming previous run...\n')
     tasks = existing.tasks
     taskStatus = { ...existing.status }
+    taps.setTasks?.(tasks)
     lastCompletedRef = await getHeadRef(cwd)
     return {
       ...ctx,
@@ -57,7 +58,15 @@ export const initializeStage: PipelineStage = async (ctx: PipelineContext) => {
   {
     taps.setPhase('architect')
     taps.appendStream('Spawning Architect Agent to break down the plan...\n')
-    tasks = await convertPlanToTasks(planContent)
+    taps.setStreamActive(true)
+    try {
+      tasks = await convertPlanToTasks(planContent, {
+        onChunk: (c) => taps.appendStream(c),
+      })
+    } finally {
+      taps.setStreamActive(false)
+    }
+    taps.setTasks?.(tasks)
     taps.appendStream(`Architect identified ${tasks.length} tasks.\n`)
     if (tasks.length === 0) {
       return {

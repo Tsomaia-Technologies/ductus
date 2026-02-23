@@ -26,6 +26,12 @@ export interface PipelineTaps {
   setStreamActive: (active: boolean) => void
   setError: (err: string | null) => void
   persistTasks: (ctx: PipelineContext) => void
+  /** Prompts user to accept tasks or provide feedback. Returns null if accepted, feedback string otherwise. */
+  promptTaskApproval: (tasks: Task[]) => Promise<string | null>
+  /** Optional: updates UI with current task (for Ink). */
+  setCurrentTask?: (index: number, taskId: string | null) => void
+  /** Optional: updates UI with task list (for Ink). */
+  setTasks?: (tasks: Task[]) => void
 }
 
 /**
@@ -90,5 +96,8 @@ export function createDefaultTaps(): PipelineTaps {
     setStreamActive: () => {},
     setError: () => {},
     persistTasks: () => {},
+    promptTaskApproval: async () => null, // No-op: always accept (for tests)
+    setCurrentTask: undefined,
+    setTasks: undefined,
   }
 }

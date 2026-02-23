@@ -1,8 +1,6 @@
 import * as path from 'path'
 import type { PipelineContext, PipelineStage } from '../context'
 import { refinePlanToTasks } from '../../lambdas/refinePlanToTasks'
-import { promptForTaskApproval } from '../../prompt-user'
-
 const MAX_REFINEMENT_FAILURES = 3
 
 /**
@@ -26,11 +24,13 @@ export const architectStage: PipelineStage = async (ctx: PipelineContext) => {
   taps.setPhase('task-review')
 
   while (true) {
-    const feedback = await promptForTaskApproval(tasks)
+    const feedback = await taps.promptTaskApproval(tasks)
     if (!feedback) break
 
     try {
-      tasks = await refinePlanToTasks(planContent, tasksPath, feedback, cwd)
+      tasks = await refinePlanToTasks(planContent, tasksPath, feedback, cwd, {
+        onChunk: (c) => taps.appendStream(c),
+      })
       if (tasks.length === 0) {
         consecutiveFailures++
         taps.setError('Architect returned empty task list. Please provide different feedback.')
@@ -46,6 +46,7 @@ export const architectStage: PipelineStage = async (ctx: PipelineContext) => {
       taskStatus = Object.fromEntries(
         tasks.map((t: { id: string }) => [t.id, 'pending'] as const),
       )
+      taps.setTasks?.(tasks)
       taps.persistTasks({
         ...ctx,
         config,

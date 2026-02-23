@@ -8,8 +8,10 @@ export async function refinePlanToTasks(
   tasksFilePath: string,
   userFeedback: string,
   cwd = process.cwd(),
+  options?: { onChunk?: (chunk: string) => void },
 ): Promise<Task[]> {
   let i = 0
+  const { onChunk } = options ?? {}
 
   const prompts = loadPrompts(
     'architect-refine',
@@ -34,6 +36,7 @@ export async function refinePlanToTasks(
       const raw = await runAgentWithStream({
         args,
         spinnerText: 'Running refinement architect agent...',
+        onChunk,
       })
 
       return TaskListSchema.parse(JSON.parse(extractJsonArray(raw)))

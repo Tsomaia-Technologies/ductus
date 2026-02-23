@@ -8,6 +8,7 @@ export async function runRemediationEngineer(
   rejection: Rejection,
   diff: string,
   cwd = process.cwd(),
+  options?: { onChunk?: (chunk: string) => void },
 ): Promise<void> {
   const prompts = loadPrompts(
     'remediation-engineer',
@@ -24,5 +25,6 @@ export async function runRemediationEngineer(
 
   await runAgentWithExecution({
     args: ['--force', '--model', model, '--print', content],
+    onChunk: options?.onChunk,
   })
 }

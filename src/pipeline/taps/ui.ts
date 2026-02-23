@@ -1,5 +1,7 @@
+import type { Task } from '../../schema'
 import type { PipelineContext, PipelineTaps, RunPhase } from '../context'
 import { createPersistTap } from './persistence'
+import { promptForTaskApproval } from '../../prompt-user'
 
 /**
  * Stub UI taps that bridge the pipeline to existing readline/ora-style output.
@@ -28,5 +30,11 @@ export function createStubTaps(): PipelineTaps {
     persistTasks(ctx: PipelineContext): void {
       persistTap(ctx)
     },
+
+    promptTaskApproval(tasks: Task[]): Promise<string | null> {
+      return promptForTaskApproval(tasks)
+    },
+    setCurrentTask: undefined,
+    setTasks: undefined,
   }
 }

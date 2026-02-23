@@ -3,8 +3,12 @@ import { extractJsonArray } from '../utils'
 import { loadPrompts } from '../load-prompts'
 import { runAgentWithStream } from '../run-agent'
 
-export async function convertPlanToTasks(plan: string): Promise<Task[]> {
+export async function convertPlanToTasks(
+  plan: string,
+  options?: { cwd?: string; onChunk?: (chunk: string) => void },
+): Promise<Task[]> {
   let i = 0
+  const { onChunk } = options ?? {}
 
   const prompts = loadPrompts('architect', { plan, schema: TaskSchemaJSON })
 
@@ -25,6 +29,7 @@ export async function convertPlanToTasks(plan: string): Promise<Task[]> {
       const raw = await runAgentWithStream({
         args,
         spinnerText: 'Running architect agent to break down plan into tasks...',
+        onChunk,
       })
 
       return TaskListSchema.parse(JSON.parse(extractJsonArray(raw)))

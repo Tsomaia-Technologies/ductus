@@ -1,0 +1,18 @@
+import React from 'react'
+import { Box, Text } from 'ink'
+import { useRunContext } from '../context/RunContext'
+import { theme } from '../theme'
+
+export function CompleteView() {
+  const { tasks } = useRunContext()
+
+  return (
+    <Box flexDirection="column">
+      {tasks.length === 0 ? (
+        <Text color={theme.colors.muted}>No tasks to execute.</Text>
+      ) : (
+        <Text color={theme.colors.success}>Orchestration complete. All tasks executed.</Text>
+      )}
+    </Box>
+  )
+}

@@ -12,10 +12,12 @@ export async function runReviewer(
   cwd = process.cwd(),
   options?: {
     commandResults?: Array<{ checkId: string; command: string; status: string; stdout: string; stderr: string }>
+    onChunk?: (chunk: string) => void
   },
 ): Promise<Approval | Rejection> {
   let i = 0
   const commandResults = options?.commandResults ?? []
+  const onChunk = options?.onChunk
   const prompts = loadPrompts(
     'reviewer',
     {
@@ -45,6 +47,7 @@ export async function runReviewer(
       const raw = await runAgentWithStream({
         args,
         spinnerText: 'Running reviewer agent...',
+        onChunk,
       })
 
       const jsonStr = extractJsonObject(raw)

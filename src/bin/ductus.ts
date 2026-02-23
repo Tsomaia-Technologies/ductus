@@ -40,7 +40,9 @@ program
     '2',
   )
   .option('--retry-failed', 'Retry tasks marked failed from a previous run')
-  .action(async (feature: string, options: { plan: string; maxRetries?: string; retryFailed?: boolean }) => {
+  .option('--no-ui', 'Disable Ink UI; use plain console (for CI or pipes)')
+  .option('--plain', 'Alias for --no-ui')
+  .action(async (feature: string, options: { plan: string; maxRetries?: string; retryFailed?: boolean; noUi?: boolean; plain?: boolean }) => {
     const cwd = process.cwd()
     const planPath = path.resolve(options.plan)
     const maxRetries = Math.max(0, parseInt(options.maxRetries ?? '2', 10) || 2)
@@ -71,23 +73,59 @@ program
       isResume: false,
     }
 
-    const taps = createStubTaps()
-    const runPipeline = pipe(
-      initializeStage,
-      architectStage,
-      topologicalSortStage,
-      executeTasksStage,
-      finalizeStage,
-      {
-        onFail: (ctx) => {
-          if (ctx.state.tasks.length > 0 && Object.keys(ctx.state.taskStatus).length > 0) {
-            taps.persistTasks(ctx)
-          }
-        },
-      },
-    )
+    const opts = options as { noUi?: boolean; plain?: boolean }
+    const disableUI =
+      process.argv.includes('--no-ui') ||
+      process.argv.includes('--plain') ||
+      opts.noUi === true ||
+      opts.plain === true
+    const useUI = !disableUI
+    const tapsRef = { current: null as any }
 
-    await runPipeline({ config, state, taps })
+    if (useUI) {
+      const { createInkTaps } = await import('../pipeline/taps/ink-taps')
+      const { runWithInk } = await import('../ui')
+      const taps = createInkTaps(tapsRef)
+      const runPipeline = pipe(
+        initializeStage,
+        architectStage,
+        topologicalSortStage,
+        executeTasksStage,
+        finalizeStage,
+        {
+          onFail: (ctx) => {
+            if (ctx.state.tasks.length > 0 && Object.keys(ctx.state.taskStatus).length > 0) {
+              taps.persistTasks(ctx)
+            }
+          },
+        },
+      )
+      await runWithInk({
+        feature,
+        maxRetries,
+        tapsRef,
+        runPipeline: async () => {
+          await runPipeline({ config, state, taps })
+        },
+      })
+    } else {
+      const taps = createStubTaps()
+      const runPipeline = pipe(
+        initializeStage,
+        architectStage,
+        topologicalSortStage,
+        executeTasksStage,
+        finalizeStage,
+        {
+          onFail: (ctx) => {
+            if (ctx.state.tasks.length > 0 && Object.keys(ctx.state.taskStatus).length > 0) {
+              taps.persistTasks(ctx)
+            }
+          },
+        },
+      )
+      await runPipeline({ config, state, taps })
+    }
   })
 
 program.parse()

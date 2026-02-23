@@ -1,5 +1,13 @@
 import { execa } from 'execa'
 
+/** Strip ANSI escape codes (avoids ESM strip-ansi in CJS build). */
+function stripAnsi(str: string): string {
+  return str.replace(
+    /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+    '',
+  )
+}
+
 export type RunAgentWithStreamOptions = {
   args: string[]
   spinnerText?: string
@@ -8,6 +16,8 @@ export type RunAgentWithStreamOptions = {
    * If false, use text format (buffered; no streaming but simpler).
    */
   useStreamJson?: boolean
+  /** When set, route output here instead of process.stdout; skips ora spinner. Use for Ink UI. */
+  onChunk?: (chunk: string) => void
 }
 
 function extractAssistantTextFromStreamJson(line: string): string | null {
@@ -30,10 +40,18 @@ function extractAssistantTextFromStreamJson(line: string): string | null {
 export async function runAgentWithStream(
   options: RunAgentWithStreamOptions,
 ): Promise<string> {
-  const { args, spinnerText = 'Running agent...', useStreamJson = true } = options
+  const { args, spinnerText = 'Running agent...', useStreamJson = true, onChunk } = options
+
+  const write = onChunk
+    ? (text: string) => {
+        onChunk(stripAnsi(text))
+      }
+    : (text: string) => {
+        process.stdout.write(text)
+      }
 
   const { default: ora } = await import('ora')
-  const spinner = ora(spinnerText).start()
+  const spinner = onChunk ? null : ora(spinnerText).start()
 
   const subprocess = execa('agent', args, {
     stdout: 'pipe',
@@ -59,9 +77,9 @@ export async function runAgentWithStream(
         if (text) {
           if (firstOutput) {
             firstOutput = false
-            spinner.succeed('Agent started, streaming output...')
+            spinner?.succeed('Agent started, streaming output...')
           }
-          process.stdout.write(text)
+          write(text)
           assistantChunks.push(text)
         }
       }
@@ -69,16 +87,16 @@ export async function runAgentWithStream(
       rawChunks.push(chunk)
       if (firstOutput) {
         firstOutput = false
-        spinner.succeed('Agent started, streaming output...')
+        spinner?.succeed('Agent started, streaming output...')
       }
-      process.stdout.write(chunk)
+      write(chunk.toString('utf-8'))
     }
   })
 
   try {
     await subprocess
   } finally {
-    if (spinner.isSpinning) {
+    if (spinner?.isSpinning) {
       spinner.stop()
     }
   }
@@ -95,19 +113,31 @@ export async function runAgentWithStream(
 }
 
 /**
- * Runs the agent with stdio inherit so the user sees all output (tool calls, edits) in real time.
- * Used for Engineer phase where we do not need to capture or parse output.
- * Returns when the process exits; throws on non-zero exit.
+ * Runs the agent with stdio inherit (or pipes to onChunk when provided).
+ * Used for Engineer/Remediation phases. When onChunk is set, stdout is piped to it.
  */
 export async function runAgentWithExecution(options: {
   args: string[]
+  onChunk?: (chunk: string) => void
 }): Promise<void> {
-  const { args } = options
-  await execa('agent', args, {
-    stdout: 'inherit',
-    stderr: 'inherit',
-    stdin: 'inherit',
-  })
+  const { args, onChunk } = options
+  if (onChunk) {
+    const subprocess = execa('agent', args, {
+      stdout: 'pipe',
+      stderr: 'inherit',
+      stdin: 'inherit',
+    })
+    subprocess.stdout?.on('data', (chunk: Buffer) => {
+      onChunk(stripAnsi(chunk.toString('utf-8')))
+    })
+    await subprocess
+  } else {
+    await execa('agent', args, {
+      stdout: 'inherit',
+      stderr: 'inherit',
+      stdin: 'inherit',
+    })
+  }
 }
 
 /**
@@ -117,10 +147,11 @@ export async function runAgentWithExecution(options: {
 export async function runAgentWithExecutionAndCapture(options: {
   args: string[]
   spinnerText?: string
+  onChunk?: (chunk: string) => void
 }): Promise<string> {
-  const { args, spinnerText } = options
+  const { args, spinnerText, onChunk } = options
   const { default: ora } = await import('ora')
-  const spinner = spinnerText ? ora(spinnerText).start() : null
+  const spinner = onChunk ? null : spinnerText ? ora(spinnerText).start() : null
 
   const subprocess = execa('agent', args, {
     stdout: 'pipe',
@@ -131,7 +162,11 @@ export async function runAgentWithExecutionAndCapture(options: {
   const chunks: Buffer[] = []
   subprocess.stdout?.on('data', (chunk: Buffer) => {
     chunks.push(chunk)
-    process.stdout.write(chunk)
+    if (onChunk) {
+      onChunk(stripAnsi(chunk.toString('utf-8')))
+    } else {
+      process.stdout.write(chunk)
+    }
     if (spinner?.isSpinning) spinner.succeed('Agent started...')
   })
 

@@ -22,6 +22,7 @@ export async function executeTaskSubPipe(
   const taskId = task.id
 
   taps.setPhase('engineer')
+  taps.setCurrentTask?.(taskIndex, taskId)
   taps.appendStream(
     `\nEngineer starting Task ${taskIndex + 1}/${totalTasks}: ${task.id} - ${task.summary}\n`,
   )
@@ -40,23 +41,29 @@ export async function executeTaskSubPipe(
 
     const beforeRef = await getHeadRef(cwd)
 
-    if (result?.decision === 'rejected') {
-      taps.setPhase('remediation')
-      const diffOfRejected = await getDiff(beforeRef, cwd)
-      await runRemediationEngineer(task, result, diffOfRejected, cwd)
-    } else {
-      taps.setPhase('engineer')
-      engineerReport = await runImplementationEngineer(task, cwd)
+    const onChunk = (c: string) => taps.appendStream(c)
+    taps.setStreamActive(true)
+    try {
+      if (result?.decision === 'rejected') {
+        taps.setPhase('remediation')
+        const diffOfRejected = await getDiff(beforeRef, cwd)
+        await runRemediationEngineer(task, result, diffOfRejected, cwd, { onChunk })
+      } else {
+        taps.setPhase('engineer')
+        engineerReport = await runImplementationEngineer(task, cwd, { onChunk })
+      }
+
+      const diff = await getDiff(beforeRef, cwd)
+      const commandResults = await runVerificationCommands(
+        engineerReport?.checks ?? [],
+        cwd,
+      )
+
+      taps.setPhase('reviewer')
+      result = await runReviewer(task, diff, cwd, { commandResults, onChunk })
+    } finally {
+      taps.setStreamActive(false)
     }
-
-    const diff = await getDiff(beforeRef, cwd)
-    const commandResults = await runVerificationCommands(
-      engineerReport?.checks ?? [],
-      cwd,
-    )
-
-    taps.setPhase('reviewer')
-    result = await runReviewer(task, diff, cwd, { commandResults })
 
     if (result.decision === 'approved') {
       const message = engineerReport?.commitMessage?.trim() || task.summary
