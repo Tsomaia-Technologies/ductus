@@ -68,12 +68,12 @@ export function ejectPrompts(
   }
 
   const configSource = getPackageConfigPath()
-  const relayDir = path.join(cwd, '.relay')
-  const configTarget = path.join(relayDir, 'config.json')
+  const ductusDir = path.join(cwd, '.ductus')
+  const configTarget = path.join(ductusDir, 'config.json')
   if (fs.existsSync(configSource)) {
     const targetExists = fs.existsSync(configTarget)
     if (!targetExists || overwrite) {
-      fs.mkdirSync(relayDir, { recursive: true })
+      fs.mkdirSync(ductusDir, { recursive: true })
       fs.cpSync(configSource, configTarget)
     }
   }

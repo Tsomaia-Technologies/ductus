@@ -1,5 +1,5 @@
 import { commitChanges } from './git'
-import { readRelayConfig, writeRelayConfig } from './relay-config'
+import { readDuctusConfig, writeDuctusConfig } from './ductus-config'
 import { promptCommitFailureRecovery } from './prompt-user'
 
 /**
@@ -15,7 +15,7 @@ export async function commitWithRetryOnFailure(
   try {
     await attempt(false)
   } catch (firstError) {
-    const config = readRelayConfig(cwd)
+    const config = readDuctusConfig(cwd)
 
     if (config?.commit?.ignoreHooksOnFailure === true) {
       await attempt(true)
@@ -29,7 +29,7 @@ export async function commitWithRetryOnFailure(
     const { ignoreHooks, remember } = await promptCommitFailureRecovery()
 
     if (remember) {
-      writeRelayConfig(cwd, { commit: { ignoreHooksOnFailure: true } })
+      writeDuctusConfig(cwd, { commit: { ignoreHooksOnFailure: true } })
     }
 
     if (!ignoreHooks) {

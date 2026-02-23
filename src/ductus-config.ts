@@ -1,21 +1,21 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-export type RelayConfig = {
+export type DuctusConfig = {
   commit?: { ignoreHooksOnFailure?: boolean }
 }
 
 const CONFIG_FILENAME = 'config.json'
 
 /**
- * Reads .relay/config.json from the project. Returns null if missing or invalid.
+ * Reads .ductus/config.json from the project. Returns null if missing or invalid.
  */
-export function readRelayConfig(cwd = process.cwd()): RelayConfig | null {
-  const configPath = path.join(cwd, '.relay', CONFIG_FILENAME)
+export function readDuctusConfig(cwd = process.cwd()): DuctusConfig | null {
+  const configPath = path.join(cwd, '.ductus', CONFIG_FILENAME)
   if (!fs.existsSync(configPath)) return null
   try {
     const raw = fs.readFileSync(configPath, 'utf-8')
-    return JSON.parse(raw) as RelayConfig
+    return JSON.parse(raw) as DuctusConfig
   } catch {
     return null
   }
@@ -23,14 +23,14 @@ export function readRelayConfig(cwd = process.cwd()): RelayConfig | null {
 
 /**
  * Merges the given commit options into the config and writes back.
- * Preserves other top-level keys. Creates .relay/ if needed.
+ * Preserves other top-level keys. Creates .ductus/ if needed.
  */
-export function writeRelayConfig(
+export function writeDuctusConfig(
   cwd: string,
   options: { commit: { ignoreHooksOnFailure: boolean } },
 ): void {
-  const relayDir = path.join(cwd, '.relay')
-  const configPath = path.join(relayDir, CONFIG_FILENAME)
+  const ductusDir = path.join(cwd, '.ductus')
+  const configPath = path.join(ductusDir, CONFIG_FILENAME)
 
   let existing: Record<string, unknown> = {}
   if (fs.existsSync(configPath)) {
@@ -52,6 +52,6 @@ export function writeRelayConfig(
     },
   }
 
-  fs.mkdirSync(relayDir, { recursive: true })
+  fs.mkdirSync(ductusDir, { recursive: true })
   fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf-8')
 }
