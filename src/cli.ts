@@ -13,6 +13,8 @@ import { createStubTaps } from './pipeline/taps/index.js'
 import type { InkTapsRef } from './pipeline/taps/ink-taps.js'
 import type { PipelineConfig, PipelineState } from './pipeline/context.js'
 import { resolvePipelineExtras } from './ductus-config.js'
+import { initLogger, log } from './logging.js'
+import type { PipelineTaps } from './pipeline/context.js'
 
 const program = new Command()
 
@@ -46,6 +48,7 @@ program
   .option('--plain', 'Alias for --no-ui')
   .action(async (feature: string, options: { plan: string; maxRetries?: string; retryFailed?: boolean; forceAdd?: boolean; noUi?: boolean; plain?: boolean }) => {
     const cwd = process.cwd()
+    initLogger(cwd, feature)
     const planPath = path.resolve(options.plan)
     const maxRetries = Math.max(0, parseInt(options.maxRetries ?? '2', 10) || 2)
     const retryFailed = options.retryFailed ?? false
@@ -90,24 +93,54 @@ program
     const useUI = !disableUI
     const tapsRef: InkTapsRef = { current: null }
 
+    let realTaps: PipelineTaps
     if (useUI) {
       const { createInkTaps } = await import('./pipeline/taps/ink-taps.js')
-      const { runWithInk } = await import('./ui/index.js')
-      const taps = createInkTaps(tapsRef)
-      const runPipeline = pipe(
-        initializeStage,
-        architectStage,
-        topologicalSortStage,
-        executeTasksStage,
-        finalizeStage,
-        {
-          onFail: (ctx: import('./pipeline/context.js').PipelineContext) => {
-            if (ctx.state.tasks.length > 0 && Object.keys(ctx.state.taskStatus).length > 0) {
-              taps.persistTasks(ctx)
+      realTaps = createInkTaps(tapsRef)
+    } else {
+      realTaps = createStubTaps()
+    }
+
+    const taps = new Proxy(realTaps, {
+      get(target, prop, receiver) {
+        const original = Reflect.get(target, prop, receiver)
+        if (typeof original === 'function') {
+          return (...args: unknown[]) => {
+            if (prop === 'appendStream') {
+              log('TOOL:STREAM', 'Chunk', args[0])
+            } else if (prop === 'setPhase') {
+              log('TOOL:PHASE', `Switching to phase: ${args[0]}`)
+            } else if (prop === 'persistTasks') {
+              log('TOOL:persistTasks', 'Persisting', { taskCount: (args[0] as { state?: { tasks?: unknown[] } })?.state?.tasks?.length })
+            } else if (prop === 'promptTaskApproval') {
+              log('TOOL:promptTaskApproval', 'Prompting', { taskCount: (args[0] as unknown[])?.length })
+            } else {
+              log(`TOOL:${String(prop)}`, '', args.length > 0 ? args : undefined)
             }
-          },
+            return (original as (...a: unknown[]) => unknown).apply(target, args)
+          }
+        }
+        return original
+      },
+    })
+
+    const runPipeline = pipe(
+      initializeStage,
+      architectStage,
+      topologicalSortStage,
+      executeTasksStage,
+      finalizeStage,
+      {
+        onFail: (ctx: import('./pipeline/context.js').PipelineContext) => {
+          if (ctx.state.tasks.length > 0 && Object.keys(ctx.state.taskStatus).length > 0) {
+            taps.persistTasks(ctx)
+          }
         },
-      )
+      },
+    )
+
+    if (useUI) {
+      const { runWithInk } = await import('./ui/index.js')
       await runWithInk({
         feature,
         maxRetries,
@@ -117,21 +150,6 @@ program
         },
       })
     } else {
-      const taps = createStubTaps()
-      const runPipeline = pipe(
-        initializeStage,
-        architectStage,
-        topologicalSortStage,
-        executeTasksStage,
-        finalizeStage,
-        {
-          onFail: (ctx: import('./pipeline/context.js').PipelineContext) => {
-            if (ctx.state.tasks.length > 0 && Object.keys(ctx.state.taskStatus).length > 0) {
-              taps.persistTasks(ctx)
-            }
-          },
-        },
-      )
       await runPipeline({ config, state, taps })
     }
   })

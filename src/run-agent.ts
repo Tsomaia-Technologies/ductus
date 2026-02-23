@@ -1,4 +1,5 @@
 import { execa } from 'execa'
+import { log } from './logging.js'
 
 /** Strip ANSI escape codes (avoids ESM strip-ansi in CJS build). */
 function stripAnsi(str: string): string {
@@ -52,6 +53,9 @@ export async function runAgentWithStream(
     stdin = 'inherit',
   } = options
 
+  log('AGENT:START', `Spawning ${agentPath}`, { args })
+  const startTime = Date.now()
+
   const write = onChunk
     ? (text: string) => {
         onChunk(stripAnsi(text))
@@ -75,8 +79,9 @@ export async function runAgentWithStream(
   let firstOutput = true
 
   subprocess.stdout?.on('data', (chunk: Buffer) => {
+    const str = chunk.toString('utf-8')
+    log('AGENT:STDOUT', 'Received chunk', str)
     if (useStreamJson) {
-      const str = chunk.toString('utf-8')
       lineBuffer += str
       const lines = lineBuffer.split('\n')
       lineBuffer = lines.pop() ?? ''
@@ -105,6 +110,11 @@ export async function runAgentWithStream(
 
   try {
     await subprocess
+    const duration = Date.now() - startTime
+    log('AGENT:EXIT', `Process finished in ${duration}ms`)
+  } catch (e) {
+    log('AGENT:ERROR', 'Process failed', String((e as Error)?.message ?? e))
+    throw e
   } finally {
     if (spinner?.isSpinning) {
       spinner.stop()
@@ -133,6 +143,10 @@ export async function runAgentWithExecution(options: {
   stdin?: 'inherit' | 'ignore'
 }): Promise<void> {
   const { args, agentPath = 'agent', onChunk, stdin = 'inherit' } = options
+
+  log('AGENT:START', `Spawning ${agentPath} (execution mode)`, { args })
+  const startTime = Date.now()
+
   if (onChunk) {
     const subprocess = execa(agentPath, args, {
       stdout: 'pipe',
@@ -140,15 +154,31 @@ export async function runAgentWithExecution(options: {
       stdin,
     })
     subprocess.stdout?.on('data', (chunk: Buffer) => {
-      onChunk(stripAnsi(chunk.toString('utf-8')))
+      const str = chunk.toString('utf-8')
+      log('AGENT:STDOUT', 'Received chunk', str)
+      onChunk(stripAnsi(str))
     })
-    await subprocess
+    try {
+      await subprocess
+      const duration = Date.now() - startTime
+      log('AGENT:EXIT', `Process finished in ${duration}ms`)
+    } catch (e) {
+      log('AGENT:ERROR', 'Process failed', String((e as Error)?.message ?? e))
+      throw e
+    }
   } else {
-    await execa(agentPath, args, {
-      stdout: 'inherit',
-      stderr: 'inherit',
-      stdin,
-    })
+    try {
+      await execa(agentPath, args, {
+        stdout: 'inherit',
+        stderr: 'inherit',
+        stdin,
+      })
+      const duration = Date.now() - startTime
+      log('AGENT:EXIT', `Process finished in ${duration}ms`)
+    } catch (e) {
+      log('AGENT:ERROR', 'Process failed', String((e as Error)?.message ?? e))
+      throw e
+    }
   }
 }
 
@@ -164,6 +194,10 @@ export async function runAgentWithExecutionAndCapture(options: {
   stdin?: 'inherit' | 'ignore'
 }): Promise<string> {
   const { args, agentPath = 'agent', spinnerText, onChunk, stdin = 'inherit' } = options
+
+  log('AGENT:START', `Spawning ${agentPath} (capture mode)`, { args })
+  const startTime = Date.now()
+
   const { default: ora } = await import('ora')
   const spinner = onChunk ? null : spinnerText ? ora(spinnerText).start() : null
 
@@ -175,6 +209,8 @@ export async function runAgentWithExecutionAndCapture(options: {
 
   const chunks: Buffer[] = []
   subprocess.stdout?.on('data', (chunk: Buffer) => {
+    const str = chunk.toString('utf-8')
+    log('AGENT:STDOUT', 'Received chunk', str)
     chunks.push(chunk)
     if (onChunk) {
       onChunk(stripAnsi(chunk.toString('utf-8')))
@@ -186,6 +222,11 @@ export async function runAgentWithExecutionAndCapture(options: {
 
   try {
     await subprocess
+    const duration = Date.now() - startTime
+    log('AGENT:EXIT', `Process finished in ${duration}ms`)
+  } catch (e) {
+    log('AGENT:ERROR', 'Process failed', String((e as Error)?.message ?? e))
+    throw e
   } finally {
     if (spinner?.isSpinning) spinner.stop()
   }
