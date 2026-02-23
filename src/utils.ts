@@ -177,7 +177,7 @@ export function extractLastJsonObject(raw: string): string {
     }
 
     if (c === ']' || c === '}') {
-      depth--
+      depth = Math.max(0, depth - 1)
       if (depth === 0 && c === '}' && objectStart >= 0) {
         lastObject = trimmed.slice(objectStart, i + 1)
       }

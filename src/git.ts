@@ -40,9 +40,11 @@ export async function getDiff(
 
 /**
  * Reverts working tree and index to the given ref. Use when retrying a failed task from clean state.
+ * Also runs `git clean -fd` to remove untracked files created during the failed attempt.
  */
 export async function revertToRef(ref: string, cwd = process.cwd()): Promise<void> {
   await execa('git', ['reset', '--hard', ref], { cwd })
+  await execa('git', ['clean', '-fd'], { cwd })
 }
 
 /**

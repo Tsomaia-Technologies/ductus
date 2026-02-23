@@ -22,6 +22,12 @@ describe('extractLastJsonObject', () => {
     )
   })
 
+  it('handles stray bracket before JSON (depth trap)', () => {
+    const input = 'Here is my response: ]\n{"commitMessage":"feat: x"}'
+    const result = extractLastJsonObject(input)
+    expect(JSON.parse(result)).toEqual({ commitMessage: 'feat: x' })
+  })
+
   it('extracts root object when nested objects exist (e.g. checks array)', () => {
     const input =
       'Preamble {"summary":"done","checks":[{"checkId":"test","command":"npm test"}],"commitMessage":"feat: x"}'

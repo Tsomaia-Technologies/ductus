@@ -3,6 +3,11 @@ import { execa } from 'execa'
 import type { CheckProfile } from './ductus-config.js'
 import type { RequestedCheck } from './schema.js'
 
+/** Escape a string for safe inclusion in a shell command (single-quote style). */
+function escapeForShell(arg: string): string {
+  return `'${arg.replace(/'/g, "'\\''")}'`
+}
+
 export interface CommandResult {
   checkId: string
   command: string
@@ -30,30 +35,17 @@ export async function runVerificationCommands(
     const runWhen = profile?.run_when ?? 'per_task'
     if (!profile || runWhen !== 'per_task') continue
 
-    const workDir = path.resolve(resolvedCwd, '.')
-    const relativeFromCwd = path.relative(resolvedCwd, workDir)
-    if (relativeFromCwd.startsWith('..')) {
-      results.push({
-        checkId: req.checkId,
-        command: profile.command,
-        status: 'failed',
-        stdout: '',
-        stderr: `Path traversal rejected for check ${req.checkId}`,
-      })
-      continue
-    }
+    const workDir = resolvedCwd
 
     try {
-      const execResult =
+      const commandToRun =
         profile.type === 'scoped' && req.args && req.args.length > 0
-          ? await execa(profile.command, req.args, {
-              cwd: workDir,
-              reject: false,
-            })
-          : await execa('sh', ['-c', profile.command], {
-              cwd: workDir,
-              reject: false,
-            })
+          ? `${profile.command} ${req.args.map(escapeForShell).join(' ')}`
+          : profile.command
+      const execResult = await execa('sh', ['-c', commandToRun], {
+        cwd: workDir,
+        reject: false,
+      })
       const exitCode = execResult.exitCode ?? 1
       results.push({
         checkId: req.checkId,
