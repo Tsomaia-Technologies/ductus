@@ -12,6 +12,7 @@ export const TaskSchema = z.object({
   objective: z.string().min(20).describe('The primary goal of this task.'),
   requirements: z.array(z.string()).describe('Specific functional requirements to be met.'),
   constraints: z.array(z.string()).describe('Non-functional requirements or architectural boundaries.'),
+  dependsOn: z.array(z.string()).optional().describe('Task ids that must complete before this task runs. E.g. ["db-setup"] if this task needs the database.'),
 })
 export type Task = z.infer<typeof TaskSchema>
 export const TaskSchemaJSON = toJsonSchema(TaskSchema)

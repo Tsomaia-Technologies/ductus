@@ -16,6 +16,8 @@ CRITICAL: Do NOT write it to a file. Do NOT use the write tool or create any fil
 
 IMPORTANT NOTE: Your response is piped to an automated parser that expects ONLY the raw JSON array in your terminal output—no file paths, no "I've saved it to...", nothing else. Creating files will break the pipeline.
 
+When a task depends on another (e.g. Task 2 needs Task 1's API or schema), include "dependsOn": ["task-id"] in that task. Use empty array or omit for tasks with no dependencies.
+
 {{ schema }}
 
 Here is the master plan to process:

@@ -10,13 +10,18 @@ export async function runReviewer(
   task: Task,
   diff: string,
   cwd = process.cwd(),
+  options?: {
+    commandResults?: Array<{ checkId: string; command: string; status: string; stdout: string; stderr: string }>
+  },
 ): Promise<Approval | Rejection> {
   let i = 0
+  const commandResults = options?.commandResults ?? []
   const prompts = loadPrompts(
     'reviewer',
     {
       task,
       diff,
+      commandResults,
       approvalSchema: ApprovalSchemaJSON,
       rejectionSchema: RejectionJSON,
     },

@@ -7,12 +7,15 @@ import { convertPlanToTasks } from '../lambdas/convertPlanToTasks'
 import { refinePlanToTasks } from '../lambdas/refinePlanToTasks'
 import { runImplementationEngineer } from '../lambdas/runImplementationEngineer'
 import { runReviewer } from '../lambdas/runReviewer'
-import { getHeadRef, getDiff } from '../git'
+import { getHeadRef, getDiff, revertToRef } from '../git'
 import type { Approval, Rejection } from '../schema'
 import type { Task } from '../schema'
 import { runRemediationEngineer } from '../lambdas/runRemediationEngineer'
+import { runVerificationCommands } from '../verify'
 import { promptForTaskApproval } from '../prompt-user'
 import { commitWithRetryOnFailure } from '../commit'
+import { topSortTasks } from '../topsort'
+import { loadTasksWithStatus, saveTasksWithStatus } from '../task-state'
 
 const program = new Command()
 
@@ -40,35 +43,45 @@ program
     'max Engineer retries per task when Reviewer rejects',
     '2',
   )
-  .action(async (feature: string, options: { plan: string; maxRetries?: string }) => {
+  .option('--retry-failed', 'Retry tasks marked failed from a previous run')
+  .action(async (feature: string, options: { plan: string; maxRetries?: string; retryFailed?: boolean }) => {
     const cwd = process.cwd()
     const planPath = options.plan
     const maxRetries = Math.max(0, parseInt(options.maxRetries ?? '2', 10) || 2)
+    const retryFailed = options.retryFailed ?? false
     const featureDir = path.join(cwd, '.ductus', feature)
 
     fs.mkdirSync(featureDir, { recursive: true })
 
-    const planContent = fs.readFileSync(planPath, 'utf-8')
+    let tasks: Task[]
+    let taskStatus: Record<string, 'pending' | 'completed' | 'failed'>
 
-    console.log('Spawning Architect Agent to break down the plan...')
+    const existing = loadTasksWithStatus(cwd, feature)
+    const isResume = existing && existing.tasks.length > 0 && Object.values(existing.status).some((s) => s !== 'pending')
 
-    let tasks: Task[] = await convertPlanToTasks(planContent)
-
-    fs.writeFileSync(
-      path.join(featureDir, 'tasks.json'),
-      JSON.stringify(tasks, null, 2),
-      'utf-8',
-    )
-
-    console.log(`Architect identified ${tasks.length} tasks.`)
-
-    if (tasks.length === 0) {
-      console.log('No tasks to execute.')
-      return
+    if (isResume && existing) {
+      console.log('Resuming previous run...')
+      tasks = existing.tasks
+      taskStatus = { ...existing.status }
+    } else {
+      const planContent = fs.readFileSync(planPath, 'utf-8')
+      console.log('Spawning Architect Agent to break down the plan...')
+      tasks = await convertPlanToTasks(planContent)
+      console.log(`Architect identified ${tasks.length} tasks.`)
+      if (tasks.length === 0) {
+        console.log('No tasks to execute.')
+        return
+      }
+      taskStatus = Object.fromEntries(tasks.map((t) => [t.id, 'pending'] as const))
+      saveTasksWithStatus(cwd, feature, { tasks, status: taskStatus })
     }
 
+    const planContent = fs.readFileSync(planPath, 'utf-8')
     const tasksPath = path.resolve(cwd, '.ductus', feature, 'tasks.json')
+    const MAX_REFINEMENT_FAILURES = 3
+    let consecutiveFailures = 0
 
+    if (!isResume) {
     while (true) {
       const feedback = await promptForTaskApproval(tasks)
       if (!feedback) break
@@ -76,14 +89,29 @@ program
       try {
         tasks = await refinePlanToTasks(planContent, tasksPath, feedback, cwd)
         if (tasks.length === 0) {
+          consecutiveFailures++
           console.error('Architect returned empty task list. Please provide different feedback.')
+          if (consecutiveFailures >= MAX_REFINEMENT_FAILURES) {
+            throw new Error(
+              `Refinement failed ${consecutiveFailures} times. Check your setup (API, prompts) and try again. Press Enter to accept current tasks on next run.`,
+            )
+          }
           continue
         }
-        fs.writeFileSync(tasksPath, JSON.stringify(tasks, null, 2), 'utf-8')
+        consecutiveFailures = 0
+        taskStatus = Object.fromEntries(tasks.map((t) => [t.id, 'pending'] as const))
+        saveTasksWithStatus(cwd, feature, { tasks, status: taskStatus })
       } catch (e) {
+        consecutiveFailures++
         console.error('Refinement failed:', e?.toString())
-        console.log('Please try again with different feedback, or press Enter to accept current tasks.')
+        if (consecutiveFailures >= MAX_REFINEMENT_FAILURES) {
+          throw new Error(
+            `Refinement failed ${consecutiveFailures} times. Check your setup (API, prompts) and try again. Press Enter to accept current tasks on next run.`,
+          )
+        }
+        console.log('Press Enter to accept current tasks, or describe different changes.')
       }
+    }
     }
 
     try {
@@ -94,7 +122,20 @@ program
       )
     }
 
-    for (const [index, task] of tasks.entries()) {
+    const sortedTaskIds = topSortTasks(tasks)
+    const taskById = new Map(tasks.map((t) => [t.id, t]))
+    let lastCompletedRef = await getHeadRef(cwd)
+
+    for (const [index, taskId] of sortedTaskIds.entries()) {
+      const task = taskById.get(taskId)
+      if (!task) continue
+      if (taskStatus[taskId] === 'completed') continue
+      if (taskStatus[taskId] === 'failed' && !retryFailed) continue
+
+      if (taskStatus[taskId] === 'failed' && retryFailed) {
+        await revertToRef(lastCompletedRef, cwd)
+      }
+
       let attempt = 0
       const maxAttempts = maxRetries + 1
       let result: Approval | Rejection | null = null
@@ -102,7 +143,7 @@ program
 
       while (attempt < maxAttempts) {
         console.log(
-          `\nEngineer starting Task ${index + 1}/${tasks.length}: ${task.id} - ${task.summary}`,
+          `\nEngineer starting Task ${index + 1}/${sortedTaskIds.length}: ${task.id} - ${task.summary}`,
         )
         if (attempt > 0) {
           console.log(`Retry attempt ${attempt}/${maxRetries}`)
@@ -123,12 +164,19 @@ program
         }
 
         const diff = await getDiff(beforeRef, cwd)
-        result = await runReviewer(task, diff, cwd)
+        const commandResults = await runVerificationCommands(
+          engineerReport?.checks ?? [],
+          cwd,
+        )
+        result = await runReviewer(task, diff, cwd, { commandResults })
 
         if (result.decision === 'approved') {
           const message = engineerReport?.commitMessage?.trim() || task.summary
           await commitWithRetryOnFailure(message, cwd)
-          console.log(`Task ${index + 1} approved and committed.`)
+          taskStatus[taskId] = 'completed'
+          saveTasksWithStatus(cwd, feature, { tasks, status: taskStatus })
+          lastCompletedRef = await getHeadRef(cwd)
+          console.log(`Task ${index + 1}/${sortedTaskIds.length} approved and committed.`)
           break
         }
 
@@ -138,6 +186,8 @@ program
         attempt++
 
         if (attempt >= maxAttempts) {
+          taskStatus[taskId] = 'failed'
+          saveTasksWithStatus(cwd, feature, { tasks, status: taskStatus })
           throw new Error(
             `Task ${task.id} rejected after ${maxAttempts} attempts`,
           )

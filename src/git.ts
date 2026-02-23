@@ -23,6 +23,13 @@ export async function getDiff(
 }
 
 /**
+ * Reverts working tree and index to the given ref. Use when retrying a failed task from clean state.
+ */
+export async function revertToRef(ref: string, cwd = process.cwd()): Promise<void> {
+  await execa('git', ['reset', '--hard', ref], { cwd })
+}
+
+/**
  * Stages all changes and creates a commit. Optionally skips hooks via --no-verify.
  */
 export async function commitChanges(

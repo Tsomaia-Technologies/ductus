@@ -42,6 +42,14 @@ Rejection schema (use if verification commands fail, or requirements are missed)
 {{ rejectionSchema }}
 
 ---
+COMMAND VERIFICATION (run by ductus — use these actual results, not Engineer attestations):
+@for (r of commandResults)
+- {{ r.checkId }}: {{ r.command }} -> {{ r.status }}
+  stdout: {{ r.stdout }}
+  stderr: {{ r.stderr }}
+@endfor
+
+---
 CHANGES TO REVIEW:
 ```diff
 {{ diff }}
