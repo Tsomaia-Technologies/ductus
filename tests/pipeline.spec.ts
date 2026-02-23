@@ -1,3 +1,6 @@
+import * as fs from 'fs'
+import * as path from 'path'
+import * as os from 'os'
 import {
   pipe,
   shallowCopyContext,
@@ -9,6 +12,7 @@ import {
   type PipelineConfig,
   type PipelineState,
 } from '../src/pipeline/context'
+import { createStubTaps } from '../src/pipeline/taps'
 
 function createTestContext(overrides?: Partial<PipelineContext>): PipelineContext {
   const config: PipelineConfig = {
@@ -142,6 +146,63 @@ describe('pipeline', () => {
       expect(() => taps.setStreamActive(true)).not.toThrow()
       expect(() => taps.setError('err')).not.toThrow()
       expect(() => taps.persistTasks(ctx)).not.toThrow()
+    })
+  })
+})
+
+describe('pipeline taps', () => {
+  describe('createStubTaps', () => {
+    it('persistTasks writes tasks.json', () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ductus-taps-'))
+      const ctx = createTestContext({
+        config: {
+          cwd: tmpDir,
+          feature: 'my-feature',
+          planPath: '/tmp/plan.md',
+          planContent: '',
+          maxRetries: 2,
+          retryFailed: false,
+        },
+        state: {
+          tasks: [{ id: 'task-1', summary: 'Test task with sufficient length', description: 'A task for testing persist', objective: 'Objective for the task', requirements: [], constraints: [] }],
+          taskStatus: { 'task-1': 'completed' },
+          sortedTaskIds: ['task-1'],
+          currentTaskId: null,
+          currentAttempt: 0,
+          engineerReport: null,
+          lastReviewResult: null,
+          headRefBeforeTask: null,
+          diff: null,
+          commandResults: null,
+          lastError: null,
+        },
+        taps: createDefaultTaps(),
+      })
+      const taps = createStubTaps()
+      taps.persistTasks(ctx)
+      const filePath = path.join(tmpDir, '.ductus', 'my-feature', 'tasks.json')
+      expect(fs.existsSync(filePath)).toBe(true)
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+      expect(parsed.tasks).toHaveLength(1)
+      expect(parsed.tasks[0].id).toBe('task-1')
+      expect(parsed.status['task-1']).toBe('completed')
+      fs.rmSync(tmpDir, { recursive: true })
+    })
+
+    it('setPhase logs to console', () => {
+      const logSpy = jest.spyOn(console, 'log').mockImplementation()
+      const taps = createStubTaps()
+      taps.setPhase('engineer')
+      expect(logSpy).toHaveBeenCalledWith('[ductus] Phase: engineer')
+      logSpy.mockRestore()
+    })
+
+    it('setError logs to console.error', () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation()
+      const taps = createStubTaps()
+      taps.setError('something failed')
+      expect(errorSpy).toHaveBeenCalledWith('[ductus]', 'something failed')
+      errorSpy.mockRestore()
     })
   })
 })
