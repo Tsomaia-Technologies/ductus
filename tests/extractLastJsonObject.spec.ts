@@ -21,4 +21,14 @@ describe('extractLastJsonObject', () => {
       'No JSON object found in response',
     )
   })
+
+  it('extracts root object when nested objects exist (e.g. checks array)', () => {
+    const input =
+      'Preamble {"summary":"done","checks":[{"checkId":"test","command":"npm test"}],"commitMessage":"feat: x"}'
+    const result = extractLastJsonObject(input)
+    const parsed = JSON.parse(result)
+    expect(parsed.summary).toBe('done')
+    expect(parsed.checks).toHaveLength(1)
+    expect(parsed.checks[0].checkId).toBe('test')
+  })
 })

@@ -22,6 +22,12 @@ function createTestContext(overrides?: Partial<PipelineContext>): PipelineContex
     planContent: '',
     maxRetries: 2,
     retryFailed: false,
+    checks: [
+      { id: 'build', type: 'global', command: 'npm run build', run_when: 'per_task' },
+      { id: 'test', type: 'global', command: 'npm test', run_when: 'per_task' },
+    ],
+    agentPath: 'agent',
+    plainMode: false,
   }
   const state: PipelineState = {
     tasks: [],
@@ -164,6 +170,12 @@ describe('pipeline taps', () => {
           planContent: '',
           maxRetries: 2,
           retryFailed: false,
+          checks: [
+            { id: 'build', type: 'global', command: 'npm run build', run_when: 'per_task' },
+            { id: 'test', type: 'global', command: 'npm test', run_when: 'per_task' },
+          ],
+          agentPath: 'agent',
+          plainMode: false,
         },
         state: {
           tasks: [{ id: 'task-1', summary: 'Test task with sufficient length', description: 'A task for testing persist', objective: 'Objective for the task', requirements: [], constraints: [] }],

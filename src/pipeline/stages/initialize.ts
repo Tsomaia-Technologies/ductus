@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import type { PipelineContext, PipelineStage } from '../context.js'
 import { loadTasksWithStatus } from '../../task-state.js'
-import { getHeadRef } from '../../git.js'
+import { getHeadRef, isWorkingTreeClean } from '../../git.js'
 import { convertPlanToTasks } from '../../lambdas/convertPlanToTasks.js'
 
 /**
@@ -20,6 +20,13 @@ export const initializeStage: PipelineStage = async (ctx: PipelineContext) => {
   } catch {
     throw new Error(
       'Not a git repository. ductus requires a git repo for the Engineer/Reviewer flow.',
+    )
+  }
+
+  const isClean = await isWorkingTreeClean(cwd)
+  if (!isClean) {
+    throw new Error(
+      'Working tree is dirty. Stash or commit your changes before running ductus.',
     )
   }
 
@@ -62,6 +69,7 @@ export const initializeStage: PipelineStage = async (ctx: PipelineContext) => {
     try {
       tasks = await convertPlanToTasks(planContent, {
         onChunk: (c) => taps.appendStream(c),
+        agentPath: config.agentPath,
       })
     } finally {
       taps.setStreamActive(false)

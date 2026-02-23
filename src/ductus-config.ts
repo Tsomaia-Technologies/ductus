@@ -1,11 +1,39 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
+export type CheckProfile = {
+  id: string
+  type: 'global' | 'scoped'
+  command: string
+  run_when?: 'per_task' | 'end_of_pipeline'
+}
+
 export type DuctusConfig = {
   commit?: { ignoreHooksOnFailure?: boolean; forceAddIgnored?: boolean }
+  checks?: CheckProfile[]
+  agent?: { path?: string }
 }
 
 const CONFIG_FILENAME = 'config.json'
+
+const DEFAULT_CHECKS: CheckProfile[] = [
+  { id: 'build', type: 'global', command: 'npm run build', run_when: 'per_task' },
+  { id: 'test', type: 'global', command: 'npm test', run_when: 'per_task' },
+]
+
+/**
+ * Returns resolved checks and agent path from config, with defaults.
+ */
+export function resolvePipelineExtras(cwd = process.cwd()): {
+  checks: CheckProfile[]
+  agentPath: string
+} {
+  const cfg = readDuctusConfig(cwd)
+  return {
+    checks: cfg?.checks && cfg.checks.length > 0 ? cfg.checks : DEFAULT_CHECKS,
+    agentPath: cfg?.agent?.path ?? 'agent',
+  }
+}
 
 /**
  * Reads .ductus/config.json from the project. Returns null if missing or invalid.

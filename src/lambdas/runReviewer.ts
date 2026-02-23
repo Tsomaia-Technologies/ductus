@@ -13,11 +13,13 @@ export async function runReviewer(
   options?: {
     commandResults?: Array<{ checkId: string; command: string; status: string; stdout: string; stderr: string }>
     onChunk?: (chunk: string) => void
+    agentPath?: string
+    stdin?: 'inherit' | 'ignore'
   },
 ): Promise<Approval | Rejection> {
   let i = 0
   const commandResults = options?.commandResults ?? []
-  const onChunk = options?.onChunk
+  const { onChunk, agentPath = 'agent', stdin = 'inherit' } = options ?? {}
   const prompts = loadPrompts(
     'reviewer',
     {
@@ -46,8 +48,10 @@ export async function runReviewer(
 
       const raw = await runAgentWithStream({
         args,
+        agentPath,
         spinnerText: 'Running reviewer agent...',
         onChunk,
+        stdin,
       })
 
       const jsonStr = extractJsonObject(raw)

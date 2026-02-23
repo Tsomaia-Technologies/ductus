@@ -13,6 +13,14 @@ CRITICAL RULES:
 EngineerReport schema (output this JSON at the end of your turn):
 {{ engineerReportSchema }}
 
+@if (availableCheckIds and availableCheckIds.length > 0)
+---
+Available checks (from .ductus/config.json). Use requested_checks with these checkIds:
+@for (id of availableCheckIds)
+- {{ id }}
+@endfor
+@endif
+
 ---
 Task: {{ task.id }} - {{ task.summary }}
 

@@ -1,16 +1,28 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import type { Task } from './schema.js'
+import { z } from 'zod/v3'
+import { TaskSchema, type Task } from './schema.js'
 
-export type TaskStatus = 'pending' | 'completed' | 'failed'
+export const TaskStatusSchema = z.enum(['pending', 'completed', 'failed'])
+export type TaskStatus = z.infer<typeof TaskStatusSchema>
 
 export interface TasksWithStatus {
   tasks: Task[]
   status: Record<string, TaskStatus>
 }
 
+const TasksFileLegacySchema = z.array(TaskSchema)
+const TasksFileSchema = z.union([
+  TasksFileLegacySchema,
+  z.object({
+    tasks: z.array(TaskSchema),
+    status: z.record(TaskStatusSchema).optional(),
+  }),
+])
+
 /**
  * Loads tasks and status from .ductus/<feature>/tasks.json.
+ * Validates with Zod; throws on invalid or corrupted file.
  * If file has legacy format (array only), returns all pending.
  */
 export function loadTasksWithStatus(
@@ -21,19 +33,31 @@ export function loadTasksWithStatus(
   if (!fs.existsSync(filePath)) return null
 
   const raw = fs.readFileSync(filePath, 'utf-8')
-  const parsed = JSON.parse(raw) as { tasks?: Task[]; status?: Record<string, TaskStatus> } | Task[]
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error(`Invalid tasks.json: malformed JSON in ${filePath}`)
+  }
 
+  const parseResult = TasksFileSchema.safeParse(parsed)
+  if (!parseResult.success) {
+    throw new Error(
+      `Invalid tasks.json: ${parseResult.error.message}. Fix or remove ${filePath}`,
+    )
+  }
+
+  const data = parseResult.data
   let tasks: Task[]
   let status: Record<string, TaskStatus>
 
-  if (Array.isArray(parsed)) {
-    tasks = parsed
+  if (Array.isArray(data)) {
+    tasks = data
     status = Object.fromEntries(tasks.map((t) => [t.id, 'pending'] as const))
-  } else if (parsed.tasks) {
-    tasks = parsed.tasks
-    status = parsed.status ?? Object.fromEntries(tasks.map((t) => [t.id, 'pending'] as const))
   } else {
-    return null
+    tasks = data.tasks
+    status =
+      data.status ?? Object.fromEntries(tasks.map((t) => [t.id, 'pending'] as const))
   }
 
   for (const t of tasks) {

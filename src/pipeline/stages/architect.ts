@@ -33,6 +33,7 @@ export const architectStage: PipelineStage = async (ctx: PipelineContext) => {
       try {
         tasks = await refinePlanToTasks(planContent, tasksPath, feedback, cwd, {
           onChunk: (c) => taps.appendStream(c),
+          agentPath: config.agentPath,
         })
       } finally {
         taps.setStreamActive(false)

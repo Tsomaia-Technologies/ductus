@@ -1,9 +1,9 @@
 import type { PipelineContext } from '../context.js'
-import type { Task } from '../../schema.js'
+import type { Task, Rejection } from '../../schema.js'
 import { runImplementationEngineer } from '../../lambdas/runImplementationEngineer.js'
 import { runReviewer } from '../../lambdas/runReviewer.js'
 import { runRemediationEngineer } from '../../lambdas/runRemediationEngineer.js'
-import { runVerificationCommands } from '../../verify.js'
+import { runVerificationCommands, type CommandResult } from '../../verify.js'
 import { commitWithRetryOnFailure } from '../../commit.js'
 import { getHeadRef, getDiff, revertToRef } from '../../git.js'
 
@@ -47,20 +47,46 @@ export async function executeTaskSubPipe(
       if (result?.decision === 'rejected') {
         taps.setPhase('remediation')
         const diffOfRejected = await getDiff(beforeRef, cwd)
-        await runRemediationEngineer(task, result, diffOfRejected, cwd, { onChunk })
+        await runRemediationEngineer(task, result, diffOfRejected, cwd, {
+          onChunk,
+          agentPath: config.agentPath,
+          stdin: config.plainMode ? 'ignore' : 'inherit',
+        })
       } else {
         taps.setPhase('engineer')
-        engineerReport = await runImplementationEngineer(task, cwd, { onChunk })
+        const availableCheckIds = config.checks
+          .filter((c) => (c.run_when ?? 'per_task') === 'per_task')
+          .map((c) => c.id)
+        engineerReport = await runImplementationEngineer(task, cwd, {
+          onChunk,
+          availableCheckIds,
+          agentPath: config.agentPath,
+          stdin: config.plainMode ? 'ignore' : 'inherit',
+        })
       }
 
       const diff = await getDiff(beforeRef, cwd)
       const commandResults = await runVerificationCommands(
-        engineerReport?.checks ?? [],
+        config.checks,
+        engineerReport?.requested_checks ?? [],
         cwd,
       )
 
-      taps.setPhase('reviewer')
-      result = await runReviewer(task, diff, cwd, { commandResults, onChunk })
+      const failedCheck = commandResults.find((r) => r.status === 'failed')
+      if (failedCheck) {
+        result = createSyntheticRejection(failedCheck)
+        taps.appendStream(
+          `Verification failed (${failedCheck.checkId}): bypassing Reviewer.\n`,
+        )
+      } else {
+        taps.setPhase('reviewer')
+        result = await runReviewer(task, diff, cwd, {
+          commandResults,
+          onChunk,
+          agentPath: config.agentPath,
+          stdin: config.plainMode ? 'ignore' : 'inherit',
+        })
+      }
     } finally {
       taps.setStreamActive(false)
     }
@@ -124,13 +150,27 @@ export async function executeTaskSubPipe(
   return { ...ctx, state: { ...state, taskStatus } }
 }
 
+function createSyntheticRejection(failed: CommandResult): Rejection {
+  const reason = `Check "${failed.checkId}" failed`
+  const fix =
+    failed.stderr?.trim() || failed.stdout?.trim()
+      ? `Command: ${failed.command}\n${failed.stderr || failed.stdout}`
+      : `Command "${failed.command}" exited with non-zero status`
+  return {
+    decision: 'rejected',
+    rejection_reason: reason,
+    required_fixes: [fix],
+  }
+}
+
 /**
- * Reverts git to lastCompletedRef before retrying a failed task.
+ * Reverts git before retrying a failed task.
+ * Uses lastCompletedRef when available; otherwise reverts to HEAD (clears uncommitted failed changes for first task).
  */
 export async function revertBeforeRetry(
   ctx: PipelineContext,
 ): Promise<void> {
   const { lastCompletedRef } = ctx.state
-  if (!lastCompletedRef) return
-  await revertToRef(lastCompletedRef, ctx.config.cwd)
+  const refToUse = lastCompletedRef ?? (await getHeadRef(ctx.config.cwd))
+  await revertToRef(refToUse, ctx.config.cwd)
 }

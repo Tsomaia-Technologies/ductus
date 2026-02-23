@@ -1,4 +1,4 @@
-import { ArchitectHeadersSchema, Task, TaskListSchema, TaskSchemaJSON } from '../schema.js'
+import { ArchitectHeadersSchema, Task, TaskListSchema, TaskListSchemaJSON } from '../schema.js'
 import { extractJsonArray } from '../utils.js'
 import { loadPrompts } from '../load-prompts.js'
 import { runAgentWithStream } from '../run-agent.js'
@@ -8,14 +8,14 @@ export async function refinePlanToTasks(
   tasksFilePath: string,
   userFeedback: string,
   cwd = process.cwd(),
-  options?: { onChunk?: (chunk: string) => void },
+  options?: { onChunk?: (chunk: string) => void; agentPath?: string },
 ): Promise<Task[]> {
   let i = 0
-  const { onChunk } = options ?? {}
+  const { onChunk, agentPath = 'agent' } = options ?? {}
 
   const prompts = loadPrompts(
     'architect-refine',
-    { plan, schema: TaskSchemaJSON, tasksFilePath, userFeedback },
+    { plan, schema: TaskListSchemaJSON, tasksFilePath, userFeedback },
     cwd,
   )
 
@@ -35,6 +35,7 @@ export async function refinePlanToTasks(
 
       const raw = await runAgentWithStream({
         args,
+        agentPath,
         spinnerText: 'Running refinement architect agent...',
         onChunk,
         stdin: 'ignore',

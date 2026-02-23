@@ -12,6 +12,7 @@ import {
 import { createStubTaps } from './pipeline/taps/index.js'
 import type { InkTapsRef } from './pipeline/taps/ink-taps.js'
 import type { PipelineConfig, PipelineState } from './pipeline/context.js'
+import { resolvePipelineExtras } from './ductus-config.js'
 
 const program = new Command()
 
@@ -50,6 +51,13 @@ program
     const retryFailed = options.retryFailed ?? false
     const forceAddIgnored = options.forceAdd ?? false
 
+    const opts = options as { noUi?: boolean; plain?: boolean }
+    const disableUI =
+      process.argv.includes('--no-ui') ||
+      process.argv.includes('--plain') ||
+      opts.noUi === true ||
+      opts.plain === true
+    const { checks, agentPath } = resolvePipelineExtras(cwd)
     const config: PipelineConfig = {
       cwd,
       feature,
@@ -58,6 +66,9 @@ program
       maxRetries,
       retryFailed,
       forceAddIgnored,
+      checks,
+      agentPath,
+      plainMode: disableUI,
     }
 
     const state: PipelineState = {
@@ -76,12 +87,6 @@ program
       isResume: false,
     }
 
-    const opts = options as { noUi?: boolean; plain?: boolean }
-    const disableUI =
-      process.argv.includes('--no-ui') ||
-      process.argv.includes('--plain') ||
-      opts.noUi === true ||
-      opts.plain === true
     const useUI = !disableUI
     const tapsRef: InkTapsRef = { current: null }
 

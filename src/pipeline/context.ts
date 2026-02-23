@@ -1,5 +1,6 @@
 import type { Task, EngineerReport, Approval, Rejection } from '../schema.js'
 import type { CommandResult } from '../verify.js'
+import type { CheckProfile } from '../ductus-config.js'
 
 /**
  * Phase of the orchestration run; used by UI taps to update the display.
@@ -55,6 +56,9 @@ export interface PipelineConfig {
   maxRetries: number
   retryFailed: boolean
   forceAddIgnored?: boolean
+  checks: CheckProfile[]
+  agentPath: string
+  plainMode?: boolean
 }
 
 /**

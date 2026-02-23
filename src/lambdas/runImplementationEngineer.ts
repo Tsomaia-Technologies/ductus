@@ -8,7 +8,7 @@ import { extractLastJsonObject } from '../utils.js'
 const FALLBACK_REPORT: EngineerReport = {
   files_modified: [],
   self_review_status: 'did_not_review_got_lazy',
-  checks: [],
+  requested_checks: [],
   coverage_status: 'got_lazy',
   implementation_status: 'got_lazy',
   implementation_notes: 'Failed to parse EngineerReport from output',
@@ -19,11 +19,17 @@ const FALLBACK_REPORT: EngineerReport = {
 export async function runImplementationEngineer(
   task: Task,
   cwd = process.cwd(),
-  options?: { onChunk?: (chunk: string) => void },
+  options?: {
+    onChunk?: (chunk: string) => void
+    availableCheckIds?: string[]
+    agentPath?: string
+    stdin?: 'inherit' | 'ignore'
+  },
 ): Promise<EngineerReport> {
+  const { availableCheckIds = [], agentPath = 'agent', stdin = 'inherit' } = options ?? {}
   const prompts = loadPrompts(
     'implementation-engineer',
-    { task, engineerReportSchema: EngineerReportSchemaJSON },
+    { task, engineerReportSchema: EngineerReportSchemaJSON, availableCheckIds },
     cwd,
   )
 
@@ -32,8 +38,10 @@ export async function runImplementationEngineer(
 
   const raw = await runAgentWithExecutionAndCapture({
     args: ['--force', '--model', model, '--print', content],
+    agentPath,
     spinnerText: 'Running implementation engineer...',
     onChunk: options?.onChunk,
+    stdin,
   })
 
   try {

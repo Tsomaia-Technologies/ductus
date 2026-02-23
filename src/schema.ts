@@ -17,9 +17,9 @@ export const TaskSchema = z.object({
 export type Task = z.infer<typeof TaskSchema>
 export const TaskSchemaJSON = toJsonSchema(TaskSchema)
 
-export const TaskListSchema = z.array(TaskSchema);
+export const TaskListSchema = z.array(TaskSchema)
 export type TaskList = z.infer<typeof TaskListSchema>
-export const TaskListSchemaJSON = toJsonSchema(TaskSchema)
+export const TaskListSchemaJSON = toJsonSchema(TaskListSchema)
 
 export const CommandStatusSchema = z.object({
   checkId: z.string().describe('Identifier for the check, e.g., "build", "tests", "linter"'),
@@ -31,6 +31,12 @@ export type CommandStatus = z.infer<typeof CommandStatusSchema>
 export const CommandStatusSchemaJSON = toJsonSchema(CommandStatusSchema)
 
 
+export const RequestedCheckSchema = z.object({
+  checkId: z.string().describe('Id of a check defined in .ductus/config.json'),
+  args: z.array(z.string()).optional().describe('Optional arguments for scoped checks (e.g. file paths for linter)'),
+})
+export type RequestedCheck = z.infer<typeof RequestedCheckSchema>
+
 export const EngineerReportSchema = z.object({
   files_modified: z.array(z.string()).describe('List of all files actually changed during implementation.'),
   self_review_status: z.enum([
@@ -38,7 +44,7 @@ export const EngineerReportSchema = z.object({
     'manually_reviewed_and_ignored_issues',
     'did_not_review_got_lazy'
   ]).describe('Engineer\'s self-assessment of the code quality before submission.'),
-  checks: z.array(CommandStatusSchema).describe('List of terminal commands run to prove implementation validity. These are self-reported attestations — the server does NOT execute them.'),
+  requested_checks: z.array(RequestedCheckSchema).describe('Check IDs to run from .ductus/config.json (e.g. build, test). Only these are executed.'),
   coverage_status: z.enum(['new_functionality_fully_covered', 'got_lazy']).describe('Confirmation of test coverage for new logic.'),
   implementation_status: z.enum(['fully_implemented', 'got_lazy']).describe('Confirmation that all requirements from the spec were addressed.'),
   implementation_notes: z.string().describe('Details regarding the technical choices or hurdles encountered during coding.'),

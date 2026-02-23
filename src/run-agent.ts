@@ -10,6 +10,7 @@ function stripAnsi(str: string): string {
 
 export type RunAgentWithStreamOptions = {
   args: string[]
+  agentPath?: string
   spinnerText?: string
   /**
    * If true, use stream-json format and parse NDJSON to extract assistant text for real-time streaming.
@@ -42,7 +43,14 @@ function extractAssistantTextFromStreamJson(line: string): string | null {
 export async function runAgentWithStream(
   options: RunAgentWithStreamOptions,
 ): Promise<string> {
-  const { args, spinnerText = 'Running agent...', useStreamJson = true, onChunk, stdin = 'inherit' } = options
+  const {
+    args,
+    agentPath = 'agent',
+    spinnerText = 'Running agent...',
+    useStreamJson = true,
+    onChunk,
+    stdin = 'inherit',
+  } = options
 
   const write = onChunk
     ? (text: string) => {
@@ -55,7 +63,7 @@ export async function runAgentWithStream(
   const { default: ora } = await import('ora')
   const spinner = onChunk ? null : ora(spinnerText).start()
 
-  const subprocess = execa('agent', args, {
+  const subprocess = execa(agentPath, args, {
     stdout: 'pipe',
     stderr: 'inherit',
     stdin,
@@ -120,24 +128,26 @@ export async function runAgentWithStream(
  */
 export async function runAgentWithExecution(options: {
   args: string[]
+  agentPath?: string
   onChunk?: (chunk: string) => void
+  stdin?: 'inherit' | 'ignore'
 }): Promise<void> {
-  const { args, onChunk } = options
+  const { args, agentPath = 'agent', onChunk, stdin = 'inherit' } = options
   if (onChunk) {
-    const subprocess = execa('agent', args, {
+    const subprocess = execa(agentPath, args, {
       stdout: 'pipe',
       stderr: 'inherit',
-      stdin: 'inherit',
+      stdin,
     })
     subprocess.stdout?.on('data', (chunk: Buffer) => {
       onChunk(stripAnsi(chunk.toString('utf-8')))
     })
     await subprocess
   } else {
-    await execa('agent', args, {
+    await execa(agentPath, args, {
       stdout: 'inherit',
       stderr: 'inherit',
-      stdin: 'inherit',
+      stdin,
     })
   }
 }
@@ -148,17 +158,19 @@ export async function runAgentWithExecution(options: {
  */
 export async function runAgentWithExecutionAndCapture(options: {
   args: string[]
+  agentPath?: string
   spinnerText?: string
   onChunk?: (chunk: string) => void
+  stdin?: 'inherit' | 'ignore'
 }): Promise<string> {
-  const { args, spinnerText, onChunk } = options
+  const { args, agentPath = 'agent', spinnerText, onChunk, stdin = 'inherit' } = options
   const { default: ora } = await import('ora')
   const spinner = onChunk ? null : spinnerText ? ora(spinnerText).start() : null
 
-  const subprocess = execa('agent', args, {
+  const subprocess = execa(agentPath, args, {
     stdout: 'pipe',
     stderr: 'inherit',
-    stdin: 'inherit',
+    stdin,
   })
 
   const chunks: Buffer[] = []

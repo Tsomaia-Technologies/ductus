@@ -9,6 +9,14 @@ export async function getGitRoot(cwd = process.cwd()): Promise<string> {
 }
 
 /**
+ * Returns true if working tree and index are clean (no uncommitted changes).
+ */
+export async function isWorkingTreeClean(cwd = process.cwd()): Promise<boolean> {
+  const { stdout } = await execa('git', ['status', '--porcelain'], { cwd })
+  return stdout.trim().length === 0
+}
+
+/**
  * Returns the current HEAD commit hash. Throws if not in a git repo.
  */
 export async function getHeadRef(cwd = process.cwd()): Promise<string> {

@@ -138,62 +138,58 @@ export function extractJsonObject(raw: string): string {
 }
 
 /**
- * Finds the last complete JSON object in the string. Useful when output contains
- * multiple objects (e.g. tool results) and we need the final one.
+ * Finds the last complete root-level JSON object in the string.
+ * Scans left-to-right, tracking bracket depth; when depth returns to 0 at '}',
+ * records that object. Returns the last one found.
+ * Handles nested structures (e.g. checks: [{"id":1}]) correctly.
  */
 export function extractLastJsonObject(raw: string): string {
   const trimmed = raw.trim()
-  const start = trimmed.lastIndexOf('{')
-  if (start === -1) {
-    throw new Error('No JSON object found in response')
-  }
-
+  let lastObject: string | null = null
+  let objectStart = -1
   let depth = 0
   let inString = false
   let escape = false
-  let i = start
 
-  while (i < trimmed.length) {
+  for (let i = 0; i < trimmed.length; i++) {
     const c = trimmed[i]
 
     if (escape) {
       escape = false
-      i++
       continue
     }
 
     if (inString) {
       if (c === '\\') escape = true
       else if (c === '"') inString = false
-      i++
       continue
     }
 
     if (c === '"') {
       inString = true
-      i++
       continue
     }
 
     if (c === '[' || c === '{') {
+      if (depth === 0 && c === '{') objectStart = i
       depth++
-      i++
       continue
     }
 
     if (c === ']' || c === '}') {
       depth--
-      if (depth === 0 && c === '}') {
-        return trimmed.slice(start, i + 1)
+      if (depth === 0 && c === '}' && objectStart >= 0) {
+        lastObject = trimmed.slice(objectStart, i + 1)
       }
-      i++
       continue
     }
-
-    i++
   }
 
-  throw new Error(
-    'No complete JSON object found in response (unmatched brackets)',
-  )
+  if (lastObject === null) {
+    if (trimmed.indexOf('{') === -1) {
+      throw new Error('No JSON object found in response')
+    }
+    throw new Error('No complete JSON object found in response (unmatched brackets)')
+  }
+  return lastObject
 }

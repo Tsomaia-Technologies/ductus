@@ -1,16 +1,16 @@
-import { ArchitectHeadersSchema, Task, TaskListSchema, TaskSchemaJSON } from '../schema.js'
+import { ArchitectHeadersSchema, Task, TaskListSchema, TaskListSchemaJSON } from '../schema.js'
 import { extractJsonArray } from '../utils.js'
 import { loadPrompts } from '../load-prompts.js'
 import { runAgentWithStream } from '../run-agent.js'
 
 export async function convertPlanToTasks(
   plan: string,
-  options?: { cwd?: string; onChunk?: (chunk: string) => void },
+  options?: { cwd?: string; onChunk?: (chunk: string) => void; agentPath?: string },
 ): Promise<Task[]> {
   let i = 0
-  const { onChunk } = options ?? {}
+  const { onChunk, agentPath = 'agent' } = options ?? {}
 
-  const prompts = loadPrompts('architect', { plan, schema: TaskSchemaJSON })
+  const prompts = loadPrompts('architect', { plan, schema: TaskListSchemaJSON })
 
   const maxTrials = Math.max(prompts.length, 5)
 
@@ -28,6 +28,7 @@ export async function convertPlanToTasks(
 
       const raw = await runAgentWithStream({
         args,
+        agentPath,
         spinnerText: 'Running architect agent to break down plan into tasks...',
         onChunk,
         stdin: 'ignore',
