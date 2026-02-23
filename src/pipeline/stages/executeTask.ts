@@ -5,7 +5,7 @@ import { runReviewer } from '../../lambdas/runReviewer.js'
 import { runRemediationEngineer } from '../../lambdas/runRemediationEngineer.js'
 import { runVerificationCommands, type CommandResult } from '../../verify.js'
 import { commitWithRetryOnFailure } from '../../commit.js'
-import { getHeadRef, getDiff, revertToRef } from '../../git.js'
+import { getHeadRef, getDiff, revertToRef, isWorkingTreeClean } from '../../git.js'
 
 /**
  * Runs implement -> verify -> review -> (commit | remediate) for a single task.
@@ -94,6 +94,22 @@ export async function executeTaskSubPipe(
     if (result.decision === 'approved') {
       const message = engineerReport?.commitMessage?.trim() || task.summary
       taps.setPhase('commit-prompt')
+      const isClean = await isWorkingTreeClean(cwd)
+      if (isClean) {
+        taps.appendStream(
+          `Task approved, but no changes detected (working tree is clean). Skipping commit.\n`,
+        )
+        taskStatus[taskId] = 'completed'
+        lastCompletedRef = await getHeadRef(cwd)
+        taps.persistTasks({
+          ...ctx,
+          state: { ...state, taskStatus, lastCompletedRef },
+        })
+        return {
+          ...ctx,
+          state: { ...state, taskStatus, lastCompletedRef },
+        }
+      }
       try {
         await commitWithRetryOnFailure(message, cwd, {
           forceAddIgnored: config.forceAddIgnored,
