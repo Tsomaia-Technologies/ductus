@@ -31,7 +31,7 @@
   "author": "Tsomaia Technologies",
   "license": "MIT",
   "dependencies": {
-    "@tsomaiatech/moxite": "^1.0.4",
+    "@tsomaiatech/moxite": "^1.0.5",
     "commander": "^14.0.3",
     "execa": "^9.6.1",
     "gray-matter": "^4.0.3",
