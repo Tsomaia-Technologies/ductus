@@ -21,3 +21,17 @@ export async function getDiff(
   })
   return stdout
 }
+
+/**
+ * Stages all changes and creates a commit. Optionally skips hooks via --no-verify.
+ */
+export async function commitChanges(
+  message: string,
+  cwd = process.cwd(),
+  options?: { noVerify?: boolean },
+): Promise<void> {
+  await execa('git', ['add', '--', '.'], { cwd })
+  const args = ['commit', '-m', message]
+  if (options?.noVerify) args.push('--no-verify')
+  await execa('git', args, { cwd })
+}

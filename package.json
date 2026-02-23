@@ -16,6 +16,7 @@
   "files": [
     "dist/",
     "src/prompts/",
+    "src/config/",
     "README.md"
   ],
   "keywords": [

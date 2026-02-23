@@ -24,6 +24,10 @@ function getPackagePromptsRoot(): string {
   return path.join(__dirname, '..', 'src', 'prompts')
 }
 
+function getPackageConfigPath(): string {
+  return path.join(__dirname, '..', 'src', 'config', 'config.json')
+}
+
 /**
  * Ejects prompts from the package into .ductus/prompts.
  * Scans package prompts root for subdirs with .mx files.
@@ -61,6 +65,17 @@ export function ejectPrompts(
       fs.rmSync(targetDir, { recursive: true })
     }
     fs.cpSync(sourceDir, targetDir, { recursive: true })
+  }
+
+  const configSource = getPackageConfigPath()
+  const relayDir = path.join(cwd, '.relay')
+  const configTarget = path.join(relayDir, 'config.json')
+  if (fs.existsSync(configSource)) {
+    const targetExists = fs.existsSync(configTarget)
+    if (!targetExists || overwrite) {
+      fs.mkdirSync(relayDir, { recursive: true })
+      fs.cpSync(configSource, configTarget)
+    }
   }
 }
 

@@ -136,3 +136,64 @@ export function extractJsonObject(raw: string): string {
     'No complete JSON object found in response (unmatched brackets)',
   )
 }
+
+/**
+ * Finds the last complete JSON object in the string. Useful when output contains
+ * multiple objects (e.g. tool results) and we need the final one.
+ */
+export function extractLastJsonObject(raw: string): string {
+  const trimmed = raw.trim()
+  const start = trimmed.lastIndexOf('{')
+  if (start === -1) {
+    throw new Error('No JSON object found in response')
+  }
+
+  let depth = 0
+  let inString = false
+  let escape = false
+  let i = start
+
+  while (i < trimmed.length) {
+    const c = trimmed[i]
+
+    if (escape) {
+      escape = false
+      i++
+      continue
+    }
+
+    if (inString) {
+      if (c === '\\') escape = true
+      else if (c === '"') inString = false
+      i++
+      continue
+    }
+
+    if (c === '"') {
+      inString = true
+      i++
+      continue
+    }
+
+    if (c === '[' || c === '{') {
+      depth++
+      i++
+      continue
+    }
+
+    if (c === ']' || c === '}') {
+      depth--
+      if (depth === 0 && c === '}') {
+        return trimmed.slice(start, i + 1)
+      }
+      i++
+      continue
+    }
+
+    i++
+  }
+
+  throw new Error(
+    'No complete JSON object found in response (unmatched brackets)',
+  )
+}

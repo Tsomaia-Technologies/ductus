@@ -4,11 +4,15 @@ import * as path from 'path'
 import { Command } from 'commander'
 import { ejectPrompts } from '../load-prompts'
 import { convertPlanToTasks } from '../lambdas/convertPlanToTasks'
+import { refinePlanToTasks } from '../lambdas/refinePlanToTasks'
 import { runImplementationEngineer } from '../lambdas/runImplementationEngineer'
 import { runReviewer } from '../lambdas/runReviewer'
 import { getHeadRef, getDiff } from '../git'
 import type { Approval, Rejection } from '../schema'
+import type { Task } from '../schema'
 import { runRemediationEngineer } from '../lambdas/runRemediationEngineer'
+import { promptForTaskApproval } from '../prompt-user'
+import { commitWithRetryOnFailure } from '../commit'
 
 const program = new Command()
 
@@ -48,7 +52,7 @@ program
 
     console.log('Spawning Architect Agent to break down the plan...')
 
-    const tasks = await convertPlanToTasks(planContent)
+    let tasks: Task[] = await convertPlanToTasks(planContent)
 
     fs.writeFileSync(
       path.join(featureDir, 'tasks.json'),
@@ -63,6 +67,25 @@ program
       return
     }
 
+    const tasksPath = path.resolve(cwd, '.ductus', feature, 'tasks.json')
+
+    while (true) {
+      const feedback = await promptForTaskApproval(tasks)
+      if (!feedback) break
+
+      try {
+        tasks = await refinePlanToTasks(planContent, tasksPath, feedback, cwd)
+        if (tasks.length === 0) {
+          console.error('Architect returned empty task list. Please provide different feedback.')
+          continue
+        }
+        fs.writeFileSync(tasksPath, JSON.stringify(tasks, null, 2), 'utf-8')
+      } catch (e) {
+        console.error('Refinement failed:', e?.toString())
+        console.log('Please try again with different feedback, or press Enter to accept current tasks.')
+      }
+    }
+
     try {
       await getHeadRef(cwd)
     } catch {
@@ -75,6 +98,7 @@ program
       let attempt = 0
       const maxAttempts = maxRetries + 1
       let result: Approval | Rejection | null = null
+      let engineerReport: Awaited<ReturnType<typeof runImplementationEngineer>> | null = null
 
       while (attempt < maxAttempts) {
         console.log(
@@ -95,17 +119,16 @@ program
             cwd,
           )
         } else {
-          await runImplementationEngineer(
-            task,
-            cwd,
-          )
+          engineerReport = await runImplementationEngineer(task, cwd)
         }
 
         const diff = await getDiff(beforeRef, cwd)
         result = await runReviewer(task, diff, cwd)
 
         if (result.decision === 'approved') {
-          console.log(`Task ${index + 1} approved.`)
+          const message = engineerReport?.commitMessage?.trim() || task.summary
+          await commitWithRetryOnFailure(message, cwd)
+          console.log(`Task ${index + 1} approved and committed.`)
           break
         }
 

@@ -109,3 +109,37 @@ export async function runAgentWithExecution(options: {
     stdin: 'inherit',
   })
 }
+
+/**
+ * Runs the agent with execution mode, piping stdout to the terminal while buffering it.
+ * Returns the raw stdout for parsing (e.g. EngineerReport JSON at end of turn).
+ */
+export async function runAgentWithExecutionAndCapture(options: {
+  args: string[]
+  spinnerText?: string
+}): Promise<string> {
+  const { args, spinnerText } = options
+  const { default: ora } = await import('ora')
+  const spinner = spinnerText ? ora(spinnerText).start() : null
+
+  const subprocess = execa('agent', args, {
+    stdout: 'pipe',
+    stderr: 'inherit',
+    stdin: 'inherit',
+  })
+
+  const chunks: Buffer[] = []
+  subprocess.stdout?.on('data', (chunk: Buffer) => {
+    chunks.push(chunk)
+    process.stdout.write(chunk)
+    if (spinner?.isSpinning) spinner.succeed('Agent started...')
+  })
+
+  try {
+    await subprocess
+  } finally {
+    if (spinner?.isSpinning) spinner.stop()
+  }
+
+  return Buffer.concat(chunks).toString('utf-8')
+}
