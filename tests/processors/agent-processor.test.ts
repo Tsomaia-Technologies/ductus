@@ -8,7 +8,6 @@ import { AsyncEventQueue } from "../../src/core/event-queue.js";
 import type { FileAdapter } from "../../src/interfaces/adapters.js";
 import type { CacheAdapter } from "../../src/interfaces/cache-adapter.js";
 import type { AgentDispatcher } from "../../src/interfaces/agent-dispatcher.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
 
 async function flushStream<T>(stream: AsyncIterable<T>): Promise<T[]> {
   const out: T[] = [];
@@ -23,8 +22,8 @@ describe("AgentProcessor", () => {
     it("yields AGENT_REPORT_RECEIVED from cache without calling FileAdapter or AgentDispatcher", async () => {
       const fileReadCalls: string[] = [];
       const mockFileAdapter: FileAdapter = {
-        append: async () => {},
-        readStream: async function* () {},
+        append: async () => { },
+        readStream: async function* () { },
         read: async (path) => {
           fileReadCalls.push(path);
           return "";
@@ -39,7 +38,7 @@ describe("AgentProcessor", () => {
           yield { type: "token" as const, content: "x" };
           yield { type: "complete" as const, parsedOutput: { files: ["b.ts"] } };
         },
-        terminate: () => {},
+        terminate: () => { },
       } as AgentDispatcher;
 
       const cache = new Map<string, unknown>();
@@ -49,13 +48,6 @@ describe("AgentProcessor", () => {
           cache.get(key) as T | undefined,
         set: async (key, val) => {
           cache.set(key, val);
-        },
-      };
-
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
         },
       };
 
@@ -76,13 +68,11 @@ describe("AgentProcessor", () => {
 
       const queue = new AsyncEventQueue();
       const processor = new AgentProcessor(
-        mockHub,
         config,
         mockDispatcher,
         mockFileAdapter,
         mockCache,
-        process.cwd(),
-        queue
+        process.cwd()
       );
 
       queue.push({
@@ -102,11 +92,11 @@ describe("AgentProcessor", () => {
       });
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const yielded = await flushStream(processor.process(queue));
 
-      const durable = broadcasts.filter((b) => b.type === "AGENT_REPORT_RECEIVED");
+      const durable = yielded.filter((b) => b.type === "AGENT_RESPONSE");
       expect(durable).toHaveLength(1);
-      expect((durable[0]!.payload as { files: string[] }).files).toEqual(["hi.ts"]);
+      expect((durable[0]!.payload as { filesModified: string[] }).filesModified).toEqual(["hi.ts"]);
 
       expect(fileReadCalls).toHaveLength(0);
       expect(dispatcherProcessCalls).toHaveLength(0);
@@ -128,22 +118,15 @@ describe("AgentProcessor", () => {
       });
 
       const mockFileAdapter: FileAdapter = {
-        append: async () => {},
-        readStream: async function* () {},
+        append: async () => { },
+        readStream: async function* () { },
         read: async () => "template",
         exists: async () => true,
       };
 
       const mockCache: CacheAdapter = {
         get: async () => undefined,
-        set: async () => {},
-      };
-
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
+        set: async () => { },
       };
 
       const config = {
@@ -163,13 +146,11 @@ describe("AgentProcessor", () => {
 
       const queue = new AsyncEventQueue();
       const processor = new AgentProcessor(
-        mockHub,
         config,
         dispatcher,
         mockFileAdapter,
         mockCache,
-        process.cwd(),
-        queue
+        process.cwd()
       );
 
       queue.push({
@@ -201,9 +182,9 @@ describe("AgentProcessor", () => {
       });
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const yielded = await flushStream(processor.process(queue));
 
-      const durable = broadcasts.filter(
+      const durable = yielded.filter(
         (b) =>
           b.type === "AGENT_REPORT_RECEIVED" || b.type === "AGENT_FAILURE"
       );

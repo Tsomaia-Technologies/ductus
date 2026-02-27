@@ -7,7 +7,6 @@
 
 import type { BaseEvent } from "../interfaces/event.js";
 import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
-import { RingBufferQueue } from "../core/event-queue.js";
 import { createTelemetryUpdated } from "../core/events/creators.js";
 
 const AUTHOR_ID = "telemetry-processor";
@@ -42,7 +41,6 @@ export class TelemetryProcessor implements EventProcessor {
   private totalOutputTokens = 0;
   private readonly byModel = new Map<string, ModelMetrics>();
   private sessionStartTimestamp: number | null = null;
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
   constructor() { }
 
@@ -61,15 +59,6 @@ export class TelemetryProcessor implements EventProcessor {
   }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    this.consumeAndAggregate(stream).catch(console.error);
-    for await (const out of this.outQueue) {
-      yield out;
-    }
-  }
-
-  private async consumeAndAggregate(
-    stream: AsyncIterable<EnqueuedEvent>
-  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "SYSTEM_START") {
         this.resetAccumulators();
@@ -78,17 +67,16 @@ export class TelemetryProcessor implements EventProcessor {
       }
 
       if (event.type === "CIRCUIT_INTERRUPTED" || event.type === "SYSTEM_HALT") {
-        this.emitTelemetryUpdated();
+        yield this.emitTelemetryUpdated();
         this.resetAccumulators();
         continue;
       }
 
       if (event.type === "AGENT_RESPONSE") {
         this.accumulateUsage(event.payload);
-        this.emitTelemetryUpdated();
+        yield this.emitTelemetryUpdated();
       }
     }
-    this.outQueue.close();
   }
 
   private accumulateUsage(payload: unknown): void {
@@ -113,12 +101,12 @@ export class TelemetryProcessor implements EventProcessor {
     this.totalOutputTokens += output;
   }
 
-  private emitTelemetryUpdated(): void {
+  private emitTelemetryUpdated(): BaseEvent {
     const byModel: Record<string, ModelMetrics> = {};
     for (const [k, v] of this.byModel) {
       byModel[k] = { ...v };
     }
-    this.outQueue.push(createTelemetryUpdated({
+    return createTelemetryUpdated({
       payload: {
         byModel,
         totalInputTokens: this.totalInputTokens,
@@ -127,7 +115,7 @@ export class TelemetryProcessor implements EventProcessor {
       },
       authorId: AUTHOR_ID,
       timestamp: Date.now()
-    }));
+    });
   }
 
   private resetAccumulators(): void {

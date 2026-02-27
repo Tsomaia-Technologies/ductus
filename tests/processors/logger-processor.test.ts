@@ -6,18 +6,18 @@
 import { LoggerProcessor } from "../../src/processors/logger-processor.js";
 import { AsyncEventQueue } from "../../src/core/event-queue.js";
 import type { TerminalAdapter } from "../../src/interfaces/adapters.js";
-import type { CommitedEvent } from "../../src/core/event-contracts.js";
+import type { CommittedEvent } from "../../src/interfaces/event.js";
 import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
 const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
 
-function mockCommitedEvent(
+function mockCommittedEvent(
   type: string,
   volatility: "durable" | "volatile",
   payload: unknown = {}
-): CommitedEvent & { isReplay?: boolean } {
+): CommittedEvent & { isReplay?: boolean } {
   return {
     eventId: VALID_UUID,
     type,
@@ -50,14 +50,14 @@ describe("LoggerProcessor", () => {
       };
 
       const queue = new AsyncEventQueue();
-      const processor = new LoggerProcessor(mockTerminalAdapter, queue);
+      const processor = new LoggerProcessor(mockTerminalAdapter);
 
-      const events: (CommitedEvent & { isReplay?: boolean })[] = [
-        mockCommitedEvent("EVENT_A", "durable"),
-        mockCommitedEvent("EVENT_B", "durable"),
-        mockCommitedEvent("EVENT_C", "durable"),
-        mockCommitedEvent("EVENT_D", "durable"),
-        mockCommitedEvent("EVENT_E", "durable"),
+      const events: (CommittedEvent & { isReplay?: boolean })[] = [
+        mockCommittedEvent("EVENT_A", "durable"),
+        mockCommittedEvent("EVENT_B", "durable"),
+        mockCommittedEvent("EVENT_C", "durable"),
+        mockCommittedEvent("EVENT_D", "durable"),
+        mockCommittedEvent("EVENT_E", "durable"),
       ];
       for (const e of events) {
         e.isReplay = true;
@@ -65,7 +65,7 @@ describe("LoggerProcessor", () => {
       }
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      await flushStream(processor.process(queue as any));
 
       expect(logCalls).toHaveLength(0);
     });
@@ -83,16 +83,16 @@ describe("LoggerProcessor", () => {
       };
 
       const queue = new AsyncEventQueue();
-      const processor = new LoggerProcessor(mockTerminalAdapter, queue);
+      const processor = new LoggerProcessor(mockTerminalAdapter);
 
       const chunk = "Hello, world!";
-      const event = mockCommitedEvent("AGENT_TOKEN_STREAM", "volatile", {
+      const event = mockCommittedEvent("AGENT_TOKEN_STREAM", "volatile", {
         chunk,
       });
       queue.push(event);
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      await flushStream(processor.process(queue as any));
 
       expect(logCalls).toHaveLength(1);
       expect(logCalls[0]).toBe(chunk);

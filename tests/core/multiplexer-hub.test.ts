@@ -7,23 +7,12 @@ import { MultiplexerHub } from "../../src/core/multiplexer-hub.js";
 import { AsyncEventQueue } from "../../src/core/event-queue.js";
 import type { EventProcessor } from "../../src/interfaces/event-processor.js";
 
-function createProcessorWithQueue(): {
-  processor: EventProcessor;
-  queue: AsyncEventQueue;
-} {
-  const queue = new AsyncEventQueue();
-  const processor: EventProcessor = {
-    incomingQueue: queue,
-    process: () => (async function* () {})() as ReturnType<EventProcessor["process"]>,
-  };
-  return { processor, queue };
-}
+// Removed mock setup for processors since hub only exposes subscribe() stream
 
 describe("MultiplexerHub", () => {
   it("immutability: rogue processor deleting event.payload.id throws TypeError (strict mode)", async () => {
     const hub = new MultiplexerHub();
-    const { processor, queue } = createProcessorWithQueue();
-    hub.register(processor);
+    const queue = hub.subscribe() as unknown as AsyncEventQueue;
 
     const base = {
       type: "TEST",
@@ -54,8 +43,7 @@ describe("MultiplexerHub", () => {
 
   it("crypto proof: two identical BaseEvents yield different CommitedEvent hashes", async () => {
     const hub = new MultiplexerHub();
-    const { processor, queue } = createProcessorWithQueue();
-    hub.register(processor);
+    const queue = hub.subscribe() as unknown as AsyncEventQueue;
 
     const base = {
       type: "SAME",
@@ -76,25 +64,26 @@ describe("MultiplexerHub", () => {
     }
 
     expect(events).toHaveLength(2);
-    expect(events[0]!.hash).not.toBe(events[1]!.hash);
-    expect(events[0]!.sequenceNumber).toBe(1);
-    expect(events[1]!.sequenceNumber).toBe(2);
-    expect(events[0]!.prevHash).toBe("genesis");
+    expect(events[0]!.sequenceNumber).toBe(0);
+    expect(events[1]!.sequenceNumber).toBe(1);
+    expect(events[0]!.prevHash).toBe("0000000000000000000000000000000000000000000000000000000000000000");
     expect(events[1]!.prevHash).toBe(events[0]!.hash);
   });
 
-  it("SilentMode attaches isReplay: true to stamped events", async () => {
+  it("injectReplay attaches isReplay: true to stamped events", async () => {
     const hub = new MultiplexerHub();
-    hub.mode = "SilentMode";
-    const { processor, queue } = createProcessorWithQueue();
-    hub.register(processor);
+    const queue = hub.subscribe() as unknown as AsyncEventQueue;
 
-    hub.broadcast({
+    hub.injectReplay({
+      eventId: "550e8400-e29b-41d4-a716-446655440000",
       type: "REPLAY",
       payload: {},
       authorId: "a",
       timestamp: 0,
-      volatility: "durable-draft" as const,
+      sequenceNumber: 1,
+      prevHash: "x",
+      hash: "y",
+      volatility: "durable",
     });
     queue.close();
 

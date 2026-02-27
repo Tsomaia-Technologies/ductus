@@ -18,8 +18,8 @@ function createMockAdapters(): {
 } {
   return {
     file: {
-      append: async () => {},
-      readStream: async function* () {},
+      append: async () => { },
+      readStream: async function* () { },
       read: async () => "",
       exists: async () => false,
     },
@@ -29,7 +29,7 @@ function createMockAdapters(): {
     terminal: {
       ask: async () => ({} as never),
       confirm: async () => false,
-      log: () => {},
+      log: () => { },
     },
   };
 }
@@ -46,9 +46,13 @@ describe("Bootstrapper", () => {
       const adapters = createMockAdapters();
       const bootstrapper = new Bootstrapper({
         cwd: process.cwd(),
-        adapterOverrides: adapters,
+        fileAdapter: adapters.file,
+        osAdapter: adapters.os,
+        terminalAdapter: adapters.terminal,
+        ledgerPath: "ledger.md",
+        configPath: "ductus.config.ts"
       });
-      await bootstrapper.ignite();
+      await bootstrapper.boot("new");
       expect(bootstrapper).toBeDefined();
     });
   });
@@ -64,8 +68,7 @@ describe("Bootstrapper", () => {
         },
       };
 
-      const loggerQueue = new AsyncEventQueue();
-      const mockLogger = new LoggerProcessor(mockTerminalAdapter, loggerQueue);
+      // Removed loggerQueue and mockLogger
 
       const tmpDir = await mkdtemp(join(tmpdir(), "ductus-test-"));
 
@@ -130,7 +133,7 @@ describe("Bootstrapper", () => {
       const ledgerLines = fiveEvents.map((e) => JSON.stringify(e));
 
       const mockFileAdapter: FileAdapter = {
-        append: async () => {},
+        append: async () => { },
         readStream: async function* () {
           for (const line of ledgerLines) yield line;
         },
@@ -143,16 +146,16 @@ describe("Bootstrapper", () => {
 
       const bootstrapper = new Bootstrapper({
         cwd: tmpDir,
-        processorOverrides: { logger: mockLogger },
-        adapterOverrides: adapters,
+        fileAdapter: adapters.file,
+        osAdapter: adapters.os,
+        terminalAdapter: adapters.terminal,
+        ledgerPath: join(tmpDir, "ledger.jsonl"),
+        configPath: "ductus.config.ts",
       });
 
-      await bootstrapper.ignite();
+      await bootstrapper.boot("resume");
 
-      loggerQueue.close();
-      await flushStream(
-        mockLogger.process(loggerQueue as Parameters<typeof mockLogger.process>[0])
-      );
+      // Removed flushStream since the wired processor inside handles it
 
       expect(logCalls.length).toBe(0);
     });

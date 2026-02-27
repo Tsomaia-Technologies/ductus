@@ -5,8 +5,7 @@
 
 import { TelemetryProcessor } from "../../src/processors/telemetry-processor.js";
 import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
-import type { CommitedEvent } from "../../src/core/event-contracts.js";
+import type { BaseEvent } from "../../src/interfaces/event.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
@@ -16,60 +15,48 @@ function mockEvent(
   type: string,
   payload: unknown = {},
   isReplay?: boolean
-): CommitedEvent & { isReplay?: boolean } {
+): any {
   return {
     eventId: VALID_UUID,
     type,
     payload,
     authorId: "agent-processor",
     timestamp: Date.now(),
-    sequenceNumber: 1,
-    prevHash: VALID_SHA256,
-    hash: VALID_SHA256,
     volatility: "durable",
     isReplay,
-  };
+  } as any;
 }
 
-async function flushStream(stream: AsyncIterable<unknown>): Promise<void> {
-  for await (const _ of stream) {
-    /* sink */
+async function flushStream(stream: AsyncIterable<BaseEvent>): Promise<BaseEvent[]> {
+  const out: BaseEvent[] = [];
+  for await (const o of stream) {
+    out.push(o);
   }
+  return out;
 }
 
 describe("TelemetryProcessor", () => {
   describe("The Replay Accrual Proof", () => {
-    it("processes AGENT_REPORT_RECEIVED with isReplay: true and accumulates tokens; yields TELEMETRY_UPDATED", async () => {
-      const broadcasts: Array<{ type: string; volatility: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; volatility: string; payload: unknown }) => {
-          broadcasts.push({
-            type: e.type,
-            volatility: e.volatility,
-            payload: e.payload,
-          });
-        },
-      };
-
+    it("processes AGENT_RESPONSE with isReplay: true and accumulates tokens; yields TELEMETRY_UPDATED", async () => {
       const queue = new AsyncEventQueue();
-      const processor = new TelemetryProcessor(mockHub, queue);
+      const processor = new TelemetryProcessor();
 
       queue.push(
         mockEvent(
-          "AGENT_REPORT_RECEIVED",
+          "AGENT_RESPONSE",
           { usage: { inputTokens: 10000, outputTokens: 500 } },
           true
         )
       );
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const yielded = await flushStream(processor.process(queue));
 
       const metrics = processor.getAccumulatedMetrics();
       expect(metrics.totalInputTokens).toBe(10000);
       expect(metrics.totalOutputTokens).toBe(500);
 
-      const telemetry = broadcasts.filter((b) => b.type === "TELEMETRY_UPDATED");
+      const telemetry = yielded.filter((b) => b.type === "TELEMETRY_UPDATED");
       expect(telemetry).toHaveLength(1);
       expect((telemetry[0]!.payload as { totalInputTokens: number }).totalInputTokens).toBe(10000);
     });
@@ -77,33 +64,26 @@ describe("TelemetryProcessor", () => {
 
   describe("The Volatile Filter Proof", () => {
     it("every yielded event has volatility: 'volatile-draft'", async () => {
-      const broadcasts: Array<{ type: string; volatility: string }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; volatility: string }) => {
-          broadcasts.push({ type: e.type, volatility: e.volatility });
-        },
-      };
-
       const queue = new AsyncEventQueue();
-      const processor = new TelemetryProcessor(mockHub, queue);
+      const processor = new TelemetryProcessor();
 
       queue.push(
-        mockEvent("AGENT_REPORT_RECEIVED", {
+        mockEvent("AGENT_RESPONSE", {
           usage: { inputTokens: 100, outputTokens: 50, model: "gpt-4" },
         })
       );
       queue.push(
-        mockEvent("AGENT_REPORT_RECEIVED", {
+        mockEvent("AGENT_RESPONSE", {
           usage: { inputTokens: 200, outputTokens: 100 },
         })
       );
       queue.push(mockEvent("CIRCUIT_INTERRUPTED", { signal: "SIGINT" }));
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const yielded = await flushStream(processor.process(queue));
 
-      expect(broadcasts.length).toBeGreaterThan(0);
-      for (const b of broadcasts) {
+      expect(yielded.length).toBeGreaterThan(0);
+      for (const b of yielded) {
         expect(b.volatility).toBe("volatile-draft");
       }
     });

@@ -7,7 +7,7 @@
 import { randomUUID } from "node:crypto";
 import type { BaseEvent } from "../interfaces/event.js";
 import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
-import { RingBufferQueue } from "../core/event-queue.js";
+
 import { createEffectSpawnAgent, createRequestInput, createPlanApproved, createPlanRejected } from "../core/events/creators.js";
 
 interface StartPlanningPayload {
@@ -34,73 +34,55 @@ function isApproval(answer: unknown): boolean {
 export class PlanningProcessor implements EventProcessor {
   /** Maps REQUEST_INPUT id → draft spec for INPUT_RECEIVED correlation. */
   private readonly pendingByRequestId = new Map<string, string>();
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
-
   constructor() { }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    this.consumeAndOrchestrate(stream).catch(console.error);
-    for await (const out of this.outQueue) {
-      yield out;
-    }
-  }
-
-  private async consumeAndOrchestrate(
-    stream: AsyncIterable<{
-      type: string;
-      payload: unknown;
-      authorId: string;
-      timestamp: number;
-      eventId?: string;
-      isReplay?: boolean;
-    }>
-  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "START_PLANNING") {
         if (event.isReplay) continue;
-        this.handleStartPlanning(event);
+        yield* this.handleStartPlanning(event);
         continue;
       }
 
       if (event.type === "AGENT_RESPONSE") {
         if ((event as any).isReplay === true) continue;
-        this.handleAgentReport(event);
+        yield* this.handleAgentReport(event);
         continue;
       }
 
       if (event.type === "INPUT_RECEIVED") {
         if ((event as any).isReplay === true) continue;
-        this.handleInputReceived(event);
+        yield* this.handleInputReceived(event);
       }
     }
-
-    this.outQueue.close();
   }
 
   private handleStartPlanning(event: {
     payload: unknown;
     eventId?: string;
-  }): void {
+  }): BaseEvent[] {
     const payload = event.payload as StartPlanningPayload;
     const prompt = typeof payload?.prompt === "string" ? payload.prompt : "";
 
-    this.outQueue.push(createEffectSpawnAgent({
-      payload: {
-        roleName: PLANNER_ROLE,
-        scope: "default",
-        input: prompt,
-      },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now()
-    }));
+    return [
+      createEffectSpawnAgent({
+        payload: {
+          roleName: PLANNER_ROLE,
+          scope: "default",
+          input: prompt,
+        },
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      })
+    ];
   }
 
   private handleAgentReport(event: {
     payload: unknown;
     authorId: string;
     eventId?: string;
-  }): void {
-    if (event.authorId !== "agent-processor") return;
+  }): BaseEvent[] {
+    if (event.authorId !== "agent-processor") return [];
 
     const raw = event.payload;
     const p =
@@ -110,74 +92,79 @@ export class PlanningProcessor implements EventProcessor {
         "correlationId" in raw
         ? (raw as { result: unknown }).result
         : raw;
-    if (typeof p === "object" && p !== null && "files" in p) return;
+    if (typeof p === "object" && p !== null && "files" in p) return [];
 
     const spec =
       typeof p === "string" ? p : (p as { spec?: string })?.spec ?? "";
 
-    if (typeof spec !== "string" || spec.length === 0) return;
+    if (typeof spec !== "string" || spec.length === 0) return [];
 
     const requestId = `approve-spec-${randomUUID()}`;
     this.pendingByRequestId.set(requestId, spec);
 
-    this.outQueue.push(createRequestInput({
-      payload: {
-        id: requestId,
-        question: "Approve this spec? Reply 'Yes' to approve, or describe the changes you want (e.g. 'No, add authentication').",
-        expectedSchemaType: "string",
-      },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now()
-    }));
+    return [
+      createRequestInput({
+        payload: {
+          id: requestId,
+          question: "Approve this spec? Reply 'Yes' to approve, or describe the changes you want (e.g. 'No, add authentication').",
+          expectedSchemaType: "string",
+        },
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      })
+    ];
   }
 
   private handleInputReceived(event: {
     payload: unknown;
     authorId: string;
-  }): void {
+  }): BaseEvent[] {
     const payload = event.payload as InputReceivedPayload;
     const id = payload?.id ?? "";
     const answer = payload?.answer;
 
     const spec = this.pendingByRequestId.get(id);
-    if (!spec) return;
+    if (!spec) return [];
 
     this.pendingByRequestId.delete(id);
 
     if (isApproval(answer)) {
-      this.outQueue.push(createPlanApproved({
-        payload: { spec },
-        authorId: AUTHOR_ID,
-        timestamp: Date.now()
-      }));
-      return;
+      return [
+        createPlanApproved({
+          payload: { spec },
+          authorId: AUTHOR_ID,
+          timestamp: Date.now()
+        })
+      ];
     }
 
     const feedback = typeof answer === "string" ? answer : String(answer ?? "");
-    this.outQueue.push(createPlanRejected({
-      payload: { spec, feedback },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now()
-    }));
 
-    this.outQueue.push(createEffectSpawnAgent({
-      payload: {
-        roleName: PLANNER_ROLE,
-        scope: "default",
-        input: feedback,
-        context: {
-          messages: [
-            {
-              role: "user" as const,
-              content: `Previous spec was rejected. User feedback: ${feedback}`,
-              timestamp: Date.now(),
-            },
-          ],
-          stats: { inputTokens: 0, outputTokens: 0, turns: 0 },
+    return [
+      createPlanRejected({
+        payload: { spec, feedback },
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      }),
+      createEffectSpawnAgent({
+        payload: {
+          roleName: PLANNER_ROLE,
+          scope: "default",
+          input: feedback,
+          context: {
+            messages: [
+              {
+                role: "user" as const,
+                content: `Previous spec was rejected. User feedback: ${feedback}`,
+                timestamp: Date.now(),
+              },
+            ],
+            stats: { inputTokens: 0, outputTokens: 0, turns: 0 },
+          },
         },
-      },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now()
-    }));
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      })
+    ];
   }
 }

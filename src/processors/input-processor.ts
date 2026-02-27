@@ -9,7 +9,6 @@ import { z } from "zod";
 import type { BaseEvent } from "../interfaces/event.js";
 import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
 import type { TerminalAdapter } from "../interfaces/adapters.js";
-import { RingBufferQueue } from "../core/event-queue.js";
 import { createInputReceived } from "../core/events/creators.js";
 
 interface RequestInputPayload {
@@ -48,22 +47,11 @@ function resolveSchemaAndAdapter(
 }
 
 export class InputProcessor implements EventProcessor {
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
-
   constructor(
     private readonly terminalAdapter: TerminalAdapter
   ) { }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    this.consumeAndPrompt(stream).catch(console.error);
-    for await (const out of this.outQueue) {
-      yield out;
-    }
-  }
-
-  private async consumeAndPrompt(
-    stream: InputEventStream
-  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "REQUEST_INPUT") {
         if (event.isReplay) continue;
@@ -79,14 +67,12 @@ export class InputProcessor implements EventProcessor {
           this.terminalAdapter
         ) as string;
 
-        this.outQueue.push(createInputReceived({
+        yield createInputReceived({
           payload: { id, answer },
           authorId: AUTHOR_ID,
           timestamp: Date.now()
-        }));
+        });
       }
     }
-
-    this.outQueue.close();
   }
 }

@@ -5,7 +5,6 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { RingBufferQueue } from "../core/event-queue.js";
 import { createEffectRunTool, createAutoRejection, createFeatureApproved } from "../core/events/creators.js";
 import { createTaskCompleted } from "../core/events/creators.js";
 
@@ -98,7 +97,6 @@ function compareClaimsVsReality(
 
 export class DevelopmentProcessor implements EventProcessor {
   private readonly pendingByTrackingId = new Map<string, PendingVerification>();
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
   constructor(
     private readonly config: DuctusConfig,
@@ -106,53 +104,36 @@ export class DevelopmentProcessor implements EventProcessor {
   ) { }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    this.consumeAndVerify(stream).catch(console.error);
-    for await (const out of this.outQueue) {
-      yield out;
-    }
-  }
-
-  private async consumeAndVerify(
-    stream: AsyncIterable<{
-      type: string;
-      payload: unknown;
-      authorId: string;
-      timestamp: number;
-      eventId?: string;
-      isReplay?: boolean;
-    }>
-  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "AGENT_RESPONSE") {
         if ((event as any).isReplay === true) continue;
-        this.handleAgentReport(event);
+        yield* this.handleAgentReport(event);
         continue;
       }
 
       if (event.type === "TOOL_COMPLETED") {
-        this.handleToolCompleted(event.payload as ToolCompletedPayload, event.authorId);
+        yield* this.handleToolCompleted(event.payload as ToolCompletedPayload, event.authorId);
         continue;
       }
 
       if (event.type === "TOOL_FAILURE") {
-        this.handleToolFailed(event.payload as ToolFailedPayload, event.authorId);
+        yield* this.handleToolFailed(event.payload as ToolFailedPayload, event.authorId);
       }
     }
-    this.outQueue.close();
   }
 
   private handleAgentReport(event: {
     payload: unknown;
     authorId: string;
     eventId?: string;
-  }): void {
+  }): BaseEvent[] {
     const raw = event.payload;
     if (
       raw !== null &&
       typeof raw === "object" &&
       "correlationId" in raw
     ) {
-      return;
+      return [];
     }
     const payload = raw as AgentReportPayload;
     const files = Array.isArray(payload?.files)
@@ -169,16 +150,18 @@ export class DevelopmentProcessor implements EventProcessor {
       phase: "git-diff",
     });
 
-    this.outQueue.push(createEffectRunTool({
-      payload: {
-        command: "git diff --name-only",
-        args: [],
-        cwd: this.cwd,
-        trackingId,
-      },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now()
-    }));
+    return [
+      createEffectRunTool({
+        payload: {
+          command: "git",
+          args: ["diff", "--name-only"],
+          cwd: this.cwd,
+          trackingId,
+        },
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      })
+    ];
   }
 
   private resolveScope(scopeName?: string): DuctusConfig["default"] {
@@ -205,14 +188,14 @@ export class DevelopmentProcessor implements EventProcessor {
   private handleToolCompleted(
     payload: ToolCompletedPayload,
     toolAuthorId: string
-  ): void {
-    if (toolAuthorId !== "tool-processor") return;
+  ): BaseEvent[] {
+    if (toolAuthorId !== "tool-processor") return [];
 
     const trackingId = payload?.trackingId as string | undefined;
-    if (!trackingId) return;
+    if (!trackingId) return [];
 
     const pending = this.pendingByTrackingId.get(trackingId);
-    if (!pending) return;
+    if (!pending) return [];
 
     this.pendingByTrackingId.delete(trackingId);
 
@@ -221,25 +204,27 @@ export class DevelopmentProcessor implements EventProcessor {
       const cmp = compareClaimsVsReality(pending.claimedFiles, actualFiles);
 
       if (!cmp.match) {
-        this.outQueue.push(createAutoRejection({
-          payload: {
-            isHallucination: true,
-            type: cmp.reason
-          },
-          authorId: AUTHOR_ID,
-          timestamp: Date.now()
-        }));
-        return;
+        return [
+          createAutoRejection({
+            payload: {
+              isHallucination: true,
+              type: "diff_mismatch"
+            },
+            authorId: AUTHOR_ID,
+            timestamp: Date.now()
+          })
+        ];
       }
 
       const checks = this.getChecksForScope("default");
       if (checks.length === 0) {
-        this.outQueue.push(createTaskCompleted({
-          payload: { taskId: pending.agentEventId },
-          authorId: AUTHOR_ID,
-          timestamp: Date.now()
-        }));
-        return;
+        return [
+          createTaskCompleted({
+            payload: { taskId: pending.agentEventId },
+            authorId: AUTHOR_ID,
+            timestamp: Date.now()
+          })
+        ];
       }
 
       const [firstCheckName, firstCheck] = checks[0]!;
@@ -261,26 +246,28 @@ export class DevelopmentProcessor implements EventProcessor {
       if (checks.length > 1) nextPending.remainingChecks = checks.slice(1);
       this.pendingByTrackingId.set(nextTrackingId, nextPending);
 
-      this.outQueue.push(createEffectRunTool({
-        payload: { command, args, cwd: this.cwd, trackingId: nextTrackingId },
-        authorId: AUTHOR_ID,
-        timestamp: Date.now()
-      }));
-      return;
+      return [
+        createEffectRunTool({
+          payload: { command, args, cwd: this.cwd, trackingId: nextTrackingId },
+          authorId: AUTHOR_ID,
+          timestamp: Date.now()
+        })
+      ];
     }
 
     if (pending.phase === "check") {
       const exitCode = payload?.exitCode ?? 0;
       if (exitCode !== 0) {
-        this.outQueue.push(createAutoRejection({
-          payload: {
-            isHallucination: false,
-            type: "check_failure"
-          },
-          authorId: AUTHOR_ID,
-          timestamp: Date.now()
-        }));
-        return;
+        return [
+          createAutoRejection({
+            payload: {
+              isHallucination: false,
+              type: "check_failure"
+            },
+            authorId: AUTHOR_ID,
+            timestamp: Date.now()
+          })
+        ];
       }
 
       const remaining = pending.remainingChecks;
@@ -301,51 +288,61 @@ export class DevelopmentProcessor implements EventProcessor {
           remainingChecks: remaining.slice(1),
         });
 
-        this.outQueue.push(createEffectRunTool({
-          payload: { command, args, cwd: this.cwd, trackingId: nextTrackingId },
-          authorId: AUTHOR_ID,
-          timestamp: Date.now()
-        }));
-        return;
+        return [
+          createEffectRunTool({
+            payload: { command, args, cwd: this.cwd, trackingId: nextTrackingId },
+            authorId: AUTHOR_ID,
+            timestamp: Date.now()
+          })
+        ];
       }
 
-      this.outQueue.push(createTaskCompleted({
-        payload: { taskId: pending.agentEventId },
-        authorId: AUTHOR_ID,
-        timestamp: Date.now()
-      }));
+      return [
+        createTaskCompleted({
+          payload: { taskId: pending.agentEventId },
+          authorId: AUTHOR_ID,
+          timestamp: Date.now()
+        })
+      ];
     }
+
+    return [];
   }
 
   private handleToolFailed(
     payload: ToolFailedPayload,
     toolAuthorId: string
-  ): void {
-    if (toolAuthorId !== "tool-processor") return;
+  ): BaseEvent[] {
+    if (toolAuthorId !== "tool-processor") return [];
 
     const trackingId = payload?.trackingId as string | undefined;
-    if (!trackingId) return;
+    if (!trackingId) return [];
 
     const pending = this.pendingByTrackingId.get(trackingId);
-    if (!pending) return;
+    if (!pending) return [];
 
     this.pendingByTrackingId.delete(trackingId);
 
     if (pending.phase === "git-diff") {
-      this.outQueue.push(createAutoRejection({
-        payload: { isHallucination: true, type: "git_diff_failed" },
-        authorId: AUTHOR_ID,
-        timestamp: Date.now()
-      }));
-      return;
+      return [
+        createAutoRejection({
+          payload: { isHallucination: true, type: "git_diff_failed" },
+          authorId: AUTHOR_ID,
+          timestamp: Date.now()
+        })
+      ];
     }
 
     if (pending.phase === "check") {
-      this.outQueue.push(createAutoRejection({
-        payload: { isHallucination: false, type: "check_failure" },
-        authorId: AUTHOR_ID,
-        timestamp: Date.now()
-      }));
+      return [
+        createAutoRejection({
+          payload: { isHallucination: false, type: "check_failure" },
+          authorId: AUTHOR_ID,
+          timestamp: Date.now()
+        })
+      ];
     }
+
+    return [];
   }
 }

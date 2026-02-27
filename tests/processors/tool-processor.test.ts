@@ -25,19 +25,10 @@ describe("ToolProcessor", () => {
         },
       };
 
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
-      };
-
       const queue = new AsyncEventQueue();
       const processor = new ToolProcessor(
-        mockHub,
         mockOsAdapter,
-        process.cwd(),
-        queue
+        process.cwd()
       );
 
       queue.push({
@@ -54,7 +45,10 @@ describe("ToolProcessor", () => {
       });
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const yielded: any[] = [];
+      for await (const ev of processor.process(queue as any)) {
+        yielded.push(ev);
+      }
 
       expect(execCalls).toHaveLength(0);
     });
@@ -70,19 +64,10 @@ describe("ToolProcessor", () => {
         }),
       };
 
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
-      };
-
       const queue = new AsyncEventQueue();
       const processor = new ToolProcessor(
-        mockHub,
         mockOsAdapter,
-        process.cwd(),
-        queue
+        process.cwd()
       );
 
       queue.push({
@@ -98,9 +83,12 @@ describe("ToolProcessor", () => {
       });
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const yielded: any[] = [];
+      for await (const ev of processor.process(queue as any)) {
+        yielded.push(ev);
+      }
 
-      const completed = broadcasts.filter((b) => b.type === "TOOL_COMPLETED");
+      const completed = yielded.filter((b) => b.type === "TOOL_COMPLETED");
       expect(completed).toHaveLength(1);
       expect((completed[0]!.payload as { log: string }).log).toBe("ABC");
     });

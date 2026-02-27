@@ -8,7 +8,6 @@ import { randomUUID } from "node:crypto";
 import type { BaseEvent } from "../interfaces/event.js";
 import type { DuctusConfig } from "../core/ductus-config-schema.js";
 import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
-import { RingBufferQueue } from "../core/event-queue.js";
 import { createEffectRunTool, createEffectSpawnAgent, createFeatureRejected, createFeatureApproved } from "../core/events/creators.js";
 
 interface ToolCompletedPayload {
@@ -49,7 +48,6 @@ function parseCommandToExec(commandStr: string): { command: string; args: string
 export class QualityProcessor implements EventProcessor {
   private readonly pendingByTrackingId = new Map<string, PendingFeatureVerification>();
   private readonly pendingAuditorByCorrelationId = new Map<string, PendingAuditorVerification>();
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
   constructor(
     private readonly config: DuctusConfig,
@@ -57,9 +55,29 @@ export class QualityProcessor implements EventProcessor {
   ) { }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    this.consumeAndVerify(stream).catch(console.error);
-    for await (const out of this.outQueue) {
-      yield out;
+    for await (const event of stream) {
+      if (event.type === "FEATURE_IMPLEMENTED") {
+        if ((event as any).isReplay) continue;
+        yield* this.handleFeatureImplemented(event);
+        continue;
+      }
+
+      if (event.type === "TOOL_COMPLETED") {
+        if (event.authorId !== "tool-processor") continue;
+        yield* this.handleToolCompleted(event.payload as ToolCompletedPayload);
+        continue;
+      }
+
+      if (event.type === "TOOL_FAILED") {
+        if (event.authorId !== "tool-processor") continue;
+        yield* this.handleToolFailed(event.payload as ToolFailedPayload);
+        continue;
+      }
+
+      if (event.type === "AGENT_RESPONSE") {
+        if ((event as any).isReplay === true) continue;
+        yield* this.handleAgentReport(event);
+      }
     }
   }
 
@@ -79,54 +97,16 @@ export class QualityProcessor implements EventProcessor {
     return entries;
   }
 
-  private async consumeAndVerify(
-    stream: AsyncIterable<{
-      type: string;
-      payload: unknown;
-      authorId: string;
-      timestamp: number;
-      eventId?: string;
-      isReplay?: boolean;
-    }>
-  ): Promise<void> {
-    for await (const event of stream) {
-      if (event.type === "FEATURE_IMPLEMENTED") {
-        if (event.isReplay) continue;
-        this.handleFeatureImplemented(event);
-        continue;
-      }
-
-      if (event.type === "TOOL_COMPLETED") {
-        if (event.authorId !== "tool-processor") continue;
-        this.handleToolCompleted(event.payload as ToolCompletedPayload);
-        continue;
-      }
-
-      if (event.type === "TOOL_FAILED") {
-        if (event.authorId !== "tool-processor") continue;
-        this.handleToolFailed(event.payload as ToolFailedPayload);
-        continue;
-      }
-
-      if (event.type === "AGENT_RESPONSE") {
-        if ((event as any).isReplay === true) continue;
-        this.handleAgentReport(event);
-      }
-    }
-    this.outQueue.close();
-  }
-
   private handleFeatureImplemented(event: {
     payload: unknown;
     eventId?: string;
-  }): void {
+  }): BaseEvent[] {
     const payload = event.payload as { spec?: string; scope?: string };
     const scope = payload?.scope ?? "default";
 
     const checks = this.getPerFeatureChecks(scope);
     if (checks.length === 0) {
-      this.spawnAuditor(payload?.spec, scope);
-      return;
+      return this.spawnAuditor(payload?.spec, scope);
     }
 
     const [, firstCheck] = checks[0]!;
@@ -140,24 +120,26 @@ export class QualityProcessor implements EventProcessor {
     };
     this.pendingByTrackingId.set(trackingId, pending);
 
-    this.outQueue.push(createEffectRunTool({
-      payload: {
-        command,
-        args,
-        cwd: this.cwd,
-        trackingId,
-      },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now()
-    }));
+    return [
+      createEffectRunTool({
+        payload: {
+          command,
+          args,
+          cwd: this.cwd,
+          trackingId,
+        },
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      })
+    ];
   }
 
-  private handleToolCompleted(payload: ToolCompletedPayload): void {
+  private handleToolCompleted(payload: ToolCompletedPayload): BaseEvent[] {
     const trackingId = payload?.trackingId as string | undefined;
-    if (!trackingId) return;
+    if (!trackingId) return [];
 
     const pending = this.pendingByTrackingId.get(trackingId);
-    if (!pending) return;
+    if (!pending) return [];
 
     this.pendingByTrackingId.delete(trackingId);
 
@@ -171,72 +153,77 @@ export class QualityProcessor implements EventProcessor {
         remainingChecks: remaining.slice(1),
       });
 
-      this.outQueue.push(createEffectRunTool({
-        payload: {
-          command,
-          args,
-          cwd: this.cwd,
-          trackingId: nextTrackingId,
-        },
-        authorId: AUTHOR_ID,
-        timestamp: Date.now()
-      }));
-      return;
+      return [
+        createEffectRunTool({
+          payload: {
+            command,
+            args,
+            cwd: this.cwd,
+            trackingId: nextTrackingId,
+          },
+          authorId: AUTHOR_ID,
+          timestamp: Date.now()
+        })
+      ];
     }
 
-    this.spawnAuditor(pending.spec, pending.scope);
+    return this.spawnAuditor(pending.spec, pending.scope);
   }
 
-  private spawnAuditor(spec?: string, scope?: string): void {
+  private spawnAuditor(spec?: string, scope?: string): BaseEvent[] {
     const correlationId = `qa-auditor-${randomUUID()}`;
     this.pendingAuditorByCorrelationId.set(correlationId, { spec });
 
-    this.outQueue.push(createEffectSpawnAgent({
-      payload: {
-        roleName: "auditor",
-        scope: scope ?? "default",
-        input: spec ?? "",
-        correlationId,
-      },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now()
-    }));
+    return [
+      createEffectSpawnAgent({
+        payload: {
+          roleName: "auditor",
+          scope: scope ?? "default",
+          input: spec ?? "",
+          correlationId,
+        },
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      })
+    ];
   }
 
-  private handleToolFailed(payload: ToolFailedPayload): void {
+  private handleToolFailed(payload: ToolFailedPayload): BaseEvent[] {
     const trackingId = payload?.trackingId as string | undefined;
-    if (!trackingId) return;
+    if (!trackingId) return [];
 
     const pending = this.pendingByTrackingId.get(trackingId);
-    if (!pending) return;
+    if (!pending) return [];
 
     this.pendingByTrackingId.delete(trackingId);
 
-    this.outQueue.push(createFeatureRejected({
-      payload: {
-        reason: "check_failure",
-        stderr: payload?.stderr ?? payload?.log ?? "",
-        log: payload?.log ?? "",
-      },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now()
-    }));
+    return [
+      createFeatureRejected({
+        payload: {
+          reason: "check_failure",
+          stderr: payload?.stderr ?? payload?.log ?? "",
+          log: payload?.log ?? "",
+        },
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      })
+    ];
   }
 
   private handleAgentReport(event: {
     payload: unknown;
     authorId: string;
-  }): void {
-    if (event.authorId !== "agent-processor") return;
+  }): BaseEvent[] {
+    if (event.authorId !== "agent-processor") return [];
     const raw = event.payload;
     const correlationId =
       raw !== null && typeof raw === "object" && "correlationId" in raw
         ? (raw as { correlationId?: string }).correlationId
         : undefined;
-    if (!correlationId) return;
+    if (!correlationId) return [];
 
     const pending = this.pendingAuditorByCorrelationId.get(correlationId);
-    if (!pending) return;
+    if (!pending) return [];
 
     this.pendingAuditorByCorrelationId.delete(correlationId);
 
@@ -255,17 +242,21 @@ export class QualityProcessor implements EventProcessor {
     const critique = report?.critique ?? "";
 
     if (!approved || critique.length > 0) {
-      this.outQueue.push(createFeatureRejected({
-        payload: { reason: "auditor_gaps", critique },
-        authorId: AUTHOR_ID,
-        timestamp: Date.now()
-      }));
+      return [
+        createFeatureRejected({
+          payload: { reason: "auditor_gaps", critique },
+          authorId: AUTHOR_ID,
+          timestamp: Date.now()
+        })
+      ];
     } else {
-      this.outQueue.push(createFeatureApproved({
-        payload: { spec: pending.spec },
-        authorId: AUTHOR_ID,
-        timestamp: Date.now()
-      }));
+      return [
+        createFeatureApproved({
+          payload: { spec: pending.spec },
+          authorId: AUTHOR_ID,
+          timestamp: Date.now()
+        })
+      ];
     }
   }
 }

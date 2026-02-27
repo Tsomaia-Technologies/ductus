@@ -46,32 +46,22 @@ describe("SessionProcessor", () => {
           readCalls.push(path);
           return '{"default":{"checks":{}}}';
         },
-        append: async () => {},
-        readStream: async function* () {},
-      };
-
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
+        append: async () => { },
+        readStream: async function* () { },
       };
 
       const queue = new AsyncEventQueue();
-      const processor = new SessionProcessor(
-        mockHub,
-        mockFileAdapter,
-        configPath,
-        ledgerPath,
-        queue
-      );
+      const processor = new SessionProcessor(mockFileAdapter, configPath, ledgerPath);
 
       queue.push(mockEnqueuedEvent("SYSTEM_START"));
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const yielded: any[] = [];
+      for await (const ev of processor.process(queue as any)) {
+        yielded.push(ev);
+      }
 
-      const abort = broadcasts.filter((b) => b.type === "SYSTEM_ABORT_REQUESTED");
+      const abort = yielded.filter((b) => b.type === "SYSTEM_ABORT_REQUESTED");
       expect(abort).toHaveLength(1);
       const payload = abort[0]!.payload as { reason: string };
       expect(payload.reason).toContain("roles");
@@ -89,32 +79,22 @@ describe("SessionProcessor", () => {
         read: async () => {
           throw new Error("read should not be called");
         },
-        append: async () => {},
-        readStream: async function* () {},
-      };
-
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
+        append: async () => { },
+        readStream: async function* () { },
       };
 
       const queue = new AsyncEventQueue();
-      const processor = new SessionProcessor(
-        mockHub,
-        mockFileAdapter,
-        configPath,
-        ledgerPath,
-        queue
-      );
+      const processor = new SessionProcessor(mockFileAdapter, configPath, ledgerPath);
 
       queue.push(mockEnqueuedEvent("SYSTEM_START"));
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const yielded: any[] = [];
+      for await (const ev of processor.process(queue as any)) {
+        yielded.push(ev);
+      }
 
-      const loaded = broadcasts.filter((b) => b.type === "CONTEXT_LOADED");
+      const loaded = yielded.filter((b) => b.type === "CONTEXT_LOADED");
       expect(loaded).toHaveLength(1);
       const payload = loaded[0]!.payload as { config: unknown; isGenesis: boolean };
       expect(payload.isGenesis).toBe(true);

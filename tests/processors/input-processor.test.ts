@@ -6,7 +6,8 @@
 import { InputProcessor } from "../../src/processors/input-processor.js";
 import { AsyncEventQueue } from "../../src/core/event-queue.js";
 import type { TerminalAdapter } from "../../src/interfaces/adapters.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
+import type { InputEventStream } from "../../src/interfaces/event-processor.js";
+import type { BaseEvent } from "../../src/interfaces/event.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
@@ -51,21 +52,12 @@ describe("InputProcessor", () => {
           confirmCalls.push(message);
           return false;
         },
-        log: () => {},
-      };
-
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
+        log: () => { },
       };
 
       const queue = new AsyncEventQueue();
       const processor = new InputProcessor(
-        mockHub,
-        mockTerminalAdapter,
-        queue
+        mockTerminalAdapter
       );
 
       queue.push(
@@ -77,7 +69,11 @@ describe("InputProcessor", () => {
       );
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const outStream = processor.process(queue);
+      const yielded = [];
+      for await (const event of outStream) {
+        yielded.push(event);
+      }
 
       expect(askCalls).toHaveLength(0);
       expect(confirmCalls).toHaveLength(0);
@@ -89,21 +85,12 @@ describe("InputProcessor", () => {
       const mockTerminalAdapter: TerminalAdapter = {
         ask: async () => "unreachable" as never,
         confirm: async () => true,
-        log: () => {},
-      };
-
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const mockHub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
+        log: () => { },
       };
 
       const queue = new AsyncEventQueue();
       const processor = new InputProcessor(
-        mockHub,
-        mockTerminalAdapter,
-        queue
+        mockTerminalAdapter
       );
 
       queue.push(
@@ -115,9 +102,13 @@ describe("InputProcessor", () => {
       );
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      const outStream = processor.process(queue);
+      const yielded = [];
+      for await (const event of outStream) {
+        yielded.push(event);
+      }
 
-      const received = broadcasts.filter((b) => b.type === "INPUT_RECEIVED");
+      const received = yielded.filter((b) => b.type === "INPUT_RECEIVED");
       expect(received).toHaveLength(1);
       const payload = received[0]!.payload as { id: string; answer: unknown };
       expect(payload.answer).toBe(true);

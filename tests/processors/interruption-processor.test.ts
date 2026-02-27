@@ -4,14 +4,14 @@
  */
 
 import { InterruptionProcessor } from "../../src/processors/interruption-processor.js";
+import { AsyncEventQueue } from "../../src/core/event-queue.js";
+import type { BaseEvent } from "../../src/interfaces/event.js";
 
 describe("InterruptionProcessor", () => {
-  let mockHub: { broadcast: jest.Mock };
   let processor: InterruptionProcessor;
   let processExitSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    mockHub = { broadcast: jest.fn().mockResolvedValue(undefined) };
     processExitSpy = jest
       .spyOn(process, "exit")
       .mockImplementation(() => undefined as never);
@@ -23,13 +23,17 @@ describe("InterruptionProcessor", () => {
   });
 
   describe("The Double Tap Proof", () => {
-    it("first handleSigint yields CIRCUIT_INTERRUPTED; second triggers process.exit(1) instantly", () => {
-      processor = new InterruptionProcessor(mockHub);
+    it("first handleSigint yields CIRCUIT_INTERRUPTED; second triggers process.exit(1) instantly", async () => {
+      processor = new InterruptionProcessor();
+      const q = new AsyncEventQueue();
+      const outStream = processor.process(q);
 
       processor.handleSignal("SIGINT");
 
-      expect(mockHub.broadcast).toHaveBeenCalledTimes(1);
-      expect(mockHub.broadcast).toHaveBeenCalledWith(
+      const iter = outStream[Symbol.asyncIterator]();
+      const result = await iter.next();
+
+      expect(result.value).toEqual(
         expect.objectContaining({
           type: "CIRCUIT_INTERRUPTED",
           payload: { signal: "SIGINT" },
@@ -41,7 +45,6 @@ describe("InterruptionProcessor", () => {
       processor.handleSignal("SIGINT");
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
-      expect(mockHub.broadcast).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -50,7 +53,7 @@ describe("InterruptionProcessor", () => {
       jest.useFakeTimers();
       const setTimeoutSpy = jest.spyOn(global, "setTimeout");
 
-      processor = new InterruptionProcessor(mockHub);
+      processor = new InterruptionProcessor();
 
       processor.handleSignal("SIGINT");
 

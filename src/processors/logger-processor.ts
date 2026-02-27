@@ -8,7 +8,6 @@
 import type { BaseEvent } from "../interfaces/event.js";
 import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
 import type { TerminalAdapter } from "../interfaces/adapters.js";
-import { RingBufferQueue } from "../core/event-queue.js";
 
 type EnqueuedEvent = BaseEvent;
 
@@ -16,22 +15,11 @@ const RED = "\u001b[31m";
 const RESET = "\u001b[0m";
 
 export class LoggerProcessor implements EventProcessor {
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(16);
-
   constructor(
     private readonly terminalAdapter: TerminalAdapter
   ) { }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    this.consumeAndFormat(stream).catch(console.error);
-    for await (const out of this.outQueue) {
-      yield out;
-    }
-  }
-
-  private async consumeAndFormat(
-    stream: AsyncIterable<EnqueuedEvent>
-  ): Promise<void> {
     for await (const event of stream) {
       if (event.isReplay) continue;
 
@@ -40,8 +28,6 @@ export class LoggerProcessor implements EventProcessor {
         this.terminalAdapter.log(formatted);
       }
     }
-
-    this.outQueue.close();
   }
 
   private formatEvent(event: EnqueuedEvent): string | null {

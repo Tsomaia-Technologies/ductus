@@ -6,14 +6,14 @@
 import { PersistenceProcessor } from "../../src/processors/persistence-processor.js";
 import { AsyncEventQueue } from "../../src/core/event-queue.js";
 import type { FileAdapter } from "../../src/interfaces/adapters.js";
-import type { CommitedEvent } from "../../src/core/event-contracts.js";
+import type { CommittedEvent } from "../../src/interfaces/event.js";
 import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
 const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
 
-function mockCommitedEvent(volatility: "durable" | "volatile"): CommitedEvent & { isReplay?: boolean } {
+function mockCommittedEvent(volatility: "durable" | "volatile"): CommittedEvent & { isReplay?: boolean } {
   return {
     eventId: VALID_UUID,
     type: "TEST",
@@ -48,14 +48,14 @@ describe("PersistenceProcessor", () => {
 
       const ledgerPath = "/tmp/ledger.jsonl";
       const queue = new AsyncEventQueue();
-      const processor = new PersistenceProcessor(mockFileAdapter, ledgerPath, queue);
+      const processor = new PersistenceProcessor(mockFileAdapter, ledgerPath);
 
-      const events: (CommitedEvent & { isReplay?: boolean })[] = [
-        mockCommitedEvent("durable"),
-        mockCommitedEvent("volatile"),
-        mockCommitedEvent("durable"),
-        mockCommitedEvent("volatile"),
-        mockCommitedEvent("durable"),
+      const events: (CommittedEvent & { isReplay?: boolean })[] = [
+        mockCommittedEvent("durable"),
+        mockCommittedEvent("volatile"),
+        mockCommittedEvent("durable"),
+        mockCommittedEvent("volatile"),
+        mockCommittedEvent("durable"),
       ];
 
       for (const e of events) {
@@ -63,7 +63,7 @@ describe("PersistenceProcessor", () => {
       }
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      await flushStream(processor.process(queue as any));
 
       expect(appendCalls).toHaveLength(3);
       for (const [path, line] of appendCalls) {
@@ -88,15 +88,15 @@ describe("PersistenceProcessor", () => {
 
       const ledgerPath = "/tmp/ledger-replay.jsonl";
       const queue = new AsyncEventQueue();
-      const processor = new PersistenceProcessor(mockFileAdapter, ledgerPath, queue);
+      const processor = new PersistenceProcessor(mockFileAdapter, ledgerPath);
 
-      const durableReplay = mockCommitedEvent("durable");
+      const durableReplay = mockCommittedEvent("durable");
       durableReplay.isReplay = true;
 
       queue.push(durableReplay);
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      await flushStream(processor.process(queue as any));
 
       expect(appendCalls).toHaveLength(0);
     });

@@ -9,7 +9,6 @@ import { render } from "@tsomaiatech/moxite";
 import type { BaseEvent } from "../interfaces/event.js";
 import type { DuctusConfig } from "../core/ductus-config-schema.js";
 import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
-import { RingBufferQueue } from "../core/event-queue.js";
 import { createAgentResponse, createAgentToken, createAgentFailure } from "../core/events/creators.js";
 
 import type { FileAdapter } from "../interfaces/adapters.js";
@@ -50,7 +49,6 @@ const ROLE_MAP: Record<string, AgentRole<unknown>> = {
 
 export class AgentProcessor implements EventProcessor {
   private readonly activeAborts = new Map<string, AbortController>();
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(1024);
 
   constructor(
     private readonly config: DuctusConfig,
@@ -61,65 +59,100 @@ export class AgentProcessor implements EventProcessor {
   ) { }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    // Fire-and-forget background consumer of the input stream
-    this.consume(stream).catch(console.error);
+    const iterator = stream[Symbol.asyncIterator]();
+    let nextStreamEvent = iterator.next();
 
-    // Foreground yielder
-    for await (const out of this.outQueue) {
-      yield out;
-    }
-  }
+    const activeAgents = new Map<string, Promise<{ id: string, result: IteratorResult<BaseEvent> }>>();
+    const agentIterators = new Map<string, AsyncIterator<BaseEvent>>();
 
-  private async consume(
-    stream: InputEventStream
-  ): Promise<void> {
-    for await (const event of stream) {
-      if (event.type === "CIRCUIT_INTERRUPTED") {
-        this.abortAll();
-        continue;
-      }
+    const addAgent = (id: string, iter: AsyncIterableIterator<BaseEvent>) => {
+      const asyncIter = iter[Symbol.asyncIterator]();
+      agentIterators.set(id, asyncIter);
+      activeAgents.set(id, asyncIter.next().then(r => ({ id, result: r })).catch(err => {
+        return { id, result: { done: true, value: undefined } };
+      }));
+    };
 
-      if (event.type === "EFFECT_SPAWN_AGENT") {
-        if (event.isReplay) continue;
+    let streamDone = false;
+    try {
+      while (true) {
+        if (streamDone && activeAgents.size === 0) break;
 
-        const payload = event.payload as EffectSpawnAgentPayload;
-        const roleName = payload?.roleName ?? "";
-        const role = ROLE_MAP[roleName];
-        if (!role) continue;
-
-        const hash = event.hash ?? "";
-        const eventId = event.eventId ?? `agent-${Date.now()}`;
-
-        const cached = await this.cacheAdapter.get<unknown>(hash);
-        if (cached !== undefined) {
-          const correlationId = payload?.correlationId;
-          const reportPayload: any =
-            correlationId !== undefined
-              ? { result: cached, correlationId }
-              : cached;
-
-          this.outQueue.push(createAgentResponse({
-            payload: { text: "Cached", filesModified: reportPayload.files ?? [] },
-            authorId: AUTHOR_ID,
-            timestamp: Date.now()
-          }));
-          continue;
+        const promises: Promise<any>[] = [...activeAgents.values()];
+        if (!streamDone) {
+          promises.push(nextStreamEvent);
         }
 
-        void this.runAgent(eventId, hash, payload, roleName, role);
-      }
-    }
+        const winner = await Promise.race(promises);
 
-    this.outQueue.close();
+        if (winner && typeof winner === "object" && "id" in winner) {
+          const { id, result } = winner;
+          if (result.done) {
+            activeAgents.delete(id);
+            agentIterators.delete(id);
+          } else {
+            yield result.value;
+            const iter = agentIterators.get(id);
+            if (iter) {
+              activeAgents.set(id, iter.next().then(r => ({ id, result: r })).catch(err => {
+                return { id, result: { done: true, value: undefined } };
+              }));
+            }
+          }
+        } else {
+          const result = winner as IteratorResult<BaseEvent>;
+          if (result.done) {
+            streamDone = true;
+            continue;
+          }
+          const event = result.value;
+          nextStreamEvent = iterator.next();
+
+          if (event.type === "CIRCUIT_INTERRUPTED") {
+            this.abortAll();
+            continue;
+          }
+
+          if (event.type === "EFFECT_SPAWN_AGENT") {
+            if ((event as any).isReplay === true) continue;
+            const payload = event.payload as EffectSpawnAgentPayload;
+            const roleName = payload?.roleName ?? "";
+            const role = ROLE_MAP[roleName];
+            if (role) {
+              const id = event.eventId ?? `agent-${Date.now()}`;
+              addAgent(id, this.runAgentGenerator(id, (event as any).hash ?? "", payload, roleName, role));
+            }
+          }
+        }
+      }
+    } finally {
+      this.abortAll();
+    }
   }
 
-  private async runAgent(
+  private async *runAgentGenerator(
     eventId: string,
     hash: string,
     payload: EffectSpawnAgentPayload,
     roleName: string,
     role: AgentRole<unknown>
-  ): Promise<void> {
+  ): AsyncIterableIterator<BaseEvent> {
+    const cached = await this.cacheAdapter.get<unknown>(hash);
+    if (cached !== undefined) {
+      const correlationId = payload?.correlationId;
+      const reportPayload: any =
+        correlationId !== undefined
+          ? { result: cached, correlationId }
+          : cached;
+
+      yield createAgentResponse({
+        payload: { text: "Cached", filesModified: reportPayload.files ?? [] },
+        authorId: AUTHOR_ID,
+        timestamp: Date.now()
+      });
+      return;
+    }
+
     const ac = new AbortController();
     this.activeAborts.set(eventId, ac);
 
@@ -146,11 +179,11 @@ export class AgentProcessor implements EventProcessor {
 
       for await (const chunk of dispatcherStream) {
         if (chunk.type === "token") {
-          this.outQueue.push(createAgentToken({
+          yield createAgentToken({
             payload: { token: chunk.content },
             authorId: AUTHOR_ID,
             timestamp: Date.now(),
-          }));
+          });
         } else if (chunk.type === "complete") {
           await this.cacheAdapter.set(hash, chunk.parsedOutput);
           const correlationId = payload?.correlationId;
@@ -159,18 +192,18 @@ export class AgentProcessor implements EventProcessor {
               ? { result: chunk.parsedOutput, correlationId }
               : chunk.parsedOutput;
 
-          this.outQueue.push(createAgentResponse({
+          yield createAgentResponse({
             payload: { text: "Complete", filesModified: reportPayload.files ?? [] },
             authorId: AUTHOR_ID,
             timestamp: Date.now()
-          }));
+          });
           break;
         } else if (chunk.type === "failure") {
-          this.outQueue.push(createAgentFailure({
-            payload: { reason: "format" }, // Or map generic error correctly
+          yield createAgentFailure({
+            payload: { reason: "format" },
             authorId: AUTHOR_ID,
             timestamp: Date.now()
-          }));
+          });
           break;
         }
       }

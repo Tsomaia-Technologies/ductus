@@ -44,9 +44,14 @@ describe("PlanningProcessor", () => {
       const broadcasts: Array<{ type: string; payload: unknown }> = [];
       let capturedRequestId = "";
 
-      const hub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
+      const processor = new PlanningProcessor();
+      const outStream = processor.process(queue);
+
+      const yielded: Array<{ type: string; payload: unknown }> = [];
+
+      const consumeTask = (async () => {
+        for await (const e of outStream) {
+          yielded.push({ type: e.type, payload: e.payload });
           if (e.type === "REQUEST_INPUT") {
             const p = e.payload as { id?: string };
             capturedRequestId = p?.id ?? "";
@@ -62,21 +67,23 @@ describe("PlanningProcessor", () => {
                 hash: VALID_SHA256,
                 volatility: "durable" as const,
               });
+              // We must wait a tick to ensure the processor has time to process the YES and yield PLAN_APPROVED
+              // before we close the queue cutting off the iterator abruptly.
+              setTimeout(() => {
+                queue.close();
+              }, 10);
             }
           }
-        },
-      };
-
-      const processor = new PlanningProcessor(hub, queue);
+        }
+      })();
 
       queue.push(
-        mockEvent("AGENT_REPORT_RECEIVED", "# SPEC\nBuild a login API.")
+        mockEvent("AGENT_RESPONSE", "# SPEC\nBuild a login API.")
       );
-      queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      await consumeTask;
 
-      const planApproved = broadcasts.filter((b) => b.type === "PLAN_APPROVED");
+      const planApproved = yielded.filter((b) => b.type === "PLAN_APPROVED");
       expect(planApproved).toHaveLength(1);
       const payload = planApproved[0]!.payload as { spec?: string };
       expect(payload.spec).toBe("# SPEC\nBuild a login API.");
@@ -87,22 +94,20 @@ describe("PlanningProcessor", () => {
     it("ignores START_PLANNING when isReplay is true", async () => {
       const queue = new AsyncEventQueue();
       const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const hub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
-      };
-
-      const processor = new PlanningProcessor(hub, queue);
+      const processor = new PlanningProcessor();
+      const outStream = processor.process(queue);
+      const yielded: Array<{ type: string; payload: unknown }> = [];
 
       queue.push(
         mockEvent("START_PLANNING", { prompt: "Build X" }, true)
       );
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      for await (const e of outStream) {
+        yielded.push(e);
+      }
 
-      const effectSpawn = broadcasts.filter((b) => b.type === "EFFECT_SPAWN_AGENT");
+      const effectSpawn = yielded.filter((b) => b.type === "EFFECT_SPAWN_AGENT");
       expect(effectSpawn).toHaveLength(0);
     });
   });
@@ -113,17 +118,21 @@ describe("PlanningProcessor", () => {
       const broadcasts: Array<{ type: string; payload: unknown }> = [];
       let capturedRequestId = "";
 
-      const hub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
+      const processor = new PlanningProcessor();
+      const outStream = processor.process(queue);
+
+      const yielded: Array<{ type: string; payload: unknown }> = [];
+      const consumeTask = (async () => {
+        for await (const e of outStream) {
+          yielded.push({ type: e.type, payload: e.payload });
           if (e.type === "REQUEST_INPUT") {
             const p = e.payload as { id?: string };
-            capturedRequestId = p?.id ?? "";
-            if (capturedRequestId) {
+            const reqId = p?.id ?? "";
+            if (reqId) {
               queue.push({
                 eventId: VALID_UUID,
                 type: "INPUT_RECEIVED",
-                payload: { id: capturedRequestId, answer: "No, add authentication to the spec" },
+                payload: { id: reqId, answer: "No, add authentication to the spec" },
                 authorId: "input-processor",
                 timestamp: Date.now(),
                 sequenceNumber: 2,
@@ -131,24 +140,22 @@ describe("PlanningProcessor", () => {
                 hash: VALID_SHA256,
                 volatility: "durable" as const,
               });
+              setTimeout(() => queue.close(), 10);
             }
           }
-        },
-      };
-
-      const processor = new PlanningProcessor(hub, queue);
+        }
+      })();
 
       queue.push(
-        mockEvent("AGENT_REPORT_RECEIVED", "# SPEC v1")
+        mockEvent("AGENT_RESPONSE", "# SPEC v1")
       );
-      queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      await consumeTask;
 
-      const planRejected = broadcasts.filter((b) => b.type === "PLAN_REJECTED");
+      const planRejected = yielded.filter((b) => b.type === "PLAN_REJECTED");
       expect(planRejected).toHaveLength(1);
 
-      const spawnAgent = broadcasts.filter((b) => b.type === "EFFECT_SPAWN_AGENT");
+      const spawnAgent = yielded.filter((b) => b.type === "EFFECT_SPAWN_AGENT");
       expect(spawnAgent.length).toBeGreaterThanOrEqual(1);
       const spawnPayload = spawnAgent[spawnAgent.length - 1]!.payload as {
         roleName?: string;

@@ -6,73 +6,83 @@
 
 import type { BaseEvent } from "../interfaces/event.js";
 import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
-import { RingBufferQueue } from "../core/event-queue.js";
 import { createTick } from "../core/events/creators.js";
 
 const TICK_INTERVAL_MS = 1000;
 const AUTHOR_ID = "clock-processor";
 
 export class ClockProcessor implements EventProcessor {
-  private intervalRef: ReturnType<typeof setInterval> | null = null;
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
-
   constructor() { }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    this.consume(stream).catch(console.error);
-    for await (const out of this.outQueue) {
-      yield out;
-    }
-  }
+    const iterator = stream[Symbol.asyncIterator]();
+    let nextStreamEvent = iterator.next();
 
-  private async consume(
-    stream: InputEventStream
-  ): Promise<void> {
-    for await (const event of stream) {
-      if (event.type === "SYSTEM_START") {
-        // We do not have hub.mode injected anymore. Replays are tagged on the event natively.
-        // Wait, if "SYSTEM_START" is replayed, its `.isReplay` flag guarantees we jump.
-        if (!event.isReplay) {
-          this.startLiveInterval();
+    let timerResolve: (() => void) | null = null;
+    let nextTimerPromise: Promise<void> = new Promise<void>(() => { });
+
+    const resetTimer = () => {
+      nextTimerPromise = new Promise<void>((resolve) => {
+        timerResolve = resolve;
+      });
+    };
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const startInterval = () => {
+      if (intervalId) clearInterval(intervalId);
+      resetTimer();
+      intervalId = setInterval(() => {
+        if (timerResolve) timerResolve();
+        resetTimer();
+      }, TICK_INTERVAL_MS);
+    };
+
+    const stopInterval = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = null;
+    };
+
+    try {
+      while (true) {
+        const promises: Promise<any>[] = [nextStreamEvent];
+        if (intervalId) {
+          promises.push(nextTimerPromise.then(() => "TICK_FIRED"));
         }
-      } else if (
-        event.type === "SYSTEM_HALT" ||
-        event.type === "CIRCUIT_INTERRUPTED"
-      ) {
-        this.stopInterval();
+
+        const winner = await Promise.race(promises);
+
+        if (winner === "TICK_FIRED") {
+          yield createTick({
+            payload: { ms: TICK_INTERVAL_MS, isReplay: false },
+            authorId: AUTHOR_ID,
+            timestamp: Date.now()
+          });
+        } else {
+          const result = winner as IteratorResult<BaseEvent>;
+          if (result.done) break;
+          const event = result.value;
+
+          nextStreamEvent = iterator.next();
+
+          if (event.type === "SYSTEM_START" && !(event as any).isReplay) {
+            startInterval();
+          } else if (event.type === "SYSTEM_HALT" || event.type === "CIRCUIT_INTERRUPTED") {
+            stopInterval();
+          }
+
+          const isReplay = (event as any).isReplay === true;
+          if (isReplay && event.type !== "TICK") {
+            yield createTick({
+              payload: { ms: TICK_INTERVAL_MS, isReplay },
+              authorId: AUTHOR_ID,
+              timestamp: event.timestamp
+            });
+          }
+        }
       }
-
-      const isReplay = (event as any).isReplay === true;
-      if (
-        isReplay &&
-        event.type !== "TICK"
-      ) {
-        this.broadcastTick(event.timestamp, isReplay);
-      }
+    } finally {
+      stopInterval();
     }
-
-    this.outQueue.close();
-  }
-
-  private startLiveInterval(): void {
-    this.stopInterval();
-    this.intervalRef = setInterval(() => {
-      this.broadcastTick(Date.now(), false);
-    }, TICK_INTERVAL_MS);
-  }
-
-  private stopInterval(): void {
-    if (this.intervalRef !== null) {
-      clearInterval(this.intervalRef);
-      this.intervalRef = null;
-    }
-  }
-
-  private broadcastTick(timestamp: number, isReplay: boolean): void {
-    this.outQueue.push(createTick({
-      payload: { ms: TICK_INTERVAL_MS, isReplay },
-      authorId: AUTHOR_ID,
-      timestamp
-    }));
   }
 }

@@ -8,7 +8,6 @@ import type { BaseEvent } from "../interfaces/event.js";
 import { DuctusConfigSchema, type DuctusConfig } from "../core/ductus-config-schema.js";
 import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
 import type { FileAdapter } from "../interfaces/adapters.js";
-import { RingBufferQueue } from "../core/event-queue.js";
 import { createSystemAbortRequested, createContextLoaded } from "../core/events/creators.js";
 
 type EnqueuedEvent = {
@@ -62,8 +61,6 @@ function parseConfigRaw(raw: string): DuctusConfig | { error: string } {
 }
 
 export class SessionProcessor implements EventProcessor {
-  private readonly outQueue = new RingBufferQueue<BaseEvent>(16);
-
   constructor(
     private readonly fileAdapter: FileAdapter,
     private readonly configPath: string,
@@ -71,15 +68,6 @@ export class SessionProcessor implements EventProcessor {
   ) { }
 
   async *process(stream: InputEventStream): OutputEventStream {
-    this.consumeAndLoad(stream).catch(console.error);
-    for await (const out of this.outQueue) {
-      yield out;
-    }
-  }
-
-  private async consumeAndLoad(
-    stream: AsyncIterable<EnqueuedEvent>
-  ): Promise<void> {
     for await (const event of stream) {
       if (event.type !== "SYSTEM_START") continue;
       if (event.isReplay) continue;
@@ -93,11 +81,11 @@ export class SessionProcessor implements EventProcessor {
         const raw = await this.fileAdapter.read(this.configPath);
         const parsed = parseConfigRaw(raw);
         if ("error" in parsed) {
-          this.outQueue.push(createSystemAbortRequested({
+          yield createSystemAbortRequested({
             payload: { reason: parsed.error },
             authorId: AUTHOR_ID,
             timestamp: Date.now()
-          }));
+          });
           continue;
         }
         config = parsed;
@@ -105,13 +93,11 @@ export class SessionProcessor implements EventProcessor {
         config = DEFAULT_CONFIG;
       }
 
-      this.outQueue.push(createContextLoaded({
+      yield createContextLoaded({
         payload: { config, isGenesis },
         authorId: AUTHOR_ID,
         timestamp: Date.now()
-      }));
+      });
     }
-
-    this.outQueue.close();
   }
 }

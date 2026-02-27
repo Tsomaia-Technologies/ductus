@@ -5,45 +5,26 @@
 
 import { ClockProcessor } from "../../src/processors/clock-processor.js";
 import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import { MultiplexerHub } from "../../src/core/multiplexer-hub.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
+import type { InputEventStream } from "../../src/interfaces/event-processor.js";
+import type { BaseEvent } from "../../src/interfaces/event.js";
 
+const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
 const JAN_1_2024_MS = 1704067200000;
 
 function mockEvent(
   type: string,
   timestamp: number,
   isReplay?: boolean
-): {
-  eventId: string;
-  type: string;
-  payload: Record<string, unknown>;
-  authorId: string;
-  timestamp: number;
-  sequenceNumber: number;
-  prevHash: string;
-  hash: string;
-  volatility: "durable" | "volatile";
-  isReplay?: boolean;
-} {
+): any {
   return {
-    eventId: "550e8400-e29b-41d4-a716-446655440000",
+    eventId: VALID_UUID,
     type,
     payload: {},
     authorId: "bootstrap",
     timestamp,
-    sequenceNumber: 1,
-    prevHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
-    hash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
-    volatility: "durable",
+    volatility: "durable" as const,
     isReplay,
   };
-}
-
-async function flushStream<T>(stream: AsyncIterable<T>): Promise<void> {
-  for await (const _ of stream) {
-    /* sink consumes until done */
-  }
 }
 
 describe("ClockProcessor", () => {
@@ -51,34 +32,27 @@ describe("ClockProcessor", () => {
     it("SYSTEM_HALT clears interval; zero active timers remain", async () => {
       jest.useFakeTimers();
 
-      const hub = new MultiplexerHub();
-      hub.mode = "LiveMode";
-
       const queue = new AsyncEventQueue();
-      const clock = new ClockProcessor(hub, queue);
+      const clock = new ClockProcessor();
+      const outStream = clock.process(queue as any);
 
-      const tickEvents: unknown[] = [];
-      const originalBroadcast = hub.broadcast.bind(hub);
-      hub.broadcast = async (e: Parameters<typeof hub.broadcast>[0]) => {
-        if (e.type === "SYSTEM_TICK") tickEvents.push(e);
-        return originalBroadcast(e);
-      };
-
-      const consumerPromise = flushStream(
-        clock.process(queue as unknown as InputEventStream)
-      );
+      const yielded: BaseEvent[] = [];
+      const consumeTask = (async () => {
+        for await (const e of outStream) {
+          yielded.push(e);
+          if (e.type === "TICK" && yielded.length >= 2) {
+            queue.push(mockEvent("SYSTEM_HALT", Date.now()));
+            queue.close();
+          }
+        }
+      })();
 
       queue.push(mockEvent("SYSTEM_START", Date.now()));
-      await Promise.resolve();
-      await jest.advanceTimersByTimeAsync(1100);
-      expect(tickEvents.length).toBeGreaterThan(0);
 
-      queue.push(mockEvent("SYSTEM_HALT", Date.now()));
-      queue.close();
+      await jest.advanceTimersByTimeAsync(3000);
+      await consumeTask;
 
-      await consumerPromise;
-
-      jest.advanceTimersByTime(0);
+      expect(yielded.filter(e => e.type === "TICK").length).toBeGreaterThan(0);
       expect(jest.getTimerCount()).toBe(0);
 
       jest.useRealTimers();
@@ -86,39 +60,23 @@ describe("ClockProcessor", () => {
   });
 
   describe("The Time Travel Proof", () => {
-    it("Replay Mode: TICK timestamps match replayed event timestamps (Jan 1)", async () => {
-      const broadcasts: Array<{ type: string; payload: unknown; timestamp: number }> =
-        [];
-      const mockHub = {
-        mode: "SilentMode" as const,
-        broadcast: async (e: { type: string; payload: unknown; timestamp: number }) => {
-          broadcasts.push({
-            type: e.type,
-            payload: e.payload,
-            timestamp: e.timestamp,
-          });
-        },
-      };
-
+    it("Replay Mode: TICK timestamps match replayed event timestamps", async () => {
       const queue = new AsyncEventQueue();
-      const clock = new ClockProcessor(mockHub, queue);
+      const clock = new ClockProcessor();
+      const outStream = clock.process(queue as any);
 
-      queue.push(
-        mockEvent("EVENT_A", JAN_1_2024_MS, true)
-      );
-      queue.push(
-        mockEvent("EVENT_B", JAN_1_2024_MS + 5000, true)
-      );
+      queue.push(mockEvent("EVENT_A", JAN_1_2024_MS, true));
+      queue.push(mockEvent("EVENT_B", JAN_1_2024_MS + 5000, true));
       queue.close();
 
-      await flushStream(clock.process(queue as unknown as InputEventStream));
+      const yielded: BaseEvent[] = [];
+      for await (const e of outStream) {
+        yielded.push(e);
+      }
 
-      const ticks = broadcasts.filter((b) => b.type === "SYSTEM_TICK");
+      const ticks = yielded.filter((b) => b.type === "TICK");
       expect(ticks).toHaveLength(2);
-      expect(ticks[0]!.payload).toEqual({ timestamp: JAN_1_2024_MS });
-      expect(ticks[1]!.payload).toEqual({
-        timestamp: JAN_1_2024_MS + 5000,
-      });
+      expect((ticks[0]!.payload as any).isReplay).toBe(true);
       expect(ticks[0]!.timestamp).toBe(JAN_1_2024_MS);
       expect(ticks[1]!.timestamp).toBe(JAN_1_2024_MS + 5000);
     });

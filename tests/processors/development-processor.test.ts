@@ -19,96 +19,93 @@ async function flushStream<T>(stream: AsyncIterable<T>): Promise<void> {
   }
 }
 
-function createMockHubWithToolResponse(
-  queue: EventQueue,
+import type { BaseEvent } from "../../src/interfaces/event.js";
+
+async function runMockToolResponder(
+  outStream: AsyncIterable<BaseEvent>,
+  queue: AsyncEventQueue,
+  yieldedOut: BaseEvent[],
   gitDiffStdout: string,
   checkExitCode = 0
 ) {
-  const broadcasts: Array<{ type: string; payload: unknown }> = [];
-  return {
-    broadcasts,
-    hub: {
-      broadcast: async (e: { type: string; payload: unknown }) => {
-        broadcasts.push({ type: e.type, payload: e.payload });
-        const p = e.payload as { command?: string; trackingId?: string; args?: string[] };
-        if (e.type === "EFFECT_RUN_TOOL" && p?.trackingId) {
-          const cmd = p.command;
-          const args = p.args ?? [];
-          if (cmd === "git" && args[0] === "diff") {
-            queue.push({
-              eventId: VALID_UUID,
-              type: "TOOL_COMPLETED",
-              payload: {
-                trackingId: p.trackingId,
-                exitCode: 0,
-                stdout: gitDiffStdout,
-                stderr: "",
-                log: gitDiffStdout,
-              },
-              authorId: "tool-processor",
-              timestamp: Date.now(),
-              sequenceNumber: 1,
-              prevHash: "a".repeat(64),
-              hash: "b".repeat(64),
-              volatility: "durable" as const,
-            });
-          } else {
-            queue.push({
-              eventId: VALID_UUID,
-              type: "TOOL_COMPLETED",
-              payload: {
-                trackingId: p.trackingId,
-                exitCode: checkExitCode,
-                stdout: "",
-                stderr: "",
-                log: "",
-              },
-              authorId: "tool-processor",
-              timestamp: Date.now(),
-              sequenceNumber: 1,
-              prevHash: "a".repeat(64),
-              hash: "b".repeat(64),
-              volatility: "durable" as const,
-            });
-          }
-        }
-      },
-    },
-  };
-}
+  let pendingChecks = 2; // git diff + 1 custom check at most
 
-describe("DevelopmentProcessor", () => {
-  describe("The True Hallucination Proof", () => {
-    it("yields AUTO_REJECTION when Agent claims [a.ts] but git diff returns [a.ts, b.ts]", async () => {
-      const queue = new AsyncEventQueue();
-      const { broadcasts, hub } = createMockHubWithToolResponse(queue, "a.ts\nb.ts");
-
-      const config: DuctusConfig = {
-        default: {
-          checks: {},
-          roles: {
-            planner: {
-              lifecycle: "single-shot",
-              maxRejections: 3,
-              maxRecognizedHallucinations: 0,
-              strategies: [{ id: "p", model: "claude", template: "p" }],
-            },
-            engineer: {
-              lifecycle: "session",
-              maxRejections: 5,
-              maxRecognizedHallucinations: 2,
-              strategies: [{ id: "e", model: "claude", template: "e" }],
-            },
-          },
-        },
-        scopes: {},
-      };
-
-      const processor = new DevelopmentProcessor(hub, config, "/tmp", queue);
+  for await (const e of outStream) {
+    yieldedOut.push(e);
+    const p = e.payload as { command?: string; trackingId?: string; args?: string[] };
+    if (e.type === "EFFECT_RUN_TOOL" && p?.trackingId) {
+      pendingChecks--;
+      const cmd = p.command;
+      const args = p.args ?? [];
+      const isGitDiff = cmd === "git" && args[0] === "diff";
 
       queue.push({
         eventId: VALID_UUID,
-        type: "AGENT_REPORT_RECEIVED",
+        type: "TOOL_COMPLETED",
+        payload: {
+          trackingId: p.trackingId,
+          exitCode: isGitDiff ? 0 : checkExitCode,
+          stdout: isGitDiff ? gitDiffStdout : "",
+          stderr: "",
+          log: isGitDiff ? gitDiffStdout : "",
+        },
+        authorId: "tool-processor",
+        timestamp: Date.now(),
+        sequenceNumber: 1,
+        prevHash: "a".repeat(64),
+        hash: "b".repeat(64),
+        volatility: "durable" as const,
+      });
+
+      if (pendingChecks <= 0) {
+        queue.close();
+      }
+    }
+
+    if (e.type === "AUTO_REJECTION") {
+      queue.close();
+    }
+  }
+}
+
+describe("DevelopmentProcessor", () => {
+  const config: DuctusConfig = {
+    default: {
+      checks: {
+        lint: {
+          command: "npx eslint {{files}}",
+          boundary: "per_iteration",
+        },
+      },
+      roles: {
+        planner: {
+          lifecycle: "single-shot",
+          maxRejections: 3,
+          maxRecognizedHallucinations: 0,
+          strategies: [{ id: "p", model: "claude", template: "p" }],
+        },
+        engineer: {
+          lifecycle: "session",
+          maxRejections: 5,
+          maxRecognizedHallucinations: 2,
+          strategies: [{ id: "e", model: "claude", template: "e" }],
+        },
+      },
+    },
+    scopes: {},
+  };
+
+  describe("The True Hallucination Proof", () => {
+    it("yields AUTO_REJECTION when Agent claims [a.ts] but git diff returns [a.ts, b.ts]", async () => {
+      const queue = new AsyncEventQueue();
+      const processor = new DevelopmentProcessor(config, "/tmp");
+      const outStream = processor.process(queue);
+      const yielded: BaseEvent[] = [];
+      const consumeTask = runMockToolResponder(outStream, queue, yielded, "a.ts\nb.ts", 0);
+
+      queue.push({
+        eventId: VALID_UUID,
+        type: "AGENT_RESPONSE",
         payload: { files: ["a.ts"] },
         authorId: "agent-processor",
         timestamp: 1000,
@@ -117,54 +114,27 @@ describe("DevelopmentProcessor", () => {
         hash: "b".repeat(64),
         volatility: "durable" as const,
       });
-      queue.close();
+      await consumeTask;
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
-
-      const autoRejections = broadcasts.filter((b) => b.type === "AUTO_REJECTION");
+      const autoRejections = yielded.filter((b) => b.type === "AUTO_REJECTION");
       expect(autoRejections).toHaveLength(1);
-      const payload = autoRejections[0]!.payload as { isHallucination?: boolean; reason?: string };
+      const payload = autoRejections[0]!.payload as { isHallucination?: boolean; type?: string };
       expect(payload.isHallucination).toBe(true);
-      expect(payload.reason).toBe("diff_mismatch");
+      expect(payload.type).toBe("diff_mismatch");
     });
   });
 
   describe("The Interpolation Proof", () => {
     it("yields EFFECT_RUN_TOOL with interpolated command npx eslint x.ts", async () => {
       const queue = new AsyncEventQueue();
-      const { broadcasts, hub } = createMockHubWithToolResponse(queue, "x.ts");
-
-      const config: DuctusConfig = {
-        default: {
-          checks: {
-            lint: {
-              command: "npx eslint {{files}}",
-              boundary: "per_iteration",
-            },
-          },
-          roles: {
-            planner: {
-              lifecycle: "single-shot",
-              maxRejections: 3,
-              maxRecognizedHallucinations: 0,
-              strategies: [{ id: "p", model: "claude", template: "p" }],
-            },
-            engineer: {
-              lifecycle: "session",
-              maxRejections: 5,
-              maxRecognizedHallucinations: 2,
-              strategies: [{ id: "e", model: "claude", template: "e" }],
-            },
-          },
-        },
-        scopes: {},
-      };
-
-      const processor = new DevelopmentProcessor(hub, config, "/tmp", queue);
+      const processor = new DevelopmentProcessor(config, "/tmp");
+      const outStream = processor.process(queue);
+      const yielded: BaseEvent[] = [];
+      const consumeTask = runMockToolResponder(outStream, queue, yielded, "x.ts", 0);
 
       queue.push({
         eventId: VALID_UUID,
-        type: "AGENT_REPORT_RECEIVED",
+        type: "AGENT_RESPONSE",
         payload: { files: ["x.ts"] },
         authorId: "agent-processor",
         timestamp: 1000,
@@ -173,11 +143,9 @@ describe("DevelopmentProcessor", () => {
         hash: "b".repeat(64),
         volatility: "durable" as const,
       });
-      queue.close();
+      await consumeTask;
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
-
-      const effectRunTools = broadcasts.filter((b) => b.type === "EFFECT_RUN_TOOL");
+      const effectRunTools = yielded.filter((b) => b.type === "EFFECT_RUN_TOOL");
       const gitDiffEffect = effectRunTools.find(
         (b) =>
           (b.payload as { command?: string }).command === "git" &&
@@ -197,41 +165,16 @@ describe("DevelopmentProcessor", () => {
   });
 
   describe("Muted Mode Protection", () => {
-    it("ignores AGENT_REPORT_RECEIVED when isReplay is true", async () => {
+    it("ignores AGENT_RESPONSE when isReplay is true", async () => {
       const queue = new AsyncEventQueue();
-      const broadcasts: Array<{ type: string; payload: unknown }> = [];
-      const hub = {
-        broadcast: async (e: { type: string; payload: unknown }) => {
-          broadcasts.push({ type: e.type, payload: e.payload });
-        },
-      };
-
-      const config: DuctusConfig = {
-        default: {
-          checks: {},
-          roles: {
-            planner: {
-              lifecycle: "single-shot",
-              maxRejections: 3,
-              maxRecognizedHallucinations: 0,
-              strategies: [{ id: "p", model: "claude", template: "p" }],
-            },
-            engineer: {
-              lifecycle: "session",
-              maxRejections: 5,
-              maxRecognizedHallucinations: 2,
-              strategies: [{ id: "e", model: "claude", template: "e" }],
-            },
-          },
-        },
-        scopes: {},
-      };
-
-      const processor = new DevelopmentProcessor(hub, config, "/tmp", queue);
+      // config declaration moved to "The True Hallucination Proof"
+      const processor = new DevelopmentProcessor(config, "/tmp");
+      const outStream = processor.process(queue);
+      const yielded: BaseEvent[] = [];
 
       queue.push({
         eventId: VALID_UUID,
-        type: "AGENT_REPORT_RECEIVED",
+        type: "AGENT_RESPONSE",
         payload: { files: ["a.ts"] },
         authorId: "agent-processor",
         timestamp: 1000,
@@ -243,9 +186,11 @@ describe("DevelopmentProcessor", () => {
       });
       queue.close();
 
-      await flushStream(processor.process(queue as unknown as InputEventStream));
+      for await (const e of outStream) {
+        yielded.push(e);
+      }
 
-      const effectRunTools = broadcasts.filter((b) => b.type === "EFFECT_RUN_TOOL");
+      const effectRunTools = yielded.filter((b) => b.type === "EFFECT_RUN_TOOL");
       expect(effectRunTools).toHaveLength(0);
     });
   });
