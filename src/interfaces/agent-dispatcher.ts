@@ -1,13 +1,13 @@
-import { AgentContext } from './agent-context.js'
-import { AgentRole } from './agent-role.js'
-import { OutputEventStream } from './output-event-stream.js'
+import type { AgentContext } from "./agent-context.js";
+import type { AgentRole } from "./agent-role.js";
+import type { OutputEventStream } from "./output-event-stream.js";
 
 export interface AgentDispatcher {
-  process<TContext extends object>(
+  process(
     input: string,
-    role: AgentRole<TContext, any>,
+    role: AgentRole<unknown>,
     context?: AgentContext
-  ): Promise<OutputEventStream>
+  ): Promise<OutputEventStream>;
 
-  terminate(role: AgentRole<any, any>): void
+  terminate(role: AgentRole<unknown>): void;
 }

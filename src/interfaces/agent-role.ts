@@ -1,14 +1,12 @@
-export type AgentType =
-  | 'planner'
-  | 'task-creator' // or 'delegator'
-  | 'task-auditor'
-  | 'engineer'
-  | 'reviewer'
-  | 'auditor'
+/**
+ * AgentRole - pure, stateless contract for Agent personas.
+ * Defines persona, allowed tools, and output parsing. No I/O.
+ * RFC-001 Task 013-agent-role-contracts, Rev 06 Section 3.1.
+ */
 
-export interface AgentRole<TContext extends object, TOutput> {
-  type: AgentType
-  allowedTools(): string[]
-  persona(context: TContext): string
-  parse(response: string): TOutput
+export interface AgentRole<TOutput = unknown> {
+  readonly name: string;
+  readonly systemPrompt: string;
+  readonly allowedTools: readonly string[];
+  parse(response: string): TOutput;
 }
