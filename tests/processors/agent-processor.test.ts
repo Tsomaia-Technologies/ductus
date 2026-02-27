@@ -1,0 +1,213 @@
+/**
+ * AgentProcessor Definition of Done.
+ * Task 015-agent-processor.
+ */
+
+import { AgentProcessor } from "../../src/processors/agent-processor.js";
+import { AsyncEventQueue } from "../../src/core/event-queue.js";
+import type { FileAdapter } from "../../src/interfaces/adapters.js";
+import type { CacheAdapter } from "../../src/interfaces/cache-adapter.js";
+import type { AgentDispatcher } from "../../src/interfaces/agent-dispatcher.js";
+import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
+
+async function flushStream<T>(stream: AsyncIterable<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const x of stream) {
+    out.push(x);
+  }
+  return out;
+}
+
+describe("AgentProcessor", () => {
+  describe("The Hash Cache Proof", () => {
+    it("yields AGENT_REPORT_RECEIVED from cache without calling FileAdapter or AgentDispatcher", async () => {
+      const fileReadCalls: string[] = [];
+      const mockFileAdapter: FileAdapter = {
+        append: async () => {},
+        readStream: async function* () {},
+        read: async (path) => {
+          fileReadCalls.push(path);
+          return "";
+        },
+        exists: async () => true,
+      };
+
+      const dispatcherProcessCalls: unknown[] = [];
+      const mockDispatcher = {
+        process: async function* (input: string, role: unknown, context: unknown, options: unknown) {
+          dispatcherProcessCalls.push({ input, role, context, options });
+          yield { type: "token" as const, content: "x" };
+          yield { type: "complete" as const, parsedOutput: { files: ["b.ts"] } };
+        },
+        terminate: () => {},
+      } as AgentDispatcher;
+
+      const cache = new Map<string, unknown>();
+      cache.set("X123", { files: ["hi.ts"] });
+      const mockCache: CacheAdapter = {
+        get: async <T>(key: string): Promise<T | undefined> =>
+          cache.get(key) as T | undefined,
+        set: async (key, val) => {
+          cache.set(key, val);
+        },
+      };
+
+      const broadcasts: Array<{ type: string; payload: unknown }> = [];
+      const mockHub = {
+        broadcast: async (e: { type: string; payload: unknown }) => {
+          broadcasts.push({ type: e.type, payload: e.payload });
+        },
+      };
+
+      const config = {
+        default: {
+          checks: {},
+          roles: {
+            engineer: {
+              lifecycle: "session" as const,
+              maxRejections: 3,
+              maxRecognizedHallucinations: 2,
+              strategies: [{ id: "s1", model: "claude", template: "./eng.mx" }],
+            },
+          },
+        },
+        scopes: {},
+      };
+
+      const queue = new AsyncEventQueue();
+      const processor = new AgentProcessor(
+        mockHub,
+        config,
+        mockDispatcher,
+        mockFileAdapter,
+        mockCache,
+        process.cwd(),
+        queue
+      );
+
+      queue.push({
+        eventId: "e1",
+        type: "EFFECT_SPAWN_AGENT",
+        payload: {
+          roleName: "engineer",
+          scope: "default",
+          input: "do x",
+        },
+        authorId: "dev",
+        timestamp: 1000,
+        sequenceNumber: 1,
+        prevHash: "a",
+        hash: "X123",
+        volatility: "durable" as const,
+      });
+      queue.close();
+
+      await flushStream(processor.process(queue as unknown as InputEventStream));
+
+      const durable = broadcasts.filter((b) => b.type === "AGENT_REPORT_RECEIVED");
+      expect(durable).toHaveLength(1);
+      expect((durable[0]!.payload as { files: string[] }).files).toEqual(["hi.ts"]);
+
+      expect(fileReadCalls).toHaveLength(0);
+      expect(dispatcherProcessCalls).toHaveLength(0);
+    });
+  });
+
+  describe("The Panic Sequence Proof", () => {
+    it("CIRCUIT_INTERRUPTED aborts stream; no durable events emitted", async () => {
+      const { AgentDispatcherImpl } = await import("../../src/agents/agent-dispatcher.js");
+      const { MockLLMProvider } = await import("../../src/agents/mock-llm-provider.js");
+
+      const dispatcher = new AgentDispatcherImpl({
+        tokenCounter: () => 50,
+        provider: new MockLLMProvider({
+          tokenDelayMs: 100,
+          response: '{"files":["x.ts"]}',
+        }),
+        strategies: [{ id: "s1", model: "claude", template: "" }],
+      });
+
+      const mockFileAdapter: FileAdapter = {
+        append: async () => {},
+        readStream: async function* () {},
+        read: async () => "template",
+        exists: async () => true,
+      };
+
+      const mockCache: CacheAdapter = {
+        get: async () => undefined,
+        set: async () => {},
+      };
+
+      const broadcasts: Array<{ type: string; payload: unknown }> = [];
+      const mockHub = {
+        broadcast: async (e: { type: string; payload: unknown }) => {
+          broadcasts.push({ type: e.type, payload: e.payload });
+        },
+      };
+
+      const config = {
+        default: {
+          checks: {},
+          roles: {
+            engineer: {
+              lifecycle: "session" as const,
+              maxRejections: 3,
+              maxRecognizedHallucinations: 2,
+              strategies: [{ id: "s1", model: "claude", template: "./eng.mx" }],
+            },
+          },
+        },
+        scopes: {},
+      };
+
+      const queue = new AsyncEventQueue();
+      const processor = new AgentProcessor(
+        mockHub,
+        config,
+        dispatcher,
+        mockFileAdapter,
+        mockCache,
+        process.cwd(),
+        queue
+      );
+
+      queue.push({
+        eventId: "e1",
+        type: "EFFECT_SPAWN_AGENT",
+        payload: {
+          roleName: "engineer",
+          scope: "default",
+          input: "x",
+        },
+        authorId: "dev",
+        timestamp: 1000,
+        sequenceNumber: 1,
+        prevHash: "a",
+        hash: "h1",
+        volatility: "durable" as const,
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      queue.push({
+        eventId: "e2",
+        type: "CIRCUIT_INTERRUPTED",
+        payload: {},
+        authorId: "int",
+        timestamp: 1001,
+        sequenceNumber: 2,
+        prevHash: "b",
+        hash: "h2",
+        volatility: "durable" as const,
+      });
+      queue.close();
+
+      await flushStream(processor.process(queue as unknown as InputEventStream));
+
+      const durable = broadcasts.filter(
+        (b) =>
+          b.type === "AGENT_REPORT_RECEIVED" || b.type === "AGENT_FAILURE"
+      );
+      expect(durable).toHaveLength(0);
+    });
+  });
+});

@@ -139,7 +139,13 @@ export class Bootstrapper {
     this.hub.register(createTaskingProcessor());
     this.hub.register(createDevelopmentProcessor());
     this.hub.register(createQualityProcessor());
-    this.hub.register(createAgentProcessor());
+    this.hub.register(
+      createAgentProcessor({
+        hub: this.hub,
+        fileAdapter: this.fileAdapter,
+        cwd: this.options.cwd,
+      })
+    );
     this.hub.register(createToolProcessor());
     this.hub.register(createTelemetryProcessor());
   }
