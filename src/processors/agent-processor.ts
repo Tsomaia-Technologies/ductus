@@ -6,12 +6,12 @@
 
 import { join } from "node:path";
 import { render } from "@tsomaiatech/moxite";
-import type { BaseEvent } from "../core/event-contracts.js";
+import type { BaseEvent } from "../interfaces/event.js";
 import type { DuctusConfig } from "../core/ductus-config-schema.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createAgentResponse, createAgentToken, createAgentFailure } from "../core/events/creators.js";
+
 import type { FileAdapter } from "../interfaces/adapters.js";
 import type { CacheAdapter } from "../interfaces/cache-adapter.js";
 import type { AgentDispatcher } from "../interfaces/agent-dispatcher.js";
@@ -22,10 +22,6 @@ import { PlannerAgent } from "../agents/planner-agent.js";
 import { AuditorAgent } from "../agents/auditor-agent.js";
 
 const AUTHOR_ID = "agent-processor";
-
-interface AgentHub {
-  broadcast(base: BaseEvent): Promise<void>;
-}
 
 interface EffectSpawnAgentPayload {
   roleName: string;
@@ -54,24 +50,29 @@ const ROLE_MAP: Record<string, AgentRole<unknown>> = {
 
 export class AgentProcessor implements EventProcessor {
   private readonly activeAborts = new Map<string, AbortController>();
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(1024);
 
   constructor(
-    private readonly hub: AgentHub,
     private readonly config: DuctusConfig,
     private readonly dispatcher: AgentDispatcher,
     private readonly fileAdapter: FileAdapter,
     private readonly cacheAdapter: CacheAdapter,
-    private readonly cwd: string,
-    public readonly incomingQueue: EventQueue
-  ) {}
+    private readonly cwd: string
+  ) { }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndDispatch(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    // Fire-and-forget background consumer of the input stream
+    this.consume(stream).catch(console.error);
+
+    // Foreground yielder
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndDispatch(
-    stream: AsyncIterable<EnqueuedEvent>
-  ): OutputEventStream {
+  private async consume(
+    stream: InputEventStream
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "CIRCUIT_INTERRUPTED") {
         this.abortAll();
@@ -92,23 +93,24 @@ export class AgentProcessor implements EventProcessor {
         const cached = await this.cacheAdapter.get<unknown>(hash);
         if (cached !== undefined) {
           const correlationId = payload?.correlationId;
-          const reportPayload =
+          const reportPayload: any =
             correlationId !== undefined
               ? { result: cached, correlationId }
               : cached;
-          void this.hub.broadcast({
-            type: "AGENT_REPORT_RECEIVED",
-            payload: reportPayload,
+
+          this.outQueue.push(createAgentResponse({
+            payload: { text: "Cached", filesModified: reportPayload.files ?? [] },
             authorId: AUTHOR_ID,
-            timestamp: Date.now(),
-            volatility: "durable-draft",
-          });
+            timestamp: Date.now()
+          }));
           continue;
         }
 
         void this.runAgent(eventId, hash, payload, roleName, role);
       }
     }
+
+    this.outQueue.close();
   }
 
   private async runAgent(
@@ -144,36 +146,31 @@ export class AgentProcessor implements EventProcessor {
 
       for await (const chunk of dispatcherStream) {
         if (chunk.type === "token") {
-          void this.hub.broadcast({
-            type: "AGENT_TOKEN_STREAM",
-            payload: { chunk: chunk.content },
+          this.outQueue.push(createAgentToken({
+            payload: { token: chunk.content },
             authorId: AUTHOR_ID,
             timestamp: Date.now(),
-            volatility: "volatile-draft",
-          });
+          }));
         } else if (chunk.type === "complete") {
           await this.cacheAdapter.set(hash, chunk.parsedOutput);
           const correlationId = payload?.correlationId;
-          const reportPayload =
+          const reportPayload: any =
             correlationId !== undefined
               ? { result: chunk.parsedOutput, correlationId }
               : chunk.parsedOutput;
-          void this.hub.broadcast({
-            type: "AGENT_REPORT_RECEIVED",
-            payload: reportPayload,
+
+          this.outQueue.push(createAgentResponse({
+            payload: { text: "Complete", filesModified: reportPayload.files ?? [] },
             authorId: AUTHOR_ID,
-            timestamp: Date.now(),
-            volatility: "durable-draft",
-          });
+            timestamp: Date.now()
+          }));
           break;
         } else if (chunk.type === "failure") {
-          void this.hub.broadcast({
-            type: "AGENT_FAILURE",
-            payload: { error: chunk.error },
+          this.outQueue.push(createAgentFailure({
+            payload: { reason: "format" }, // Or map generic error correctly
             authorId: AUTHOR_ID,
-            timestamp: Date.now(),
-            volatility: "durable-draft",
-          });
+            timestamp: Date.now()
+          }));
           break;
         }
       }

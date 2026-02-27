@@ -5,16 +5,11 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { BaseEvent } from "../core/event-contracts.js";
+import type { BaseEvent } from "../interfaces/event.js";
 import type { DuctusConfig } from "../core/ductus-config-schema.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
-
-interface QualityProcessorHub {
-  broadcast(base: BaseEvent): Promise<void>;
-}
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createEffectRunTool, createEffectSpawnAgent, createFeatureRejected, createFeatureApproved } from "../core/events/creators.js";
 
 interface ToolCompletedPayload {
   trackingId?: string;
@@ -53,20 +48,19 @@ function parseCommandToExec(commandStr: string): { command: string; args: string
 
 export class QualityProcessor implements EventProcessor {
   private readonly pendingByTrackingId = new Map<string, PendingFeatureVerification>();
-  private readonly pendingAuditorByCorrelationId = new Map<
-    string,
-    PendingAuditorVerification
-  >();
+  private readonly pendingAuditorByCorrelationId = new Map<string, PendingAuditorVerification>();
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
   constructor(
-    private readonly hub: QualityProcessorHub,
     private readonly config: DuctusConfig,
-    private readonly cwd: string,
-    public readonly incomingQueue: EventQueue
-  ) {}
+    private readonly cwd: string
+  ) { }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndVerify(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndVerify(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
   private getPerFeatureChecks(scopeName?: string): [string, { command: string; boundary: string }][] {
@@ -85,7 +79,7 @@ export class QualityProcessor implements EventProcessor {
     return entries;
   }
 
-  private async *consumeAndVerify(
+  private async consumeAndVerify(
     stream: AsyncIterable<{
       type: string;
       payload: unknown;
@@ -94,37 +88,38 @@ export class QualityProcessor implements EventProcessor {
       eventId?: string;
       isReplay?: boolean;
     }>
-  ): OutputEventStream {
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "FEATURE_IMPLEMENTED") {
         if (event.isReplay) continue;
-        yield* this.handleFeatureImplemented(event);
+        this.handleFeatureImplemented(event);
         continue;
       }
 
       if (event.type === "TOOL_COMPLETED") {
         if (event.authorId !== "tool-processor") continue;
-        yield* this.handleToolCompleted(event.payload as ToolCompletedPayload);
+        this.handleToolCompleted(event.payload as ToolCompletedPayload);
         continue;
       }
 
       if (event.type === "TOOL_FAILED") {
         if (event.authorId !== "tool-processor") continue;
-        yield* this.handleToolFailed(event.payload as ToolFailedPayload);
+        this.handleToolFailed(event.payload as ToolFailedPayload);
         continue;
       }
 
-      if (event.type === "AGENT_REPORT_RECEIVED") {
-        if (event.isReplay) continue;
-        yield* this.handleAgentReport(event);
+      if (event.type === "AGENT_RESPONSE") {
+        if ((event as any).isReplay === true) continue;
+        this.handleAgentReport(event);
       }
     }
+    this.outQueue.close();
   }
 
-  private async *handleFeatureImplemented(event: {
+  private handleFeatureImplemented(event: {
     payload: unknown;
     eventId?: string;
-  }): OutputEventStream {
+  }): void {
     const payload = event.payload as { spec?: string; scope?: string };
     const scope = payload?.scope ?? "default";
 
@@ -145,8 +140,7 @@ export class QualityProcessor implements EventProcessor {
     };
     this.pendingByTrackingId.set(trackingId, pending);
 
-    void this.hub.broadcast({
-      type: "EFFECT_RUN_TOOL",
+    this.outQueue.push(createEffectRunTool({
       payload: {
         command,
         args,
@@ -154,12 +148,11 @@ export class QualityProcessor implements EventProcessor {
         trackingId,
       },
       authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "durable-draft",
-    });
+      timestamp: Date.now()
+    }));
   }
 
-  private async *handleToolCompleted(payload: ToolCompletedPayload): OutputEventStream {
+  private handleToolCompleted(payload: ToolCompletedPayload): void {
     const trackingId = payload?.trackingId as string | undefined;
     if (!trackingId) return;
 
@@ -178,8 +171,7 @@ export class QualityProcessor implements EventProcessor {
         remainingChecks: remaining.slice(1),
       });
 
-      void this.hub.broadcast({
-        type: "EFFECT_RUN_TOOL",
+      this.outQueue.push(createEffectRunTool({
         payload: {
           command,
           args,
@@ -187,9 +179,8 @@ export class QualityProcessor implements EventProcessor {
           trackingId: nextTrackingId,
         },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
       return;
     }
 
@@ -200,8 +191,7 @@ export class QualityProcessor implements EventProcessor {
     const correlationId = `qa-auditor-${randomUUID()}`;
     this.pendingAuditorByCorrelationId.set(correlationId, { spec });
 
-    void this.hub.broadcast({
-      type: "EFFECT_SPAWN_AGENT",
+    this.outQueue.push(createEffectSpawnAgent({
       payload: {
         roleName: "auditor",
         scope: scope ?? "default",
@@ -209,12 +199,11 @@ export class QualityProcessor implements EventProcessor {
         correlationId,
       },
       authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "durable-draft",
-    });
+      timestamp: Date.now()
+    }));
   }
 
-  private async *handleToolFailed(payload: ToolFailedPayload): OutputEventStream {
+  private handleToolFailed(payload: ToolFailedPayload): void {
     const trackingId = payload?.trackingId as string | undefined;
     if (!trackingId) return;
 
@@ -223,23 +212,21 @@ export class QualityProcessor implements EventProcessor {
 
     this.pendingByTrackingId.delete(trackingId);
 
-    void this.hub.broadcast({
-      type: "FEATURE_REJECTED",
+    this.outQueue.push(createFeatureRejected({
       payload: {
         reason: "check_failure",
         stderr: payload?.stderr ?? payload?.log ?? "",
         log: payload?.log ?? "",
       },
       authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "durable-draft",
-    });
+      timestamp: Date.now()
+    }));
   }
 
-  private async *handleAgentReport(event: {
+  private handleAgentReport(event: {
     payload: unknown;
     authorId: string;
-  }): OutputEventStream {
+  }): void {
     if (event.authorId !== "agent-processor") return;
     const raw = event.payload;
     const correlationId =
@@ -255,8 +242,8 @@ export class QualityProcessor implements EventProcessor {
 
     const p =
       raw !== null &&
-      typeof raw === "object" &&
-      "result" in raw
+        typeof raw === "object" &&
+        "result" in raw
         ? (raw as { result: unknown }).result
         : raw;
     const report =
@@ -268,21 +255,17 @@ export class QualityProcessor implements EventProcessor {
     const critique = report?.critique ?? "";
 
     if (!approved || critique.length > 0) {
-      void this.hub.broadcast({
-        type: "FEATURE_REJECTED",
+      this.outQueue.push(createFeatureRejected({
         payload: { reason: "auditor_gaps", critique },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
     } else {
-      void this.hub.broadcast({
-        type: "FEATURE_APPROVED",
+      this.outQueue.push(createFeatureApproved({
         payload: { spec: pending.spec },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
     }
   }
 }

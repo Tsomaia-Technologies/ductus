@@ -10,9 +10,10 @@ class ClockGeneratorProcessor implements EventProcessor {
     async *process(stream: InputEventStream): OutputEventStream {
         // Generate exactly 5 ticks
         for (let i = 0; i < 5; i++) {
-            yield createTick({ ms: 1000, isReplay: false }, "clock", Date.now() + i * 1000)({
+            yield createTick({
                 payload: { ms: 1000, isReplay: false },
-                authorId: "clock"
+                authorId: "clock",
+                timestamp: Date.now() + i * 1000
             });
             // Simulate real-world asynchronous delay
             await new Promise((r) => setTimeout(r, 10));
@@ -28,7 +29,7 @@ class TranslatorProcessor implements EventProcessor {
     async *process(stream: InputEventStream): OutputEventStream {
         for await (const incoming of stream) {
             if (incoming.type === "TICK") {
-                yield createAgentToken({ token: "beep" }, "translator")({
+                yield createAgentToken({
                     payload: { token: "beep" },
                     authorId: "translator"
                 });
@@ -79,6 +80,9 @@ describe("MultiplexerHub Yield Harness", () => {
                 break; // Stop listening
             }
         }
+
+        // Shut down the hub to close all processor subscriptions
+        hub.close();
 
         // Wait for the synchronous core loops to finish what they were doing and clean up
         await engineCore;

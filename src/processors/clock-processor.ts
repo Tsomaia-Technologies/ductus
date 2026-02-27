@@ -4,41 +4,35 @@
  * RFC-001 Task 007-clock-processor, Impl Guide Phase 2.
  */
 
-import type { BaseEvent } from "../core/event-contracts.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
-import type { HubMode } from "../core/multiplexer-hub.js";
-
-interface ClockHub {
-  mode: HubMode;
-  broadcast(base: BaseEvent): Promise<void>;
-}
-
-type EnqueuedEvent = { type: string; timestamp: number; isReplay?: boolean };
+import type { BaseEvent } from "../interfaces/event.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createTick } from "../core/events/creators.js";
 
 const TICK_INTERVAL_MS = 1000;
 const AUTHOR_ID = "clock-processor";
 
 export class ClockProcessor implements EventProcessor {
   private intervalRef: ReturnType<typeof setInterval> | null = null;
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
-  constructor(
-    private readonly hub: ClockHub,
-    public readonly incomingQueue: EventQueue
-  ) {}
+  constructor() { }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndDispatch(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consume(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndDispatch(
-    stream: AsyncIterable<EnqueuedEvent>
-  ): OutputEventStream {
+  private async consume(
+    stream: InputEventStream
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "SYSTEM_START") {
-        if (this.hub.mode === "LiveMode") {
+        // We do not have hub.mode injected anymore. Replays are tagged on the event natively.
+        // Wait, if "SYSTEM_START" is replayed, its `.isReplay` flag guarantees we jump.
+        if (!event.isReplay) {
           this.startLiveInterval();
         }
       } else if (
@@ -48,19 +42,22 @@ export class ClockProcessor implements EventProcessor {
         this.stopInterval();
       }
 
+      const isReplay = (event as any).isReplay === true;
       if (
-        event.isReplay === true &&
-        event.type !== "SYSTEM_TICK"
+        isReplay &&
+        event.type !== "TICK"
       ) {
-        this.broadcastTick(event.timestamp);
+        this.broadcastTick(event.timestamp, isReplay);
       }
     }
+
+    this.outQueue.close();
   }
 
   private startLiveInterval(): void {
     this.stopInterval();
     this.intervalRef = setInterval(() => {
-      this.broadcastTick(Date.now());
+      this.broadcastTick(Date.now(), false);
     }, TICK_INTERVAL_MS);
   }
 
@@ -71,13 +68,11 @@ export class ClockProcessor implements EventProcessor {
     }
   }
 
-  private broadcastTick(timestamp: number): void {
-    void this.hub.broadcast({
-      type: "SYSTEM_TICK",
-      payload: { timestamp },
+  private broadcastTick(timestamp: number, isReplay: boolean): void {
+    this.outQueue.push(createTick({
+      payload: { ms: TICK_INTERVAL_MS, isReplay },
       authorId: AUTHOR_ID,
-      timestamp,
-      volatility: "durable-draft",
-    });
+      timestamp
+    }));
   }
 }

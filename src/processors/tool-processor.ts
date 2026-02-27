@@ -4,16 +4,11 @@
  * RFC-001 Task 010-tool-processor, Rev 06 Section 6.3.
  */
 
-import type { BaseEvent } from "../core/event-contracts.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
+import type { BaseEvent } from "../interfaces/event.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
 import type { OSAdapter } from "../interfaces/adapters.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
-
-interface ToolHub {
-  broadcast(base: BaseEvent): Promise<void>;
-}
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createToolStdoutChunk, createToolCompleted, createToolFailed } from "../core/events/creators.js";
 
 interface EffectRunToolPayload {
   command: string;
@@ -37,21 +32,23 @@ const AUTHOR_ID = "tool-processor";
 
 export class ToolProcessor implements EventProcessor {
   private readonly activeExecutions = new Map<string, AbortController>();
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
   constructor(
-    private readonly hub: ToolHub,
     private readonly osAdapter: OSAdapter,
-    private readonly defaultCwd: string,
-    public readonly incomingQueue: EventQueue
-  ) {}
+    private readonly defaultCwd: string
+  ) { }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndExecute(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndExecute(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndExecute(
+  private async consumeAndExecute(
     stream: AsyncIterable<EnqueuedEvent>
-  ): OutputEventStream {
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "CIRCUIT_INTERRUPTED") {
         this.abortAll();
@@ -68,9 +65,11 @@ export class ToolProcessor implements EventProcessor {
         const eventId = event.eventId ?? `tool-${Date.now()}-${Math.random()}`;
         const trackingId = payload?.trackingId;
 
-        await this.runTool(command, args, cwd, event.timestamp, eventId, trackingId);
+        // Do NOT await, so we don't block CIRCUIT_INTERRUPTED.
+        this.runTool(command, args, cwd, event.timestamp, eventId, trackingId).catch(console.error);
       }
     }
+    this.outQueue.close();
   }
 
   private abortAll(): void {
@@ -100,18 +99,15 @@ export class ToolProcessor implements EventProcessor {
 
       const log = result.stdout + result.stderr;
 
-      void this.hub.broadcast({
-        type: "TOOL_STDOUT_CHUNK",
+      this.outQueue.push(createToolStdoutChunk({
         payload: { chunk: log },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "volatile-draft",
-      });
+        timestamp: Date.now()
+      }));
 
       const basePayload = { trackingId };
       if (result.exitCode === 0) {
-        void this.hub.broadcast({
-          type: "TOOL_COMPLETED",
+        this.outQueue.push(createToolCompleted({
           payload: {
             ...basePayload,
             exitCode: 0,
@@ -120,12 +116,10 @@ export class ToolProcessor implements EventProcessor {
             log,
           },
           authorId: AUTHOR_ID,
-          timestamp: Date.now(),
-          volatility: "durable-draft",
-        });
+          timestamp: Date.now()
+        }));
       } else {
-        void this.hub.broadcast({
-          type: "TOOL_FAILED",
+        this.outQueue.push(createToolFailed({
           payload: {
             ...basePayload,
             exitCode: result.exitCode,
@@ -135,9 +129,8 @@ export class ToolProcessor implements EventProcessor {
             reason: "NONZERO_EXIT",
           },
           authorId: AUTHOR_ID,
-          timestamp: Date.now(),
-          volatility: "durable-draft",
-        });
+          timestamp: Date.now()
+        }));
       }
     } catch (err) {
       if ((err as Error & { name?: string }).name === "AbortError") {
@@ -145,7 +138,7 @@ export class ToolProcessor implements EventProcessor {
       }
       const reason =
         String(err).toLowerCase().includes("timeout") ||
-        String(err).toLowerCase().includes("timed out")
+          String(err).toLowerCase().includes("timed out")
           ? "TIMEOUT"
           : "ERROR";
       const msg = err instanceof Error ? err.message : String(err);
@@ -158,13 +151,12 @@ export class ToolProcessor implements EventProcessor {
         reason,
       };
       if (trackingId !== undefined) payload.trackingId = trackingId;
-      void this.hub.broadcast({
-        type: "TOOL_FAILED",
+
+      this.outQueue.push(createToolFailed({
         payload,
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
     } finally {
       this.activeExecutions.delete(eventId);
     }

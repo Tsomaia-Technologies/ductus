@@ -44,10 +44,26 @@ export const createAgentResponse = createEvent("AGENT_RESPONSE", "durable-draft"
 export const createAgentFailure = createEvent("AGENT_FAILURE", "durable-draft");
 
 // --- Tools (Durable/Volatile mix) ---
-export const createRequestTool = createEvent("REQUEST_TOOL", "durable-draft");
-export const createToolOutput = createEvent("TOOL_OUTPUT", "durable-draft");
-export const createToolFailure = createEvent("TOOL_FAILURE", "durable-draft");
+export const createEffectRunTool = createEvent("EFFECT_RUN_TOOL", "durable-draft");
+export const createToolCompleted = createEvent("TOOL_COMPLETED", "durable-draft");
+export const createToolFailed = createEvent("TOOL_FAILED", "durable-draft");
 
 // High-frequency UI events MUST be volatile
 export const createToolStdoutChunk = createEvent("TOOL_STDOUT_CHUNK", "volatile-draft");
 export const createAgentToken = createEvent("AGENT_TOKEN", "volatile-draft");
+export const createInputReceived = createEvent("INPUT_RECEIVED", "durable-draft");
+
+export const createEffectSpawnAgent = createEvent("EFFECT_SPAWN_AGENT", "durable-draft");
+export const createRequestInput = createEvent("REQUEST_INPUT", "durable-draft");
+export const createPlanApproved = createEvent("PLAN_APPROVED", "durable-draft");
+export const createPlanRejected = createEvent("PLAN_REJECTED", "durable-draft");
+export const createSystemAbortRequested = createEvent("SYSTEM_ABORT_REQUESTED", "durable-draft");
+
+export const createTelemetryUpdated = createEvent("TELEMETRY_UPDATED", "volatile-draft");
+
+export const createFeatureRejected = createEvent("FEATURE_REJECTED", "durable-draft");
+
+// --- State Machine Internals (Durable) ---
+export const createAutoRejection = createEvent("AUTO_REJECTION", "durable-draft");
+export const createKillAgent = createEvent("KILL_AGENT", "durable-draft");
+export const createHallucinationDetected = createEvent("HALLUCINATION_DETECTED", "durable-draft");

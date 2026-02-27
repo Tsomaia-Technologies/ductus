@@ -9,8 +9,8 @@ import type { EventQueue } from "../interfaces/event-queue.js";
 
 type EnqueuedEvent = CommittedEvent & { isReplay?: boolean };
 
-export class AsyncEventQueue implements EventQueue {
-  private buffer: EnqueuedEvent[];
+export class RingBufferQueue<T> {
+  private buffer: T[];
   private head: number = 0;
   private tail: number = 0;
   private size: number = 0;
@@ -24,7 +24,7 @@ export class AsyncEventQueue implements EventQueue {
     this.buffer = new Array(this.capacity);
   }
 
-  push(event: EnqueuedEvent): void {
+  push(event: T): void {
     if (this.size === this.capacity) {
       this.resize();
     }
@@ -63,7 +63,7 @@ export class AsyncEventQueue implements EventQueue {
     }
   }
 
-  async *[Symbol.asyncIterator](): AsyncGenerator<EnqueuedEvent> {
+  async *[Symbol.asyncIterator](): AsyncGenerator<T> {
     for (; ;) {
       if (this.size > 0) {
         const item = this.buffer[this.head]!;
@@ -84,3 +84,5 @@ export class AsyncEventQueue implements EventQueue {
     }
   }
 }
+
+export class AsyncEventQueue extends RingBufferQueue<EnqueuedEvent> implements EventQueue { }

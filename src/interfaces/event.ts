@@ -10,7 +10,9 @@ export interface BaseEvent<T extends string = string, P = unknown> {
   payload: P;
   authorId: string;
   timestamp: number;
-  volatility: VolatilityDraft;
+  volatility: Volatility | VolatilityDraft;
+  isReplay?: boolean;
+  eventId?: string;
 }
 
 /**

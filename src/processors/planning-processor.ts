@@ -5,15 +5,10 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { BaseEvent } from "../core/event-contracts.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
-
-interface PlanningProcessorHub {
-  broadcast(base: BaseEvent): Promise<void>;
-}
+import type { BaseEvent } from "../interfaces/event.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createEffectSpawnAgent, createRequestInput, createPlanApproved, createPlanRejected } from "../core/events/creators.js";
 
 interface StartPlanningPayload {
   prompt?: string;
@@ -39,17 +34,18 @@ function isApproval(answer: unknown): boolean {
 export class PlanningProcessor implements EventProcessor {
   /** Maps REQUEST_INPUT id → draft spec for INPUT_RECEIVED correlation. */
   private readonly pendingByRequestId = new Map<string, string>();
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
-  constructor(
-    private readonly hub: PlanningProcessorHub,
-    public readonly incomingQueue: EventQueue
-  ) {}
+  constructor() { }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndOrchestrate(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndOrchestrate(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndOrchestrate(
+  private async consumeAndOrchestrate(
     stream: AsyncIterable<{
       type: string;
       payload: unknown;
@@ -58,60 +54,60 @@ export class PlanningProcessor implements EventProcessor {
       eventId?: string;
       isReplay?: boolean;
     }>
-  ): OutputEventStream {
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "START_PLANNING") {
         if (event.isReplay) continue;
-        yield* this.handleStartPlanning(event);
+        this.handleStartPlanning(event);
         continue;
       }
 
-      if (event.type === "AGENT_REPORT_RECEIVED") {
-        if (event.isReplay) continue;
-        yield* this.handleAgentReport(event);
+      if (event.type === "AGENT_RESPONSE") {
+        if ((event as any).isReplay === true) continue;
+        this.handleAgentReport(event);
         continue;
       }
 
       if (event.type === "INPUT_RECEIVED") {
-        if (event.isReplay) continue;
-        yield* this.handleInputReceived(event);
+        if ((event as any).isReplay === true) continue;
+        this.handleInputReceived(event);
       }
     }
+
+    this.outQueue.close();
   }
 
-  private async *handleStartPlanning(event: {
+  private handleStartPlanning(event: {
     payload: unknown;
     eventId?: string;
-  }): OutputEventStream {
+  }): void {
     const payload = event.payload as StartPlanningPayload;
     const prompt = typeof payload?.prompt === "string" ? payload.prompt : "";
 
-    void this.hub.broadcast({
-      type: "EFFECT_SPAWN_AGENT",
+    this.outQueue.push(createEffectSpawnAgent({
       payload: {
         roleName: PLANNER_ROLE,
         scope: "default",
         input: prompt,
       },
       authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "durable-draft",
-    });
+      timestamp: Date.now()
+    }));
   }
 
-  private async *handleAgentReport(event: {
+  private handleAgentReport(event: {
     payload: unknown;
     authorId: string;
     eventId?: string;
-  }): OutputEventStream {
+  }): void {
     if (event.authorId !== "agent-processor") return;
 
     const raw = event.payload;
     const p =
       raw !== null &&
-      typeof raw === "object" &&
-      "result" in raw &&
-      "correlationId" in raw
+        typeof raw === "object" &&
+        "result" in raw &&
+        "correlationId" in raw
         ? (raw as { result: unknown }).result
         : raw;
     if (typeof p === "object" && p !== null && "files" in p) return;
@@ -124,23 +120,21 @@ export class PlanningProcessor implements EventProcessor {
     const requestId = `approve-spec-${randomUUID()}`;
     this.pendingByRequestId.set(requestId, spec);
 
-    void this.hub.broadcast({
-      type: "REQUEST_INPUT",
+    this.outQueue.push(createRequestInput({
       payload: {
         id: requestId,
         question: "Approve this spec? Reply 'Yes' to approve, or describe the changes you want (e.g. 'No, add authentication').",
         expectedSchemaType: "string",
       },
       authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "durable-draft",
-    });
+      timestamp: Date.now()
+    }));
   }
 
-  private async *handleInputReceived(event: {
+  private handleInputReceived(event: {
     payload: unknown;
     authorId: string;
-  }): OutputEventStream {
+  }): void {
     const payload = event.payload as InputReceivedPayload;
     const id = payload?.id ?? "";
     const answer = payload?.answer;
@@ -151,27 +145,22 @@ export class PlanningProcessor implements EventProcessor {
     this.pendingByRequestId.delete(id);
 
     if (isApproval(answer)) {
-      void this.hub.broadcast({
-        type: "PLAN_APPROVED",
+      this.outQueue.push(createPlanApproved({
         payload: { spec },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
       return;
     }
 
-    void this.hub.broadcast({
-      type: "PLAN_REJECTED",
-      payload: { spec, feedback: typeof answer === "string" ? answer : String(answer ?? "") },
-      authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "durable-draft",
-    });
-
     const feedback = typeof answer === "string" ? answer : String(answer ?? "");
-    void this.hub.broadcast({
-      type: "EFFECT_SPAWN_AGENT",
+    this.outQueue.push(createPlanRejected({
+      payload: { spec, feedback },
+      authorId: AUTHOR_ID,
+      timestamp: Date.now()
+    }));
+
+    this.outQueue.push(createEffectSpawnAgent({
       payload: {
         roleName: PLANNER_ROLE,
         scope: "default",
@@ -188,8 +177,7 @@ export class PlanningProcessor implements EventProcessor {
         },
       },
       authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "durable-draft",
-    });
+      timestamp: Date.now()
+    }));
   }
 }

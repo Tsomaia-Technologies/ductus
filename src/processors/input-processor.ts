@@ -6,16 +6,11 @@
  */
 
 import { z } from "zod";
-import type { BaseEvent } from "../core/event-contracts.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
+import type { BaseEvent } from "../interfaces/event.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
 import type { TerminalAdapter } from "../interfaces/adapters.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
-
-interface InputProcessorHub {
-  broadcast(base: BaseEvent): Promise<void>;
-}
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createInputReceived } from "../core/events/creators.js";
 
 interface RequestInputPayload {
   id: string;
@@ -53,19 +48,22 @@ function resolveSchemaAndAdapter(
 }
 
 export class InputProcessor implements EventProcessor {
-  constructor(
-    private readonly hub: InputProcessorHub,
-    private readonly terminalAdapter: TerminalAdapter,
-    public readonly incomingQueue: EventQueue
-  ) {}
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndPrompt(stream);
+  constructor(
+    private readonly terminalAdapter: TerminalAdapter
+  ) { }
+
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndPrompt(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndPrompt(
-    stream: AsyncIterable<EnqueuedEvent>
-  ): OutputEventStream {
+  private async consumeAndPrompt(
+    stream: InputEventStream
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "REQUEST_INPUT") {
         if (event.isReplay) continue;
@@ -79,16 +77,16 @@ export class InputProcessor implements EventProcessor {
           expectedSchemaType,
           question,
           this.terminalAdapter
-        );
+        ) as string;
 
-        void this.hub.broadcast({
-          type: "INPUT_RECEIVED",
+        this.outQueue.push(createInputReceived({
           payload: { id, answer },
           authorId: AUTHOR_ID,
-          timestamp: Date.now(),
-          volatility: "durable-draft",
-        });
+          timestamp: Date.now()
+        }));
       }
     }
+
+    this.outQueue.close();
   }
 }

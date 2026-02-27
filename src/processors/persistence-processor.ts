@@ -4,29 +4,31 @@
  * RFC-001 Task 004-persistence-processor, Impl Guide Phase 1.
  */
 
-import type { CommitedEvent } from "../core/event-contracts.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
+import type { BaseEvent } from "../interfaces/event.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
 import type { FileAdapter } from "../interfaces/adapters.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
+import { RingBufferQueue } from "../core/event-queue.js";
 
-type EnqueuedEvent = CommitedEvent & { isReplay?: boolean };
+type EnqueuedEvent = BaseEvent;
 
 export class PersistenceProcessor implements EventProcessor {
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(16);
+
   constructor(
     private readonly fileAdapter: FileAdapter,
-    private readonly ledgerPath: string,
-    public readonly incomingQueue: EventQueue
-  ) {}
+    private readonly ledgerPath: string
+  ) { }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndSink(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndSink(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndSink(
+  private async consumeAndSink(
     stream: AsyncIterable<EnqueuedEvent>
-  ): OutputEventStream {
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.isReplay) continue;
       if (event.volatility !== "durable") continue;
@@ -35,5 +37,6 @@ export class PersistenceProcessor implements EventProcessor {
         JSON.stringify(event) + "\n"
       );
     }
+    this.outQueue.close();
   }
 }

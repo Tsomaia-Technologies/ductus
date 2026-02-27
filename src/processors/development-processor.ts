@@ -5,16 +5,16 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { BaseEvent } from "../core/event-contracts.js";
-import type { DuctusConfig } from "../core/ductus-config-schema.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createEffectRunTool, createAutoRejection, createFeatureApproved } from "../core/events/creators.js";
+import { createTaskCompleted } from "../core/events/creators.js";
 
-interface DevelopmentProcessorHub {
-  broadcast(base: BaseEvent): Promise<void>;
-}
+// Let me ensure we just use the named types from the type registry we set up.
+// Specifically `REQUEST_TOOL`, `AUTO_REJECTION`, `TASK_COMPLETED`.
+
+import type { BaseEvent } from "../interfaces/event.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
+import type { DuctusConfig } from "../core/ductus-config-schema.js";
 
 interface AgentReportPayload {
   files?: string[];
@@ -98,19 +98,21 @@ function compareClaimsVsReality(
 
 export class DevelopmentProcessor implements EventProcessor {
   private readonly pendingByTrackingId = new Map<string, PendingVerification>();
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
   constructor(
-    private readonly hub: DevelopmentProcessorHub,
     private readonly config: DuctusConfig,
-    private readonly cwd: string,
-    public readonly incomingQueue: EventQueue
-  ) {}
+    private readonly cwd: string
+  ) { }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndVerify(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndVerify(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndVerify(
+  private async consumeAndVerify(
     stream: AsyncIterable<{
       type: string;
       payload: unknown;
@@ -119,30 +121,31 @@ export class DevelopmentProcessor implements EventProcessor {
       eventId?: string;
       isReplay?: boolean;
     }>
-  ): OutputEventStream {
+  ): Promise<void> {
     for await (const event of stream) {
-      if (event.type === "AGENT_REPORT_RECEIVED") {
-        if (event.isReplay) continue;
-        yield* this.handleAgentReport(event);
+      if (event.type === "AGENT_RESPONSE") {
+        if ((event as any).isReplay === true) continue;
+        this.handleAgentReport(event);
         continue;
       }
 
       if (event.type === "TOOL_COMPLETED") {
-        yield* this.handleToolCompleted(event.payload as ToolCompletedPayload, event.authorId);
+        this.handleToolCompleted(event.payload as ToolCompletedPayload, event.authorId);
         continue;
       }
 
-      if (event.type === "TOOL_FAILED") {
-        yield* this.handleToolFailed(event.payload as ToolFailedPayload, event.authorId);
+      if (event.type === "TOOL_FAILURE") {
+        this.handleToolFailed(event.payload as ToolFailedPayload, event.authorId);
       }
     }
+    this.outQueue.close();
   }
 
-  private async *handleAgentReport(event: {
+  private handleAgentReport(event: {
     payload: unknown;
     authorId: string;
     eventId?: string;
-  }): OutputEventStream {
+  }): void {
     const raw = event.payload;
     if (
       raw !== null &&
@@ -166,18 +169,16 @@ export class DevelopmentProcessor implements EventProcessor {
       phase: "git-diff",
     });
 
-    void this.hub.broadcast({
-      type: "EFFECT_RUN_TOOL",
+    this.outQueue.push(createEffectRunTool({
       payload: {
-        command: "git",
-        args: ["diff", "--name-only"],
+        command: "git diff --name-only",
+        args: [],
         cwd: this.cwd,
         trackingId,
       },
       authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "durable-draft",
-    });
+      timestamp: Date.now()
+    }));
   }
 
   private resolveScope(scopeName?: string): DuctusConfig["default"] {
@@ -201,10 +202,10 @@ export class DevelopmentProcessor implements EventProcessor {
     return entries;
   }
 
-  private async *handleToolCompleted(
+  private handleToolCompleted(
     payload: ToolCompletedPayload,
     toolAuthorId: string
-  ): OutputEventStream {
+  ): void {
     if (toolAuthorId !== "tool-processor") return;
 
     const trackingId = payload?.trackingId as string | undefined;
@@ -220,30 +221,24 @@ export class DevelopmentProcessor implements EventProcessor {
       const cmp = compareClaimsVsReality(pending.claimedFiles, actualFiles);
 
       if (!cmp.match) {
-        void this.hub.broadcast({
-          type: "AUTO_REJECTION",
+        this.outQueue.push(createAutoRejection({
           payload: {
-            reason: "diff_mismatch",
             isHallucination: true,
-            detail: cmp.reason,
-            authorId: pending.authorId,
+            type: cmp.reason
           },
           authorId: AUTHOR_ID,
-          timestamp: Date.now(),
-          volatility: "durable-draft",
-        });
+          timestamp: Date.now()
+        }));
         return;
       }
 
       const checks = this.getChecksForScope("default");
       if (checks.length === 0) {
-        void this.hub.broadcast({
-          type: "VALIDATION_SUCCESS",
-          payload: { files: actualFiles },
+        this.outQueue.push(createTaskCompleted({
+          payload: { taskId: pending.agentEventId },
           authorId: AUTHOR_ID,
-          timestamp: Date.now(),
-          volatility: "durable-draft",
-        });
+          timestamp: Date.now()
+        }));
         return;
       }
 
@@ -266,38 +261,25 @@ export class DevelopmentProcessor implements EventProcessor {
       if (checks.length > 1) nextPending.remainingChecks = checks.slice(1);
       this.pendingByTrackingId.set(nextTrackingId, nextPending);
 
-      void this.hub.broadcast({
-        type: "EFFECT_RUN_TOOL",
-        payload: {
-          command,
-          args,
-          cwd: this.cwd,
-          trackingId: nextTrackingId,
-        },
+      this.outQueue.push(createEffectRunTool({
+        payload: { command, args, cwd: this.cwd, trackingId: nextTrackingId },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
       return;
     }
 
     if (pending.phase === "check") {
       const exitCode = payload?.exitCode ?? 0;
       if (exitCode !== 0) {
-        void this.hub.broadcast({
-          type: "AUTO_REJECTION",
+        this.outQueue.push(createAutoRejection({
           payload: {
-            reason: "check_failure",
             isHallucination: false,
-            command: pending.checkCommand,
-            stderr: payload?.stderr ?? payload?.log ?? "",
-            checkName: pending.checkName,
-            authorId: pending.authorId,
+            type: "check_failure"
           },
           authorId: AUTHOR_ID,
-          timestamp: Date.now(),
-          volatility: "durable-draft",
-        });
+          timestamp: Date.now()
+        }));
         return;
       }
 
@@ -319,35 +301,26 @@ export class DevelopmentProcessor implements EventProcessor {
           remainingChecks: remaining.slice(1),
         });
 
-        void this.hub.broadcast({
-          type: "EFFECT_RUN_TOOL",
-          payload: {
-            command,
-            args,
-            cwd: this.cwd,
-            trackingId: nextTrackingId,
-          },
+        this.outQueue.push(createEffectRunTool({
+          payload: { command, args, cwd: this.cwd, trackingId: nextTrackingId },
           authorId: AUTHOR_ID,
-          timestamp: Date.now(),
-          volatility: "durable-draft",
-        });
+          timestamp: Date.now()
+        }));
         return;
       }
 
-      void this.hub.broadcast({
-        type: "VALIDATION_SUCCESS",
-        payload: { files: pending.verifiedFiles ?? [] },
+      this.outQueue.push(createTaskCompleted({
+        payload: { taskId: pending.agentEventId },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
     }
   }
 
-  private async *handleToolFailed(
+  private handleToolFailed(
     payload: ToolFailedPayload,
     toolAuthorId: string
-  ): OutputEventStream {
+  ): void {
     if (toolAuthorId !== "tool-processor") return;
 
     const trackingId = payload?.trackingId as string | undefined;
@@ -359,36 +332,20 @@ export class DevelopmentProcessor implements EventProcessor {
     this.pendingByTrackingId.delete(trackingId);
 
     if (pending.phase === "git-diff") {
-      void this.hub.broadcast({
-        type: "AUTO_REJECTION",
-        payload: {
-          reason: "git_diff_failed",
-          isHallucination: true,
-          detail: payload?.stderr ?? payload?.log ?? "git diff failed",
-          authorId: pending.authorId,
-        },
+      this.outQueue.push(createAutoRejection({
+        payload: { isHallucination: true, type: "git_diff_failed" },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
       return;
     }
 
     if (pending.phase === "check") {
-      void this.hub.broadcast({
-        type: "AUTO_REJECTION",
-        payload: {
-          reason: "check_failure",
-          isHallucination: false,
-          command: pending.checkCommand,
-          stderr: payload?.stderr ?? payload?.log ?? "",
-          checkName: pending.checkName,
-          authorId: pending.authorId,
-        },
+      this.outQueue.push(createAutoRejection({
+        payload: { isHallucination: false, type: "check_failure" },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
     }
   }
 }

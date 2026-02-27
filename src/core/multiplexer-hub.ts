@@ -93,6 +93,17 @@ export class MultiplexerHub {
     }
 
     /**
+     * Gracefully shuts down the Hub, terminating all active subscriptions
+     * to prevent deadlocks in async iterables.
+     */
+    public close(): void {
+        for (const queue of this.queues) {
+            queue.close();
+        }
+        this.queues.clear();
+    }
+
+    /**
      * Bypasses cryptographic generation; re-injects historical literal events.
      * Only the bootstrapper should call this during hydration.
      */

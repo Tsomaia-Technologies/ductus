@@ -4,17 +4,12 @@
  * RFC-001 Task 012-session-processor, Rev 06 Section 2.1.
  */
 
-import type { BaseEvent } from "../core/event-contracts.js";
+import type { BaseEvent } from "../interfaces/event.js";
 import { DuctusConfigSchema, type DuctusConfig } from "../core/ductus-config-schema.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
 import type { FileAdapter } from "../interfaces/adapters.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
-
-interface SessionProcessorHub {
-  broadcast(base: BaseEvent): Promise<void>;
-}
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createSystemAbortRequested, createContextLoaded } from "../core/events/creators.js";
 
 type EnqueuedEvent = {
   type: string;
@@ -67,21 +62,24 @@ function parseConfigRaw(raw: string): DuctusConfig | { error: string } {
 }
 
 export class SessionProcessor implements EventProcessor {
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(16);
+
   constructor(
-    private readonly hub: SessionProcessorHub,
     private readonly fileAdapter: FileAdapter,
     private readonly configPath: string,
-    private readonly ledgerPath: string,
-    public readonly incomingQueue: EventQueue
-  ) {}
+    private readonly ledgerPath: string
+  ) { }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndLoad(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndLoad(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndLoad(
+  private async consumeAndLoad(
     stream: AsyncIterable<EnqueuedEvent>
-  ): OutputEventStream {
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.type !== "SYSTEM_START") continue;
       if (event.isReplay) continue;
@@ -95,13 +93,11 @@ export class SessionProcessor implements EventProcessor {
         const raw = await this.fileAdapter.read(this.configPath);
         const parsed = parseConfigRaw(raw);
         if ("error" in parsed) {
-          void this.hub.broadcast({
-            type: "SYSTEM_ABORT_REQUESTED",
+          this.outQueue.push(createSystemAbortRequested({
             payload: { reason: parsed.error },
             authorId: AUTHOR_ID,
-            timestamp: Date.now(),
-            volatility: "durable-draft",
-          });
+            timestamp: Date.now()
+          }));
           continue;
         }
         config = parsed;
@@ -109,13 +105,13 @@ export class SessionProcessor implements EventProcessor {
         config = DEFAULT_CONFIG;
       }
 
-      void this.hub.broadcast({
-        type: "CONTEXT_LOADED",
+      this.outQueue.push(createContextLoaded({
         payload: { config, isGenesis },
         authorId: AUTHOR_ID,
-        timestamp: Date.now(),
-        volatility: "durable-draft",
-      });
+        timestamp: Date.now()
+      }));
     }
+
+    this.outQueue.close();
   }
 }

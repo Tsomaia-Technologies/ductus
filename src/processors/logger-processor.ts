@@ -5,31 +5,33 @@
  * RFC-001 Task 005-logger-processor, Impl Guide Phase 3.
  */
 
-import type { CommitedEvent } from "../core/event-contracts.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
+import type { BaseEvent } from "../interfaces/event.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
 import type { TerminalAdapter } from "../interfaces/adapters.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
+import { RingBufferQueue } from "../core/event-queue.js";
 
-type EnqueuedEvent = CommitedEvent & { isReplay?: boolean };
+type EnqueuedEvent = BaseEvent;
 
 const RED = "\u001b[31m";
 const RESET = "\u001b[0m";
 
 export class LoggerProcessor implements EventProcessor {
-  constructor(
-    private readonly terminalAdapter: TerminalAdapter,
-    public readonly incomingQueue: EventQueue
-  ) {}
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(16);
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndFormat(stream);
+  constructor(
+    private readonly terminalAdapter: TerminalAdapter
+  ) { }
+
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndFormat(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndFormat(
+  private async consumeAndFormat(
     stream: AsyncIterable<EnqueuedEvent>
-  ): OutputEventStream {
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.isReplay) continue;
 
@@ -38,6 +40,8 @@ export class LoggerProcessor implements EventProcessor {
         this.terminalAdapter.log(formatted);
       }
     }
+
+    this.outQueue.close();
   }
 
   private formatEvent(event: EnqueuedEvent): string | null {

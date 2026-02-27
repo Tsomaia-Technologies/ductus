@@ -4,7 +4,6 @@
  * RFC-001 Task 008, 015.
  */
 
-import { AsyncEventQueue } from "../core/event-queue.js";
 import { AgentProcessor } from "../processors/agent-processor.js";
 import { DevelopmentProcessor } from "../processors/development-processor.js";
 import { PlanningProcessor } from "../processors/planning-processor.js";
@@ -17,11 +16,9 @@ import type { EventProcessor } from "../interfaces/event-processor.js";
 import type { InputEventStream } from "../interfaces/input-event-stream.js";
 import type { OutputEventStream } from "../interfaces/output-event-stream.js";
 import type { DuctusConfig } from "../core/ductus-config-schema.js";
-import type { MultiplexerHub } from "../core/multiplexer-hub.js";
 import type { AgentDispatcher } from "../interfaces/agent-dispatcher.js";
 import type { FileAdapter, OSAdapter } from "../interfaces/adapters.js";
 import type { CacheAdapter } from "../interfaces/cache-adapter.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
 
 const DEFAULT_AGENT_CONFIG: DuctusConfig = {
   default: {
@@ -51,9 +48,7 @@ const DEFAULT_AGENT_CONFIG: DuctusConfig = {
 };
 
 function createStubProcessor(name: string): EventProcessor {
-  const queue = new AsyncEventQueue();
   return {
-    incomingQueue: queue,
     process: (stream: InputEventStream): OutputEventStream =>
       (async function* () {
         for await (const _ of stream) {
@@ -67,10 +62,8 @@ export function createSessionProcessor(): EventProcessor {
   return createStubProcessor("SessionProcessor");
 }
 
-export function createPlanningProcessor(deps?: { hub: MultiplexerHub }): EventProcessor {
-  if (!deps) return createStubProcessor("PlanningProcessor");
-  const queue = new AsyncEventQueue();
-  return new PlanningProcessor(deps.hub, queue);
+export function createPlanningProcessor(): EventProcessor {
+  return new PlanningProcessor();
 }
 
 export function createTaskingProcessor(): EventProcessor {
@@ -78,28 +71,23 @@ export function createTaskingProcessor(): EventProcessor {
 }
 
 export function createDevelopmentProcessor(deps?: {
-  hub: MultiplexerHub;
-  config: DuctusConfig;
+  config: any;
   cwd: string;
 }): EventProcessor {
   if (!deps) return createStubProcessor("DevelopmentProcessor");
-  const queue = new AsyncEventQueue();
-  return new DevelopmentProcessor(deps.hub, deps.config, deps.cwd, queue);
+  return new DevelopmentProcessor(deps.config, deps.cwd);
 }
 
 export function createQualityProcessor(deps?: {
-  hub: MultiplexerHub;
-  config: DuctusConfig;
+  config: any;
   cwd: string;
 }): EventProcessor {
   if (!deps) return createStubProcessor("QualityProcessor");
-  const queue = new AsyncEventQueue();
-  return new QualityProcessor(deps.hub, deps.config, deps.cwd, queue);
+  return new QualityProcessor(deps.config, deps.cwd);
 }
 
 export function createAgentProcessor(deps?: {
-  hub: MultiplexerHub;
-  config?: DuctusConfig;
+  config?: any;
   dispatcher?: AgentDispatcher;
   fileAdapter: FileAdapter;
   cacheAdapter?: CacheAdapter;
@@ -108,30 +96,23 @@ export function createAgentProcessor(deps?: {
   if (!deps) {
     return createStubProcessor("AgentProcessor");
   }
-  const queue = new AsyncEventQueue();
   return new AgentProcessor(
-    deps.hub,
     deps.config ?? DEFAULT_AGENT_CONFIG,
     deps.dispatcher ?? new MockAgentDispatcher(),
     deps.fileAdapter,
     deps.cacheAdapter ?? new MemoryCacheAdapter(),
-    deps.cwd,
-    queue
+    deps.cwd
   );
 }
 
 export function createToolProcessor(deps?: {
-  hub: MultiplexerHub;
   osAdapter: OSAdapter;
   cwd: string;
 }): EventProcessor {
   if (!deps) return createStubProcessor("ToolProcessor");
-  const queue = new AsyncEventQueue();
-  return new ToolProcessor(deps.hub, deps.osAdapter, deps.cwd, queue);
+  return new ToolProcessor(deps.osAdapter, deps.cwd);
 }
 
-export function createTelemetryProcessor(deps?: { hub: MultiplexerHub }): EventProcessor {
-  if (!deps) return createStubProcessor("TelemetryProcessor");
-  const queue = new AsyncEventQueue();
-  return new TelemetryProcessor(deps.hub, queue);
+export function createTelemetryProcessor(): EventProcessor {
+  return new TelemetryProcessor();
 }

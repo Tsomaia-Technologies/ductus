@@ -5,17 +5,12 @@
  * RFC-001 Task 019-telemetry-processor, Rev 06 Section 2.1, 5.1.
  */
 
-import type { BaseEvent } from "../core/event-contracts.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
-import type { InputEventStream } from "../interfaces/input-event-stream.js";
-import type { OutputEventStream } from "../interfaces/output-event-stream.js";
-import type { EventQueue } from "../interfaces/event-queue.js";
+import type { BaseEvent } from "../interfaces/event.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../interfaces/event-processor.js";
+import { RingBufferQueue } from "../core/event-queue.js";
+import { createTelemetryUpdated } from "../core/events/creators.js";
 
 const AUTHOR_ID = "telemetry-processor";
-
-interface TelemetryHub {
-  broadcast(base: BaseEvent): Promise<void>;
-}
 
 interface UsagePayload {
   inputTokens?: number;
@@ -47,11 +42,9 @@ export class TelemetryProcessor implements EventProcessor {
   private totalOutputTokens = 0;
   private readonly byModel = new Map<string, ModelMetrics>();
   private sessionStartTimestamp: number | null = null;
+  private readonly outQueue = new RingBufferQueue<BaseEvent>(128);
 
-  constructor(
-    private readonly hub: TelemetryHub,
-    public readonly incomingQueue: EventQueue
-  ) {}
+  constructor() { }
 
   /** Debug accessor for Definition of Done tests. Returns current accumulated state. */
   getAccumulatedMetrics(): TelemetryAccumulate {
@@ -67,13 +60,16 @@ export class TelemetryProcessor implements EventProcessor {
     };
   }
 
-  process(stream: InputEventStream): OutputEventStream {
-    return this.consumeAndAggregate(stream);
+  async *process(stream: InputEventStream): OutputEventStream {
+    this.consumeAndAggregate(stream).catch(console.error);
+    for await (const out of this.outQueue) {
+      yield out;
+    }
   }
 
-  private async *consumeAndAggregate(
+  private async consumeAndAggregate(
     stream: AsyncIterable<EnqueuedEvent>
-  ): OutputEventStream {
+  ): Promise<void> {
     for await (const event of stream) {
       if (event.type === "SYSTEM_START") {
         this.resetAccumulators();
@@ -87,11 +83,12 @@ export class TelemetryProcessor implements EventProcessor {
         continue;
       }
 
-      if (event.type === "AGENT_REPORT_RECEIVED") {
+      if (event.type === "AGENT_RESPONSE") {
         this.accumulateUsage(event.payload);
         this.emitTelemetryUpdated();
       }
     }
+    this.outQueue.close();
   }
 
   private accumulateUsage(payload: unknown): void {
@@ -121,8 +118,7 @@ export class TelemetryProcessor implements EventProcessor {
     for (const [k, v] of this.byModel) {
       byModel[k] = { ...v };
     }
-    void this.hub.broadcast({
-      type: "TELEMETRY_UPDATED",
+    this.outQueue.push(createTelemetryUpdated({
       payload: {
         byModel,
         totalInputTokens: this.totalInputTokens,
@@ -130,9 +126,8 @@ export class TelemetryProcessor implements EventProcessor {
         sessionStartTimestamp: this.sessionStartTimestamp,
       },
       authorId: AUTHOR_ID,
-      timestamp: Date.now(),
-      volatility: "volatile-draft",
-    });
+      timestamp: Date.now()
+    }));
   }
 
   private resetAccumulators(): void {
