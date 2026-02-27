@@ -1,112 +1,113 @@
 /**
- * Multiplexer Hub - The concurrent spine of the Event Sourcing pipeline.
- * Receives BaseEvents, stamps into CommitedEvents, freezes payload, fan-out broadcasts.
- * RFC-001 Impl Guide, Task 002-multiplexer-hub.
+ * The Multiplexer Hub (The Circuit)
+ * RFC-001 Section 2.1 - The Spine connecting all Processors concurrently.
+ * Re-built to strictly respect pure AsyncIterables and Zero-Trust validation.
  */
+import { createHash } from "node:crypto";
+import type { BaseEvent, CommittedEvent } from "../interfaces/event.js";
+import { AsyncEventQueue } from "./event-queue.js";
 
-import { createHash, randomUUID } from "node:crypto";
-import type { BaseEvent, CommitedEvent } from "./event-contracts.js";
-import type { EventProcessor } from "../interfaces/event-processor.js";
-
-export type HubMode = "LiveMode" | "SilentMode";
-
-const GENESIS_HASH = "genesis";
-
-/**
- * Computes SHA-256 hex of: prevHash + authorId + sequenceNumber + stringified payload.
- * Matches RFC 4.1: hash = SHA-256(prevHash + authorId + sequenceNumber + JSON.stringify(payload))
- */
-function computeHash(
-  prevHash: string,
-  authorId: string,
-  sequenceNumber: number,
-  payload: unknown
-): string {
-  const data =
-    prevHash + authorId + String(sequenceNumber) + JSON.stringify(payload);
-  return createHash("sha256").update(data).digest("hex");
-}
-
-/** Maps draft volatility to committed form. */
-function toCommittedVolatility(
-  v: "durable-draft" | "volatile-draft"
-): "durable" | "volatile" {
-  return v === "durable-draft" ? "durable" : "volatile";
+function sha256(data: string): string {
+    return createHash("sha256").update(data).digest("hex");
 }
 
 export class MultiplexerHub {
-  private readonly processors: EventProcessor[] = [];
-  private sequenceNumber = 0;
-  private lastHash = GENESIS_HASH;
-  private _mode: HubMode = "LiveMode";
+    private readonly queues = new Set<AsyncEventQueue>();
+    private sequenceCounter = 0;
+    // Fallback hash logic: Start with a zero-state root if ledger is brand new.
+    private lastHash: string = "0000000000000000000000000000000000000000000000000000000000000000";
 
-  get mode(): HubMode {
-    return this._mode;
-  }
+    public mode: "LiveMode" | "ReplayMode" | "SilentMode" = "LiveMode";
 
-  set mode(value: HubMode) {
-    this._mode = value;
-  }
-
-  register(processor: EventProcessor): void {
-    this.processors.push(processor);
-  }
-
-  /**
-   * Injects a pre-stamped CommitedEvent during replay. Does not re-stamp.
-   * Used by Bootstrapper for hydration.
-   */
-  injectReplay(event: CommitedEvent & { isReplay?: boolean }): void {
-    const replay = { ...event, isReplay: true };
-    Object.freeze(replay);
-    const len = this.processors.length;
-    for (let i = 0; i < len; i++) {
-      this.processors[i]!.incomingQueue.push(replay);
-    }
-  }
-
-  /**
-   * Stamps BaseEvent into CommitedEvent, freezes payload, fan-out broadcast.
-   * Fire-and-forget: does NOT await processor completion.
-   */
-  async broadcast(base: BaseEvent): Promise<void> {
-    this.sequenceNumber += 1;
-    const prevHash = this.lastHash;
-
-    const payload = base.payload;
-    if (payload !== null && typeof payload === "object") {
-      Object.freeze(payload);
+    /**
+     * Used *only* by the Bootstrapper during hydration to set the initial hash
+     * state before allowing new live events to be broadcast.
+     */
+    public overrideLedgerState(sequence: number, hash: string) {
+        this.sequenceCounter = sequence;
+        this.lastHash = hash;
     }
 
-    const hash = computeHash(
-      prevHash,
-      base.authorId,
-      this.sequenceNumber,
-      payload
-    );
-    this.lastHash = hash;
+    /**
+     * Processors subscribe to the Hub by requesting a dedicated queue.
+     * Hub does NOT know who the processors are or how to call them.
+     */
+    public subscribe(): AsyncIterable<CommittedEvent> {
+        const queue = new AsyncEventQueue(256);
+        this.queues.add(queue);
 
-    const committed: CommitedEvent & { isReplay?: boolean } = {
-      eventId: randomUUID(),
-      type: base.type,
-      payload,
-      authorId: base.authorId,
-      timestamp: base.timestamp,
-      sequenceNumber: this.sequenceNumber,
-      prevHash,
-      hash,
-      volatility: toCommittedVolatility(base.volatility),
-    };
+        // Attach cleanup logic if the consumer aborts/breaks the loop
+        const iterable = queue[Symbol.asyncIterator]();
+        const originalReturn = iterable.return?.bind(iterable);
 
-    if (this._mode === "SilentMode") {
-      committed.isReplay = true;
+        iterable.return = async (value) => {
+            this.queues.delete(queue);
+            if (originalReturn) {
+                return originalReturn(value);
+            }
+            return { done: true, value };
+        };
+
+        return queue;
     }
 
-    Object.freeze(committed);
+    /**
+     * Takes a raw BaseEvent generated by a processor, assigns it its immutable 
+     * sequence and cryptographic hash, freezes it, and broadcasts it.
+     */
+    public broadcast(baseEvent: BaseEvent): void {
+        const seq = this.sequenceCounter++;
+        const prev = this.lastHash;
 
-    const len = this.processors.length;
-    for (let i = 0; i < len; i++) {
-      this.processors[i]!.incomingQueue.push(committed);
+        // Hash definition per RFC 4.1
+        // SHA-256(prevHash + authorId + sequenceNumber + JSON.stringify(payload))
+        const rawPayload = JSON.stringify(baseEvent.payload);
+        const hashTarget = `${prev}${baseEvent.authorId}${seq}${rawPayload}`;
+        const hash = sha256(hashTarget);
+
+        this.lastHash = hash;
+
+        // Convert drafted volatility into finalized volatility
+        const volatility = baseEvent.volatility === "durable-draft" ? "durable" : "volatile";
+
+        const committed: CommittedEvent = {
+            eventId: crypto.randomUUID(), // Node 19+ global native
+            type: baseEvent.type,
+            payload: baseEvent.payload,
+            authorId: baseEvent.authorId,
+            timestamp: baseEvent.timestamp,
+            sequenceNumber: seq,
+            prevHash: prev,
+            hash: hash,
+            volatility: volatility,
+        };
+
+        // Immutability is Law (RFC 1.2.3)
+        Object.freeze(committed);
+        Object.freeze(committed.payload);
+
+        // Fan-out to all subscribed queues
+        for (const queue of this.queues) {
+            queue.push(committed);
+        }
     }
-  }
+
+    /**
+     * Bypasses cryptographic generation; re-injects historical literal events.
+     * Only the bootstrapper should call this during hydration.
+     */
+    public injectReplay(historicalEvent: CommittedEvent): void {
+        // Fan-out to all subscribed queues, flagged as replay
+        for (const queue of this.queues) {
+            queue.push({
+                ...historicalEvent,
+                isReplay: true
+            });
+        }
+
+        // Update internal state trackers so that when it flips to LiveMode, 
+        // the next new broadcast continues seamlessly from the end of history.
+        this.sequenceCounter = Math.max(this.sequenceCounter, historicalEvent.sequenceNumber + 1);
+        this.lastHash = historicalEvent.hash;
+    }
 }
