@@ -46,3 +46,11 @@ You must output a single, valid JSON block wrapped in standard markdown.
 }
 
 ```
+
+Once you load this protocol, answer ONLY with:
+
+```json
+{
+  "status": "AWAITING_ENGINEER_REPORT"
+}
+```
