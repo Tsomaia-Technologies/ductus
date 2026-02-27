@@ -7,8 +7,8 @@ export interface BaseEvent<T extends string, P> {
 }
 
 export type CommitedEvent<TEvent extends BaseEvent<any, unknown>> = Omit<TEvent, 'volatility'> & {
-  id: string
-  sequence: number
+  eventId: string
+  sequenceNumber: number
   prevHash: string
   hash: string
   volatility: 'durable' | 'volatile'

@@ -10,12 +10,12 @@ describe("DuctusEventSchema", () => {
   const validUuid = "550e8400-e29b-41d4-a716-446655440000";
 
   const validEvent = {
-    id: validUuid,
+    eventId: validUuid,
     type: "TEST_EVENT",
     payload: {},
     authorId: "processor-1",
     timestamp: 0,
-    sequence: 0,
+    sequenceNumber: 0,
     prevHash: validSha256,
     hash: validSha256,
     volatility: "durable" as const,
@@ -51,8 +51,8 @@ describe("DuctusEventSchema", () => {
     expect(() => DuctusEventSchema.parse(invalid)).toThrow();
   });
 
-  it("throws when id is not a valid UUID", () => {
-    const invalid = { ...validEvent, id: "not-a-uuid" };
+  it("throws when eventId is not a valid UUID", () => {
+    const invalid = { ...validEvent, eventId: "not-a-uuid" };
 
     expect(() => DuctusEventSchema.parse(invalid)).toThrow();
   });

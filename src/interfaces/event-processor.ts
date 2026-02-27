@@ -1,6 +1,8 @@
-import { InputEventStream } from './input-event-stream.js'
-import { OutputEventStream } from './output-event-stream.js'
+import { InputEventStream } from "./input-event-stream.js";
+import { OutputEventStream } from "./output-event-stream.js";
+import type { EventQueue } from "./event-queue.js";
 
 export interface EventProcessor {
-  process(stream: InputEventStream): OutputEventStream
+  readonly incomingQueue: EventQueue;
+  process(stream: InputEventStream): OutputEventStream;
 }

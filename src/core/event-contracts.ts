@@ -37,8 +37,8 @@ export const BaseEventUnknownSchema = z.object({
 
 export interface CommitedEvent<T extends string = string, P = unknown>
   extends Omit<BaseEvent<T, P>, "volatility"> {
-  id: string;
-  sequence: number;
+  eventId: string;
+  sequenceNumber: number;
   prevHash: string;
   hash: string;
   volatility: Volatility;
@@ -52,12 +52,12 @@ export type DuctusEvent<T = unknown> = CommitedEvent<string, T>;
 const Sha256HexSchema = z.hash("sha256");
 
 export const DuctusEventSchema = z.object({
-  id: z.string().uuid(),
+  eventId: z.string().uuid(),
   type: z.string(),
   payload: z.unknown(),
   authorId: z.string().min(1),
   timestamp: z.number(),
-  sequence: z.number().int().nonnegative(),
+  sequenceNumber: z.number().int().nonnegative(),
   prevHash: Sha256HexSchema,
   hash: Sha256HexSchema,
   volatility: VolatilitySchema,
