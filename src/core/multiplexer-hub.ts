@@ -53,6 +53,19 @@ export class MultiplexerHub {
   }
 
   /**
+   * Injects a pre-stamped CommitedEvent during replay. Does not re-stamp.
+   * Used by Bootstrapper for hydration.
+   */
+  injectReplay(event: CommitedEvent & { isReplay?: boolean }): void {
+    const replay = { ...event, isReplay: true };
+    Object.freeze(replay);
+    const len = this.processors.length;
+    for (let i = 0; i < len; i++) {
+      this.processors[i]!.incomingQueue.push(replay);
+    }
+  }
+
+  /**
    * Stamps BaseEvent into CommitedEvent, freezes payload, fan-out broadcast.
    * Fire-and-forget: does NOT await processor completion.
    */
