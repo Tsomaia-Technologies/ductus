@@ -41,6 +41,7 @@
     "ink-scroll-view": "^0.3.6",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
+    "micromatch": "^4.0.8",
     "ora": "^9.3.0",
     "react": "^19.0.0",
     "zod": "^4.3.6",
@@ -49,6 +50,7 @@
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^30.0.0",
+    "@types/micromatch": "^4.0.10",
     "@types/node": "^20.11.0",
     "@types/react": "^19.0.0",
     "jest": "^30.2.0",
