@@ -19,6 +19,7 @@ import type { AgentRole } from "../interfaces/agent-role.js";
 import type { AgentContext } from "../interfaces/agent-context.js";
 import { EngineerAgent } from "../agents/engineer-agent.js";
 import { PlannerAgent } from "../agents/planner-agent.js";
+import { AuditorAgent } from "../agents/auditor-agent.js";
 
 const AUTHOR_ID = "agent-processor";
 
@@ -31,6 +32,8 @@ interface EffectSpawnAgentPayload {
   scope: string;
   input: string;
   context?: AgentContext;
+  /** Correlation ID echoed in AGENT_REPORT_RECEIVED for QualityProcessor etc. */
+  correlationId?: string;
 }
 
 type EnqueuedEvent = {
@@ -46,6 +49,7 @@ type EnqueuedEvent = {
 const ROLE_MAP: Record<string, AgentRole<unknown>> = {
   engineer: new EngineerAgent(),
   planner: new PlannerAgent(),
+  auditor: new AuditorAgent(),
 };
 
 export class AgentProcessor implements EventProcessor {
@@ -87,9 +91,14 @@ export class AgentProcessor implements EventProcessor {
 
         const cached = await this.cacheAdapter.get<unknown>(hash);
         if (cached !== undefined) {
+          const correlationId = payload?.correlationId;
+          const reportPayload =
+            correlationId !== undefined
+              ? { result: cached, correlationId }
+              : cached;
           void this.hub.broadcast({
             type: "AGENT_REPORT_RECEIVED",
-            payload: cached,
+            payload: reportPayload,
             authorId: AUTHOR_ID,
             timestamp: Date.now(),
             volatility: "durable-draft",
@@ -144,9 +153,14 @@ export class AgentProcessor implements EventProcessor {
           });
         } else if (chunk.type === "complete") {
           await this.cacheAdapter.set(hash, chunk.parsedOutput);
+          const correlationId = payload?.correlationId;
+          const reportPayload =
+            correlationId !== undefined
+              ? { result: chunk.parsedOutput, correlationId }
+              : chunk.parsedOutput;
           void this.hub.broadcast({
             type: "AGENT_REPORT_RECEIVED",
-            payload: chunk.parsedOutput,
+            payload: reportPayload,
             authorId: AUTHOR_ID,
             timestamp: Date.now(),
             volatility: "durable-draft",

@@ -143,7 +143,15 @@ export class DevelopmentProcessor implements EventProcessor {
     authorId: string;
     eventId?: string;
   }): OutputEventStream {
-    const payload = event.payload as AgentReportPayload;
+    const raw = event.payload;
+    if (
+      raw !== null &&
+      typeof raw === "object" &&
+      "correlationId" in raw
+    ) {
+      return;
+    }
+    const payload = raw as AgentReportPayload;
     const files = Array.isArray(payload?.files)
       ? payload.files
       : [];

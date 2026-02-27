@@ -106,7 +106,14 @@ export class PlanningProcessor implements EventProcessor {
   }): OutputEventStream {
     if (event.authorId !== "agent-processor") return;
 
-    const p = event.payload;
+    const raw = event.payload;
+    const p =
+      raw !== null &&
+      typeof raw === "object" &&
+      "result" in raw &&
+      "correlationId" in raw
+        ? (raw as { result: unknown }).result
+        : raw;
     if (typeof p === "object" && p !== null && "files" in p) return;
 
     const spec =

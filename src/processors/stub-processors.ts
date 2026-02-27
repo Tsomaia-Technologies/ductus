@@ -8,6 +8,7 @@ import { AsyncEventQueue } from "../core/event-queue.js";
 import { AgentProcessor } from "../processors/agent-processor.js";
 import { DevelopmentProcessor } from "../processors/development-processor.js";
 import { PlanningProcessor } from "../processors/planning-processor.js";
+import { QualityProcessor } from "../processors/quality-processor.js";
 import { ToolProcessor } from "../processors/tool-processor.js";
 import { MockAgentDispatcher } from "../agents/mock-agent-dispatcher.js";
 import { MemoryCacheAdapter } from "../adapters/memory-cache-adapter.js";
@@ -36,6 +37,12 @@ const DEFAULT_AGENT_CONFIG: DuctusConfig = {
         maxRejections: 5,
         maxRecognizedHallucinations: 2,
         strategies: [{ id: "default", model: "claude", template: "engineer" }],
+      },
+      auditor: {
+        lifecycle: "single-shot",
+        maxRejections: 0,
+        maxRecognizedHallucinations: 0,
+        strategies: [{ id: "default", model: "claude", template: "auditor" }],
       },
     },
   },
@@ -79,8 +86,14 @@ export function createDevelopmentProcessor(deps?: {
   return new DevelopmentProcessor(deps.hub, deps.config, deps.cwd, queue);
 }
 
-export function createQualityProcessor(): EventProcessor {
-  return createStubProcessor("QualityProcessor");
+export function createQualityProcessor(deps?: {
+  hub: MultiplexerHub;
+  config: DuctusConfig;
+  cwd: string;
+}): EventProcessor {
+  if (!deps) return createStubProcessor("QualityProcessor");
+  const queue = new AsyncEventQueue();
+  return new QualityProcessor(deps.hub, deps.config, deps.cwd, queue);
 }
 
 export function createAgentProcessor(deps?: {

@@ -46,6 +46,12 @@ const DEFAULT_CONFIG: DuctusConfig = {
         maxRecognizedHallucinations: 2,
         strategies: [{ id: "default", model: "claude-3-5-sonnet", template: "engineer" }],
       },
+      auditor: {
+        lifecycle: "single-shot",
+        maxRejections: 0,
+        maxRecognizedHallucinations: 0,
+        strategies: [{ id: "default", model: "claude-3-5-sonnet", template: "auditor" }],
+      },
     },
   },
   scopes: {},
@@ -182,7 +188,13 @@ export class Bootstrapper {
         cwd: this.options.cwd,
       })
     );
-    this.hub.register(createQualityProcessor());
+    this.hub.register(
+      createQualityProcessor({
+        hub: this.hub,
+        config,
+        cwd: this.options.cwd,
+      })
+    );
     this.hub.register(
       createAgentProcessor({
         hub: this.hub,
