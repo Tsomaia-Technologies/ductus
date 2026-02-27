@@ -209,7 +209,7 @@ export class Bootstrapper {
         cwd: this.options.cwd,
       })
     );
-    this.hub.register(createTelemetryProcessor());
+    this.hub.register(createTelemetryProcessor({ hub: this.hub }));
   }
 
   private async hydrateLedger(ledgerPath: string): Promise<void> {

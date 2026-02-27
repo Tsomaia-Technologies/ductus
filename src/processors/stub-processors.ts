@@ -9,6 +9,7 @@ import { AgentProcessor } from "../processors/agent-processor.js";
 import { DevelopmentProcessor } from "../processors/development-processor.js";
 import { PlanningProcessor } from "../processors/planning-processor.js";
 import { QualityProcessor } from "../processors/quality-processor.js";
+import { TelemetryProcessor } from "../processors/telemetry-processor.js";
 import { ToolProcessor } from "../processors/tool-processor.js";
 import { MockAgentDispatcher } from "../agents/mock-agent-dispatcher.js";
 import { MemoryCacheAdapter } from "../adapters/memory-cache-adapter.js";
@@ -129,6 +130,8 @@ export function createToolProcessor(deps?: {
   return new ToolProcessor(deps.hub, deps.osAdapter, deps.cwd, queue);
 }
 
-export function createTelemetryProcessor(): EventProcessor {
-  return createStubProcessor("TelemetryProcessor");
+export function createTelemetryProcessor(deps?: { hub: MultiplexerHub }): EventProcessor {
+  if (!deps) return createStubProcessor("TelemetryProcessor");
+  const queue = new AsyncEventQueue();
+  return new TelemetryProcessor(deps.hub, queue);
 }
