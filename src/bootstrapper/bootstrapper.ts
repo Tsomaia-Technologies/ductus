@@ -13,6 +13,7 @@ import { AsyncEventQueue } from "../core/event-queue.js";
 import { PersistenceProcessor } from "../processors/persistence-processor.js";
 import { LoggerProcessor } from "../processors/logger-processor.js";
 import { ClockProcessor } from "../processors/clock-processor.js";
+import { InputProcessor } from "../processors/input-processor.js";
 import {
   createSessionProcessor,
   createPlanningProcessor,
@@ -32,6 +33,7 @@ export interface BootstrapperOptions {
   /** For testing: override processors (e.g. mock LoggerProcessor). */
   processorOverrides?: {
     logger?: EventProcessor;
+    input?: EventProcessor;
   };
   /** For testing: override adapters to avoid loading execa etc. */
   adapterOverrides?: {
@@ -98,6 +100,7 @@ export class Bootstrapper {
     const persistenceQueue = new AsyncEventQueue();
     const loggerQueue = new AsyncEventQueue();
     const clockQueue = new AsyncEventQueue();
+    const inputQueue = new AsyncEventQueue();
 
     const persistence = new PersistenceProcessor(
       this.fileAdapter,
@@ -108,10 +111,14 @@ export class Bootstrapper {
       this.options.processorOverrides?.logger ??
       new LoggerProcessor(this.terminalAdapter, loggerQueue);
     const clock = new ClockProcessor(this.hub, clockQueue);
+    const input =
+      this.options.processorOverrides?.input ??
+      new InputProcessor(this.hub, this.terminalAdapter, inputQueue);
 
     this.hub.register(persistence);
     this.hub.register(logger);
     this.hub.register(clock);
+    this.hub.register(input);
     this.hub.register(createSessionProcessor());
     this.hub.register(createPlanningProcessor());
     this.hub.register(createTaskingProcessor());

@@ -6,11 +6,18 @@
 
 import type { ZodSchema } from "zod";
 
+export interface OSAdapterExecOptions {
+  timeoutMs: number;
+  cwd: string;
+  /** Optional AbortSignal for cancellation (e.g. on CIRCUIT_INTERRUPTED). */
+  signal?: AbortSignal;
+}
+
 export interface OSAdapter {
   exec(
     command: string,
     args: string[],
-    options: { timeoutMs: number; cwd: string }
+    options: OSAdapterExecOptions
   ): Promise<{
     stdout: string;
     stderr: string;

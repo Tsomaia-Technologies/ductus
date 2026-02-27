@@ -11,13 +11,14 @@ export class NodeOSAdapter implements OSAdapter {
   async exec(
     command: string,
     args: string[],
-    options: { timeoutMs: number; cwd: string }
+    options: import("../interfaces/adapters.js").OSAdapterExecOptions
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const result = await execa(command, args, {
       cwd: options.cwd,
       timeout: options.timeoutMs,
       reject: false,
       stdin: "ignore",
+      signal: options.signal,
     });
     return {
       stdout: result.stdout ?? "",
