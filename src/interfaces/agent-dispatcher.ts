@@ -1,13 +1,20 @@
 import type { AgentContext } from "./agent-context.js";
 import type { AgentRole } from "./agent-role.js";
-import type { OutputEventStream } from "./output-event-stream.js";
+import type { AgentStreamEvent } from "./agent-stream-event.js";
+
+export interface AgentDispatcherProcessOptions {
+  signal?: AbortSignal;
+  maxTokens: number;
+  maxRetries?: number;
+}
 
 export interface AgentDispatcher {
-  process(
+  process<TOutput>(
     input: string,
-    role: AgentRole<unknown>,
-    context?: AgentContext
-  ): Promise<OutputEventStream>;
+    role: AgentRole<TOutput>,
+    context: AgentContext | undefined,
+    options: AgentDispatcherProcessOptions
+  ): AsyncIterableIterator<AgentStreamEvent<TOutput>>;
 
   terminate(role: AgentRole<unknown>): void;
 }
