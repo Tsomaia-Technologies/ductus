@@ -20,7 +20,7 @@ module.exports = {
               options: {
                 metaObjectReplacement: {
                   url: pathToFileURL(
-                    path.resolve(process.cwd(), "src", "load-prompts.ts")
+                    path.resolve(process.cwd(), "src", "load-prompts.md.ts")
                   ).href,
                 },
               },

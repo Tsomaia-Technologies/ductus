@@ -128,8 +128,8 @@ export default {
       maxRejections: 5,
       maxRecognizedHallucinations: 2,
       strategies: [
-        { model: "claude-3-5-sonnet", template: "./prompts/eng.mx", maxRetries: 3 },
-        { model: "gpt-4o", template: "./prompts/eng-openai.mx", maxRetries: 2 }
+        { model: "claude-3-5-sonnet", template: "./prompts.md/eng.mx", maxRetries: 3 },
+        { model: "gpt-4o", template: "./prompts.md/eng-openai.mx", maxRetries: 2 }
       ]
     }
   }

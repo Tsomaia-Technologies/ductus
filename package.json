@@ -9,15 +9,15 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "NODE_OPTIONS='--import tsx/esm' tsx src/cli.ts",
-    "dev:watch": "NODE_OPTIONS='--import tsx/esm' tsx watch src/cli.ts",
+    "dev": "NODE_OPTIONS='--import tsx/esm' tsx ../moxite/research/old-ductus/src/cli.ts",
+    "dev:watch": "NODE_OPTIONS='--import tsx/esm' tsx watch ../moxite/research/old-ductus/src/cli.ts",
     "start": "node dist/bin/ductus.js",
     "test": "jest"
   },
   "files": [
     "dist/",
-    "src/prompts/",
-    "src/config/",
+    "../moxite/research/old-ductus/src/prompts/",
+    "../moxite/research/old-ductus/src/config/",
     "README.md",
     "LICENSE"
   ],

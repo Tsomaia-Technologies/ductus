@@ -1,8 +1,0 @@
-{
-  "commit": { "ignoreHooksOnFailure": false },
-  "checks": [
-    { "id": "build", "type": "global", "command": "npm run build", "run_when": "per_task" },
-    { "id": "test", "type": "global", "command": "npm test", "run_when": "per_task" }
-  ],
-  "agent": { "path": "agent" }
-}
