@@ -1,0 +1,162 @@
+/**
+ * PlanningProcessor Definition of Done.
+ * Task 017-planning-processor.
+ */
+
+import { PlanningProcessor } from "../../src/processors/planning-processor.js";
+import { AsyncEventQueue } from "../../src/core/event-queue.js";
+import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
+import type { EventQueue } from "../../src/interfaces/event-queue.js";
+
+const VALID_SHA256 =
+  "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
+const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
+
+async function flushStream<T>(stream: AsyncIterable<T>): Promise<void> {
+  for await (const _ of stream) {
+    /* sink */
+  }
+}
+
+function mockEvent(
+  type: string,
+  payload: unknown,
+  isReplay = false
+): Parameters<EventQueue["push"]>[0] {
+  return {
+    eventId: VALID_UUID,
+    type,
+    payload,
+    authorId: "agent-processor",
+    timestamp: 0,
+    sequenceNumber: 1,
+    prevHash: VALID_SHA256,
+    hash: VALID_SHA256,
+    volatility: "durable" as const,
+    isReplay,
+  };
+}
+
+describe("PlanningProcessor", () => {
+  describe("The Approval Relay Test", () => {
+    it("INPUT_RECEIVED with answer Yes yields PLAN_APPROVED containing the spec", async () => {
+      const queue = new AsyncEventQueue();
+      const broadcasts: Array<{ type: string; payload: unknown }> = [];
+      let capturedRequestId = "";
+
+      const hub = {
+        broadcast: async (e: { type: string; payload: unknown }) => {
+          broadcasts.push({ type: e.type, payload: e.payload });
+          if (e.type === "REQUEST_INPUT") {
+            const p = e.payload as { id?: string };
+            capturedRequestId = p?.id ?? "";
+            if (capturedRequestId) {
+              queue.push({
+                eventId: VALID_UUID,
+                type: "INPUT_RECEIVED",
+                payload: { id: capturedRequestId, answer: "Yes" },
+                authorId: "input-processor",
+                timestamp: Date.now(),
+                sequenceNumber: 2,
+                prevHash: VALID_SHA256,
+                hash: VALID_SHA256,
+                volatility: "durable" as const,
+              });
+            }
+          }
+        },
+      };
+
+      const processor = new PlanningProcessor(hub, queue);
+
+      queue.push(
+        mockEvent("AGENT_REPORT_RECEIVED", "# SPEC\nBuild a login API.")
+      );
+      queue.close();
+
+      await flushStream(processor.process(queue as unknown as InputEventStream));
+
+      const planApproved = broadcasts.filter((b) => b.type === "PLAN_APPROVED");
+      expect(planApproved).toHaveLength(1);
+      const payload = planApproved[0]!.payload as { spec?: string };
+      expect(payload.spec).toBe("# SPEC\nBuild a login API.");
+    });
+  });
+
+  describe("Muted Mode Protection", () => {
+    it("ignores START_PLANNING when isReplay is true", async () => {
+      const queue = new AsyncEventQueue();
+      const broadcasts: Array<{ type: string; payload: unknown }> = [];
+      const hub = {
+        broadcast: async (e: { type: string; payload: unknown }) => {
+          broadcasts.push({ type: e.type, payload: e.payload });
+        },
+      };
+
+      const processor = new PlanningProcessor(hub, queue);
+
+      queue.push(
+        mockEvent("START_PLANNING", { prompt: "Build X" }, true)
+      );
+      queue.close();
+
+      await flushStream(processor.process(queue as unknown as InputEventStream));
+
+      const effectSpawn = broadcasts.filter((b) => b.type === "EFFECT_SPAWN_AGENT");
+      expect(effectSpawn).toHaveLength(0);
+    });
+  });
+
+  describe("The Redaction Loop", () => {
+    it("INPUT_RECEIVED with rejection yields PLAN_REJECTED and EFFECT_SPAWN_AGENT", async () => {
+      const queue = new AsyncEventQueue();
+      const broadcasts: Array<{ type: string; payload: unknown }> = [];
+      let capturedRequestId = "";
+
+      const hub = {
+        broadcast: async (e: { type: string; payload: unknown }) => {
+          broadcasts.push({ type: e.type, payload: e.payload });
+          if (e.type === "REQUEST_INPUT") {
+            const p = e.payload as { id?: string };
+            capturedRequestId = p?.id ?? "";
+            if (capturedRequestId) {
+              queue.push({
+                eventId: VALID_UUID,
+                type: "INPUT_RECEIVED",
+                payload: { id: capturedRequestId, answer: "No, add authentication to the spec" },
+                authorId: "input-processor",
+                timestamp: Date.now(),
+                sequenceNumber: 2,
+                prevHash: VALID_SHA256,
+                hash: VALID_SHA256,
+                volatility: "durable" as const,
+              });
+            }
+          }
+        },
+      };
+
+      const processor = new PlanningProcessor(hub, queue);
+
+      queue.push(
+        mockEvent("AGENT_REPORT_RECEIVED", "# SPEC v1")
+      );
+      queue.close();
+
+      await flushStream(processor.process(queue as unknown as InputEventStream));
+
+      const planRejected = broadcasts.filter((b) => b.type === "PLAN_REJECTED");
+      expect(planRejected).toHaveLength(1);
+
+      const spawnAgent = broadcasts.filter((b) => b.type === "EFFECT_SPAWN_AGENT");
+      expect(spawnAgent.length).toBeGreaterThanOrEqual(1);
+      const spawnPayload = spawnAgent[spawnAgent.length - 1]!.payload as {
+        roleName?: string;
+        input?: string;
+        context?: unknown;
+      };
+      expect(spawnPayload.roleName).toBe("planner");
+      expect(spawnPayload.input).toContain("authentication");
+    });
+  });
+});

@@ -19,6 +19,8 @@ interface EffectRunToolPayload {
   command: string;
   args: string[];
   cwd?: string;
+  /** Correlation ID echoed in TOOL_COMPLETED/TOOL_FAILED for DevelopmentProcessor tracking. */
+  trackingId?: string;
 }
 
 type EnqueuedEvent = {
@@ -64,8 +66,9 @@ export class ToolProcessor implements EventProcessor {
         const args = Array.isArray(payload?.args) ? payload.args : [];
         const cwd = payload?.cwd ?? this.defaultCwd;
         const eventId = event.eventId ?? `tool-${Date.now()}-${Math.random()}`;
+        const trackingId = payload?.trackingId;
 
-        await this.runTool(command, args, cwd, event.timestamp, eventId);
+        await this.runTool(command, args, cwd, event.timestamp, eventId, trackingId);
       }
     }
   }
@@ -82,7 +85,8 @@ export class ToolProcessor implements EventProcessor {
     args: string[],
     cwd: string,
     timestamp: number,
-    eventId: string
+    eventId: string,
+    trackingId?: string
   ): Promise<void> {
     const controller = new AbortController();
     this.activeExecutions.set(eventId, controller);
@@ -104,10 +108,17 @@ export class ToolProcessor implements EventProcessor {
         volatility: "volatile-draft",
       });
 
+      const basePayload = { trackingId };
       if (result.exitCode === 0) {
         void this.hub.broadcast({
           type: "TOOL_COMPLETED",
-          payload: { exitCode: 0, stdout: result.stdout, stderr: result.stderr, log },
+          payload: {
+            ...basePayload,
+            exitCode: 0,
+            stdout: result.stdout,
+            stderr: result.stderr,
+            log,
+          },
           authorId: AUTHOR_ID,
           timestamp: Date.now(),
           volatility: "durable-draft",
@@ -116,6 +127,7 @@ export class ToolProcessor implements EventProcessor {
         void this.hub.broadcast({
           type: "TOOL_FAILED",
           payload: {
+            ...basePayload,
             exitCode: result.exitCode,
             stdout: result.stdout,
             stderr: result.stderr,
@@ -138,15 +150,17 @@ export class ToolProcessor implements EventProcessor {
           : "ERROR";
       const msg = err instanceof Error ? err.message : String(err);
 
+      const payload: Record<string, unknown> = {
+        exitCode: -1,
+        stdout: "",
+        stderr: msg,
+        log: msg,
+        reason,
+      };
+      if (trackingId !== undefined) payload.trackingId = trackingId;
       void this.hub.broadcast({
         type: "TOOL_FAILED",
-        payload: {
-          exitCode: -1,
-          stdout: "",
-          stderr: msg,
-          log: msg,
-          reason,
-        },
+        payload,
         authorId: AUTHOR_ID,
         timestamp: Date.now(),
         volatility: "durable-draft",

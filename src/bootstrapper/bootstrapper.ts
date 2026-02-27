@@ -7,6 +7,7 @@
 
 import { join } from "node:path";
 import type { CommitedEvent } from "../core/event-contracts.js";
+import { DuctusConfigSchema, type DuctusConfig } from "../core/ductus-config-schema.js";
 import type { FileAdapter, OSAdapter, TerminalAdapter } from "../interfaces/adapters.js";
 import { MultiplexerHub } from "../core/multiplexer-hub.js";
 import { AsyncEventQueue } from "../core/event-queue.js";
@@ -28,6 +29,27 @@ import type { EventProcessor } from "../interfaces/event-processor.js";
 
 const LEDGER_FILENAME = "ledger.jsonl";
 const CONFIG_FILENAME = "ductus.config.json";
+
+const DEFAULT_CONFIG: DuctusConfig = {
+  default: {
+    checks: {},
+    roles: {
+      planner: {
+        lifecycle: "single-shot",
+        maxRejections: 3,
+        maxRecognizedHallucinations: 0,
+        strategies: [{ id: "default", model: "claude-3-5-sonnet", template: "planner" }],
+      },
+      engineer: {
+        lifecycle: "session",
+        maxRejections: 5,
+        maxRecognizedHallucinations: 2,
+        strategies: [{ id: "default", model: "claude-3-5-sonnet", template: "engineer" }],
+      },
+    },
+  },
+  scopes: {},
+};
 
 export interface BootstrapperOptions {
   cwd: string;
@@ -68,7 +90,8 @@ export class Bootstrapper {
   }
 
   async ignite(): Promise<void> {
-    this.wireProcessors();
+    const config = await this.loadConfig();
+    this.wireProcessors(config);
 
     const ledgerPath = join(this.options.cwd, LEDGER_FILENAME);
     const ledgerExists = await this.fileAdapter.exists(ledgerPath);
@@ -98,7 +121,22 @@ export class Bootstrapper {
     });
   }
 
-  private wireProcessors(): void {
+  private async loadConfig(): Promise<DuctusConfig> {
+    const configPath = join(this.options.cwd, CONFIG_FILENAME);
+    const exists = await this.fileAdapter.exists(configPath);
+    if (!exists) return DEFAULT_CONFIG;
+    const raw = await this.fileAdapter.read(configPath);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return DEFAULT_CONFIG;
+    }
+    const result = DuctusConfigSchema.safeParse(parsed);
+    return result.success ? result.data : DEFAULT_CONFIG;
+  }
+
+  private wireProcessors(config: DuctusConfig): void {
     const persistenceQueue = new AsyncEventQueue();
     const loggerQueue = new AsyncEventQueue();
     const clockQueue = new AsyncEventQueue();
@@ -135,9 +173,15 @@ export class Bootstrapper {
     this.hub.register(clock);
     this.hub.register(input);
     this.hub.register(session);
-    this.hub.register(createPlanningProcessor());
+    this.hub.register(createPlanningProcessor({ hub: this.hub }));
     this.hub.register(createTaskingProcessor());
-    this.hub.register(createDevelopmentProcessor());
+    this.hub.register(
+      createDevelopmentProcessor({
+        hub: this.hub,
+        config,
+        cwd: this.options.cwd,
+      })
+    );
     this.hub.register(createQualityProcessor());
     this.hub.register(
       createAgentProcessor({
@@ -146,7 +190,13 @@ export class Bootstrapper {
         cwd: this.options.cwd,
       })
     );
-    this.hub.register(createToolProcessor());
+    this.hub.register(
+      createToolProcessor({
+        hub: this.hub,
+        osAdapter: this.osAdapter,
+        cwd: this.options.cwd,
+      })
+    );
     this.hub.register(createTelemetryProcessor());
   }
 
