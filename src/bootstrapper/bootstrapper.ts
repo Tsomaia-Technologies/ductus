@@ -14,8 +14,8 @@ import { PersistenceProcessor } from "../processors/persistence-processor.js";
 import { LoggerProcessor } from "../processors/logger-processor.js";
 import { ClockProcessor } from "../processors/clock-processor.js";
 import { InputProcessor } from "../processors/input-processor.js";
+import { SessionProcessor } from "../processors/session-processor.js";
 import {
-  createSessionProcessor,
   createPlanningProcessor,
   createTaskingProcessor,
   createDevelopmentProcessor,
@@ -27,6 +27,7 @@ import {
 import type { EventProcessor } from "../interfaces/event-processor.js";
 
 const LEDGER_FILENAME = "ledger.jsonl";
+const CONFIG_FILENAME = "ductus.config.json";
 
 export interface BootstrapperOptions {
   cwd: string;
@@ -34,6 +35,7 @@ export interface BootstrapperOptions {
   processorOverrides?: {
     logger?: EventProcessor;
     input?: EventProcessor;
+    session?: EventProcessor;
   };
   /** For testing: override adapters to avoid loading execa etc. */
   adapterOverrides?: {
@@ -101,10 +103,14 @@ export class Bootstrapper {
     const loggerQueue = new AsyncEventQueue();
     const clockQueue = new AsyncEventQueue();
     const inputQueue = new AsyncEventQueue();
+    const sessionQueue = new AsyncEventQueue();
+
+    const configPath = join(this.options.cwd, CONFIG_FILENAME);
+    const ledgerPath = join(this.options.cwd, LEDGER_FILENAME);
 
     const persistence = new PersistenceProcessor(
       this.fileAdapter,
-      join(this.options.cwd, LEDGER_FILENAME),
+      ledgerPath,
       persistenceQueue
     );
     const logger =
@@ -114,12 +120,21 @@ export class Bootstrapper {
     const input =
       this.options.processorOverrides?.input ??
       new InputProcessor(this.hub, this.terminalAdapter, inputQueue);
+    const session =
+      this.options.processorOverrides?.session ??
+      new SessionProcessor(
+        this.hub,
+        this.fileAdapter,
+        configPath,
+        ledgerPath,
+        sessionQueue
+      );
 
     this.hub.register(persistence);
     this.hub.register(logger);
     this.hub.register(clock);
     this.hub.register(input);
-    this.hub.register(createSessionProcessor());
+    this.hub.register(session);
     this.hub.register(createPlanningProcessor());
     this.hub.register(createTaskingProcessor());
     this.hub.register(createDevelopmentProcessor());
