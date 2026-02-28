@@ -9,10 +9,15 @@ export class EventBridge {
   private readonly pushResolverQueue = new LinkedList<() => void>()
   private readonly processorResolverQueue = new LinkedList<EventResolver>()
   private isTerminated = false
+  private isPushPending = false
 
   async push(event: CommittedEvent): Promise<void> {
     if (this.isTerminated) {
-      return
+      throw new Error('Cannot push to the terminated event bridge')
+    }
+
+    if (this.isPushPending) {
+      throw new Error('Cannot push, the previous push operation has not been resolved yet')
     }
 
     const resolve = this.processorResolverQueue.removeFirst()
@@ -21,10 +26,14 @@ export class EventBridge {
       resolve(event)
       return
     } else {
+      this.isPushPending = true
       this.eventQueue.insertLast(event)
 
       return await new Promise<void>(resolve => {
-        this.pushResolverQueue.insertLast(resolve)
+        this.pushResolverQueue.insertLast(() => {
+          this.isPushPending = false
+          resolve()
+        })
       })
     }
   }
