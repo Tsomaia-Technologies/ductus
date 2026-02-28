@@ -31,7 +31,7 @@ export interface AgentChunkUsage extends AgentChunkBase {
   outputTokens: number
 }
 
-export interface AgentChunkComplete {
+export interface AgentChunkComplete extends AgentChunkBase {
   type: 'complete'
 }
 
