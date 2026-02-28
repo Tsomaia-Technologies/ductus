@@ -1,10 +1,10 @@
 import { CommittedEvent } from '../interfaces/event.js'
 import { LinkedList } from './linked-list.js'
-import { TerminateProcessorEvent } from '../events/types.js'
+import { EventSubscriber } from '../interfaces/event-subscriber.js'
 
-type EventResolver = (event: TerminateProcessorEvent | CommittedEvent) => void
+type EventResolver = (event: CommittedEvent) => void
 
-export class EventBridge {
+export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
   private readonly eventQueue = new LinkedList<CommittedEvent>()
   private readonly pushResolverQueue = new LinkedList<() => void>()
   private readonly processorResolverQueue = new LinkedList<EventResolver>()
@@ -38,7 +38,7 @@ export class EventBridge {
     }
   }
 
-  async *streamEvents(): AsyncIterable<TerminateProcessorEvent | CommittedEvent> {
+  async *streamEvents(): AsyncIterable<CommittedEvent> {
     while (true) {
       const event = this.eventQueue.removeFirst()
 
@@ -69,6 +69,12 @@ export class EventBridge {
         authorId: 'system',
         volatility: 'volatile',
         timestamp: Date.now(),
+
+        eventId: '',
+        sequenceNumber: -1,
+        prevHash: '',
+        isCommited: true,
+        hash: '',
       })
     }
 

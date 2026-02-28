@@ -1,5 +1,5 @@
 /**
- * The Multiplexer Hub (The Circuit)
+ * The CryptographicMultiplexer Hub (The Circuit)
  * RFC-001 Section 2.1 - The Spine connecting all Processors concurrently.
  * Re-built to strictly respect pure AsyncIterables and Zero-Trust validation.
  */

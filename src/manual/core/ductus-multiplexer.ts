@@ -1,13 +1,14 @@
-import { EventBridge } from './event-bridge.js'
+import { BufferedSubscriber } from './buffered-subscriber.js'
 import { DuctusEvent } from '../events/types.js'
 import { CommittedEvent } from '../interfaces/event.js'
 import { freezeEvent } from '../utils/object.utils.js'
 import { sha256 } from '../utils/crypto-utils.js'
+import { Multiplexer } from '../interfaces/multiplexer.js'
 
-export class Multiplexer {
+export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEvent> {
   private lastHash = '0'.repeat(64)
   private lastSequenceNumber = 0
-  private readonly bridges: EventBridge[] = []
+  private readonly bridges: BufferedSubscriber[] = []
   private broadcastLock = Promise.resolve()
 
   constructor(initialHash?: string, initialSequenceNumber?: number) {
@@ -15,8 +16,8 @@ export class Multiplexer {
     if (initialSequenceNumber) this.lastSequenceNumber = initialSequenceNumber
   }
 
-  subscribe(): EventBridge {
-    const bridge = new EventBridge()
+  subscribe(): BufferedSubscriber {
+    const bridge = new BufferedSubscriber()
     this.bridges.push(bridge)
 
     return bridge

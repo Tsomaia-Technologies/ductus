@@ -17,7 +17,7 @@ To evolve Ductus from a sequence of scripts into a **reactive engine** capable o
 
 ---
 
-## 2. Core Topology (The Multiplexer Hub)
+## 2. Core Topology (The CryptographicMultiplexer Hub)
 
 The system is built as a **Circuit** of asynchronous, independent **StreamProcessors**. Every event is broadcasted concurrently to all nodes.
 
@@ -36,7 +36,7 @@ The system is built as a **Circuit** of asynchronous, independent **StreamProces
 ### 2.2 System Flow Diagram
 ```mermaid
 graph TD
-    Hub{Multiplexer Hub}
+    Hub{CryptographicMultiplexer Hub}
     Hub <--> SM[StateMachine]
     Hub <--> OP[OrchestrationProcessor]
     Hub <--> AD[AgentDispatcher]
