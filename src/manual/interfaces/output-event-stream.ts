@@ -1,3 +1,3 @@
-import type { BaseEvent } from "./event.js";
+import { DuctusEvent } from '../events/types.js'
 
-export type OutputEventStream = AsyncIterable<BaseEvent>;
+export type OutputEventStream = AsyncIterable<DuctusEvent>;

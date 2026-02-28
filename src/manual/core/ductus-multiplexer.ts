@@ -2,11 +2,11 @@ import { BufferedSubscriber } from './buffered-subscriber.js'
 import { DuctusEvent } from '../events/types.js'
 import { CommittedEvent } from '../interfaces/event.js'
 import { freezeEvent } from '../utils/object.utils.js'
-import { sha256 } from '../utils/crypto-utils.js'
+import { getEventHash, getInitialEventHash } from '../utils/crypto-utils.js'
 import { Multiplexer } from '../interfaces/multiplexer.js'
 
 export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEvent> {
-  private lastHash = '0'.repeat(64)
+  private lastHash = getInitialEventHash()
   private lastSequenceNumber = 0
   private readonly bridges: BufferedSubscriber[] = []
   private broadcastLock = Promise.resolve()
@@ -45,27 +45,20 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
   private commitEvent(event: DuctusEvent): CommittedEvent {
     ++this.lastSequenceNumber
     const eventId = crypto.randomUUID()
-    const hashPayload = JSON.stringify({
-      type: event.type,
-      payload: event.payload,
-      authorId: event.authorId,
-      timestamp: event.timestamp,
-      volatility: event.volatility,
-
+    const hash = getEventHash({
+      ...event,
       eventId,
       sequenceNumber: this.lastSequenceNumber,
       prevHash: this.lastHash,
       isCommited: true,
     })
-
-    const hash = sha256(hashPayload)
     const commitedEvent: CommittedEvent = {
       ...event,
       eventId,
       sequenceNumber: this.lastSequenceNumber,
       prevHash: this.lastHash,
-      isReplay: false,
       isCommited: true,
+      isReplay: false,
       hash,
     }
     this.lastHash = hash
