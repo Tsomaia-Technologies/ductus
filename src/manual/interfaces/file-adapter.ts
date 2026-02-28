@@ -95,7 +95,7 @@ export interface FileAdapter {
   append(absolutePath: string, content: string): Promise<void>
 
   /**
-   * Appends an arbitrary text to a file on a new line
+   * Appends an arbitrary text to a file followed by a new line
    *
    * @param {string} absolutePath
    * @param {string} content
@@ -103,14 +103,7 @@ export interface FileAdapter {
   appendLine(absolutePath: string, content: string): Promise<void>
 
   /**
-   * Deletes a file/directory at the given path
-   *
-   * @param {string} absolutePath
-   */
-  delete(absolutePath: string): Promise<boolean>
-
-  /**
-   * Appends serialized JSON text to a file on a new line
+   * Appends serialized JSON text to a file followed by a new line
    *
    * @param {string} absolutePath
    * @param {string} content
@@ -130,4 +123,11 @@ export interface FileAdapter {
    * @param {string} absolutePath
    */
   createDirectoryRecursive(absolutePath: string): Promise<void>
+
+  /**
+   * Deletes a file/directory at the given path
+   *
+   * @param {string} absolutePath
+   */
+  delete(absolutePath: string): Promise<boolean>
 }
