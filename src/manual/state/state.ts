@@ -8,8 +8,9 @@ import {
 } from '../events/types.js'
 import { Task } from '../schema/task.js'
 import { ImplementationReport } from '../schema/implementation-report.js'
+import { DeeplyReadonly } from '../interfaces/helpers.js'
 
-export interface DuctusState {
+export type DuctusState = DeeplyReadonly<{
   plansRevisions: Record<PlanRevisionID, PlanRevisionState>
   taskBreakdownRevisions: Record<TaskBreakdownRevisionID, TaskBreakdownRevisionState>
   taskRevisions: Record<TaskRevisionID, TaskRevisionState>
@@ -19,7 +20,7 @@ export interface DuctusState {
   currentTaskBreakdownRevisions: Record<TaskBreakdownID, TaskBreakdownRevisionID>
   currentTaskRevisions: Record<TaskID, TaskRevisionID>
   currentPlanVerifications: Record<TaskID, TaskRevisionID>
-}
+}>
 
 export type ArtifactStatus =
   | 'initial'
