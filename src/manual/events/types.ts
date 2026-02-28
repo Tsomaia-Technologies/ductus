@@ -1,6 +1,7 @@
 import { BaseEvent } from '../interfaces/event.js'
 import { Task } from '../schema/task.js'
 import { ImplementationReport } from '../schema/implementation-report.js'
+import { AgentChunk } from '../interfaces/agent-chunk.js'
 
 export type FeatureRequestEvent = BaseEvent<'feature-request', {
   description: string
@@ -77,7 +78,7 @@ export type TaskBreakdownAnswerEvent = BaseEvent<'task-breakdown-answer', {
   answer: string
 }>
 
-export type TaskBreakdownProposalEvent = BaseEvent<'task-breakdown-response', {
+export type TaskBreakdownProposalEvent = BaseEvent<'task-breakdown-proposal', {
   planId: string
   planRevisionId: number
   breakdownId: number
@@ -224,7 +225,7 @@ export type FeatureUserReviewRequest = BaseEvent<'feature-user-review-request', 
   featureReviewId: number
 }>
 
-export type FeatureUserApproval = BaseEvent<'feature-user-review-request', {
+export type FeatureUserApproval = BaseEvent<'feature-user-review-approval', {
   planId: string
   planRevisionId: number
   breakdownId: number
@@ -275,4 +276,30 @@ export type FeatureCompletedEvent = BaseEvent<'feature-agent-completed', {
   breakdownRevisionId: number
   featureId: number
   featureRevisionId: number
+}>
+
+export type AgentStartedReasoningEvent = BaseEvent<'agent-started-reasoning', {
+  agentId: string
+  responseId: string
+}>
+
+export type AgentCompletedReasoningEvent = BaseEvent<'agent-completed-reasoning', {
+  agentId: string
+  responseId: string
+}>
+
+export type AgentStartedResponseEvent = BaseEvent<'agent-started-response', {
+  agentId: string
+  responseId: string
+}>
+
+export type AgentResponseChunkEvent = BaseEvent<'agent-response-chunk', {
+  agentId: string
+  responseId: string
+  chunk: AgentChunk
+}>
+
+export type AgentCompletedResponseEvent = BaseEvent<'agent-completed-response', {
+  agentId: string
+  responseId: string
 }>
