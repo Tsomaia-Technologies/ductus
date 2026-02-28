@@ -8,7 +8,7 @@ export interface BaseEvent<T extends string = string, P = unknown> {
   authorId: string
   timestamp: number
   volatility: Volatility
-  isDraft: boolean
+  isCommited?: boolean
   isReplay?: boolean
   eventId?: string
 }
@@ -19,5 +19,5 @@ export type CommittedEvent<TEvent extends DuctusEvent = DuctusEvent> = TEvent & 
   prevHash: string
   hash: string
   volatility: Volatility
-  isDraft: false
+  isCommited: true
 }

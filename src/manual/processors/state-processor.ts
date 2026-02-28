@@ -11,7 +11,7 @@ export class StateProcessor implements EventProcessor {
     this.currentState = initialState
   }
 
-  async* process(events: InputEventStream): OutputEventStream {
+  async *process(events: InputEventStream): OutputEventStream {
     for await (const event of events) {
       const [newState, newEvents] = ductusReducer(this.currentState, event)
       this.currentState = newState

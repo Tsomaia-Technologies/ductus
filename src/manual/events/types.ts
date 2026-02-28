@@ -15,6 +15,8 @@ export type TaskQuestionID = `${TaskRevisionID}-question-${number}`
 export type PlanVerificationID = `${PlanRevisionID}-verification-${number}`
 export type PlanVerificationQuestionID = `${PlanVerificationID}-question-${number}`
 
+export type TerminateProcessorEvent = BaseEvent<'terminate-processor', void>
+
 export type FeatureRequestEvent = BaseEvent<'feature-request', {
   description: string
 }>
@@ -401,6 +403,7 @@ export type AgentCompletedResponseEvent = BaseEvent<'agent-completed-response', 
 }>
 
 export type DuctusEvent =
+  | TerminateProcessorEvent
   | FeatureRequestEvent
   | PlanCreatedEvent
   | PlanQuestionEvent
