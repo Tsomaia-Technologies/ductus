@@ -46,8 +46,8 @@ The deeply tainted core networking must be removed and rewritten cleanly as pure
 
 ---
 
-### 2. Salvage The Brain (State Machine)
-The State Machine was written but completely orphaned from the engine. 
+### 2. Salvage The Brain (Type Machine)
+The Type Machine was written but completely orphaned from the engine. 
 
 #### [DELETE] `src/core/state-machine-reducer.ts`
 

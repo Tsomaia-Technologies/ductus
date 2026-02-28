@@ -30,11 +30,11 @@ We must explicitly burn down the core wiring, establish a rigid, mathematical te
      ```
    - Prove the loop actually spins infinitely.
 
-## Phase 2: Salvage The Brain (State Machine)
+## Phase 2: Salvage The Brain (Type Machine)
 
-1. **Delete the State Machine Reducer:**
+1. **Delete the Type Machine Reducer:**
    - Nuke `src/core/state-machine-reducer.ts`. The agents wrote a good reducer but failed to wire it.
-2. **Execute New Task 006 (State Machine Reducer):**
+2. **Execute New Task 006 (Type Machine Reducer):**
    - Provide `rfcs/tasks/006-state-machine-reducer.md`. Ensure it remains a pure `(state, event) => [state, effects]` function.
 3. **Build the `StateMachineProcessor` (Missing from Original Agent Gen):**
    - We must create a new physical stream processor that wraps the pure reducer. 

@@ -13,7 +13,7 @@ Implement the `MultiplexerHub`. This is the concurrent spine of the digital orga
 - **Cryptographic Chaining:** Real `hash` logic requires appending the `prevHash` + `authorId` + `sequenceNumber` + stringified payload.
 
 ## 3. I/O Boundaries & Dependencies
-- **No Outside State:** The Hub holds no I/O adapters. You MUST use native `node:crypto` (`createHash('sha256')`) for hashing. No third-party crypto libs.
+- **No Outside Type:** The Hub holds no I/O adapters. You MUST use native `node:crypto` (`createHash('sha256')`) for hashing. No third-party crypto libs.
 
 ## 4. Exact Event Signatures (Contract Adherence)
 - **Input:** Accepts `BaseEvent` variants from connected Processors.

@@ -24,7 +24,7 @@ Implement the `PlanningProcessor`. This is the initial node of the prefrontal co
 
 ## 6. Required Execution Constraints
 - Manage a standard state tracker using `eventId`s to map pending `INPUT_RECEIVED` events to the correct draft `SPEC.md`.
-- Ensure that when the User answers "Yes" to the draft spec, the processor yields the final, locked `PLAN_APPROVED` event, including the full text of the approved specification. This signals the State Machine Reducer to exit the `planning` phase and enter the `tasking` phase.
+- Ensure that when the User answers "Yes" to the draft spec, the processor yields the final, locked `PLAN_APPROVED` event, including the full text of the approved specification. This signals the Type Machine Reducer to exit the `planning` phase and enter the `tasking` phase.
 
 ## 7. Definition of Done
 1. **The Approval Relay Test:** Yield an `INPUT_RECEIVED` mapped to a valid session where `answer === "Yes"`. Assert that the Processor immediately yields `PLAN_APPROVED` containing the associated spec string payload, terminating the planning cycle.

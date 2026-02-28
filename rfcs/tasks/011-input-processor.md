@@ -5,7 +5,7 @@
 - `rfc-001.revision-06.md` (Section 6.1 InputProcessor Architecture)
 
 ## 1. Objective & Responsibility
-Implement the `InputProcessor` (Sensory Cortex). It processes situations where the pure State Machine halts because human decisions, approvals, or missing context are required. If the State Machine yields `REQUEST_INPUT`, this processor queries the human string using the `TerminalAdapter` facade.
+Implement the `InputProcessor` (Sensory Cortex). It processes situations where the pure Type Machine halts because human decisions, approvals, or missing context are required. If the Type Machine yields `REQUEST_INPUT`, this processor queries the human string using the `TerminalAdapter` facade.
 
 ## 2. Invariants & Global Contracts (The Happy Path)
 - **Zero Raw Prompts:** No direct CLI dependencies (`readline`, `inquirer`, `clack`) can exist here. You MUST route interaction through `TerminalAdapter.ask()` and `TerminalAdapter.confirm()`.
@@ -25,7 +25,7 @@ Implement the `InputProcessor` (Sensory Cortex). It processes situations where t
 
 ## 6. Required Execution Constraints
 - Map incoming `REQUEST_INPUT` schema types (string identifiers in the payload) to actual physical Zod schema objects (e.g., `z.string()`, `z.boolean()`).
-- The `process` method must `await` the human response before yielding down the stream. This naturally creates backpressure blocking the State Machine until the human fulfills the request, which is exactly the intended behavior.
+- The `process` method must `await` the human response before yielding down the stream. This naturally creates backpressure blocking the Type Machine until the human fulfills the request, which is exactly the intended behavior.
 
 ## 7. Definition of Done
 1. **The Hydration Filter Test:** Mock the `TerminalAdapter`. Yield a `REQUEST_INPUT` event with `isReplay: true`. Assert that the `TerminalAdapter.ask` mock is called 0 times.

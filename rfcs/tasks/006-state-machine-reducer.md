@@ -2,15 +2,15 @@
 
 **Global References:** 
 - `rfc-001.implementation-guide.md` (MUST READ for Pure Determinism and Zero I/O overrides)
-- `rfc-001.revision-06.md` (Section 8.3 The Full State Lifecycle)
+- `rfc-001.revision-06.md` (Section 8.3 The Full Type Lifecycle)
 
 ## 1. Objective & Responsibility
-Implement the pure, mathematical Core Logic (The Memory & Limbic System). This replaces XState. You are to build a purely functional Reducer `(State, Event) -> [NewState, PendingEffects]` that maintains the exact global lifecycle (Negotiating -> Planning -> Tasking -> Coding -> Verifying -> Done).
+Implement the pure, mathematical Core Logic (The Memory & Limbic System). This replaces XState. You are to build a purely functional Reducer `(Type, Event) -> [NewState, PendingEffects]` that maintains the exact global lifecycle (Negotiating -> Planning -> Tasking -> Coding -> Verifying -> Done).
 
 ## 2. Invariants & Global Contracts (The Happy Path)
-- **Mathematical Determinism:** If you pass the exact same State tree and the exact same `CommitedEvent` to this reducer one million times, it MUST return the exact same output tuple one million times. 
+- **Mathematical Determinism:** If you pass the exact same Type tree and the exact same `CommitedEvent` to this reducer one million times, it MUST return the exact same output tuple one million times. 
 - **Pure Functional Yield:** The Reducer DOES NOT put events on the Hub. It calculates what *should* happen next, returning an array of new `BaseEvent` side-effects. The `StateMachineProcessor` wrapping this pure function is responsible for I/O routing.
-- **Mutation Forbidden:** You MUST NEVER mutate the `State` parameter. You must return a shallow (or deep, if necessary) clone representing the next tick.
+- **Mutation Forbidden:** You MUST NEVER mutate the `Type` parameter. You must return a shallow (or deep, if necessary) clone representing the next tick.
 
 ## 3. I/O Boundaries & Dependencies
 - **Zero I/O Allowable:** This file must not import anything other than TypeScript Types. No `fs`, no `crypto`, no `Date.now()`, no `Math.random()`. Contextual randomness or time must come entirely from the `Event` payload.
@@ -23,7 +23,7 @@ Implement the pure, mathematical Core Logic (The Memory & Limbic System). This r
 
 ## 5. Lifecycle & Unhappy Path
 - **Threshold Escalation:** If the incoming event is `AUTO_REJECTION`, the reducer must increment `state.hallucinations`. If `state.hallucinations` strictly exceeds the config threshold limit, it MUST calculate a `KILL_AGENT` and `HALLUCINATION_DETECTED` effect array instead of a normal retry, enforcing the Quarantine Protocol.
-- **Panic State:** If the event is `EMERGENCY_STOP` or `CIRCUIT_INTERRUPTED`, force the state status to 'failed' and clear all active task arrays instantly.
+- **Panic Type:** If the event is `EMERGENCY_STOP` or `CIRCUIT_INTERRUPTED`, force the state status to 'failed' and clear all active task arrays instantly.
 
 ## 6. Required Execution Constraints
 - Define the `StateMachineContext` interface strictly, tracking `status`, `hallucinations`, `rejections`, and the active `tasks` array.

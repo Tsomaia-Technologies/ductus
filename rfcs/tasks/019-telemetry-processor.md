@@ -8,7 +8,7 @@
 Implement the `TelemetryProcessor` (The Accountant/Metabolism). This strictly observational processor sits on the Hub and monitors the high-volume chatter to compile aggregate system metrics. It transforms low-level granular events into high-level human insights (e.g., total token usage across a session, estimated API cost, execution duration).
 
 ## 2. Invariants & Global Contracts (The Happy Path)
-- **Passive Observer Guarantee:** The system's logical state MUST NEVER branch or change based on the output of this Processor. It has zero power to halt the execution loop or influence the State Machine Reducer. Its sole job is compilation.
+- **Passive Observer Guarantee:** The system's logical state MUST NEVER branch or change based on the output of this Processor. It has zero power to halt the execution loop or influence the Type Machine Reducer. Its sole job is compilation.
 - **Volatile Outputs Only:** The metrics (e.g., `TELEMETRY_UPDATED`) yielded by this Processor are for immediate UI consumption by the `LoggerProcessor` only. It must yield exclusively `volatile` events. If you generate `durable` events here, every single LLM call will double-bloat the Ledger with metric metadata.
 
 ## 3. I/O Boundaries & Dependencies

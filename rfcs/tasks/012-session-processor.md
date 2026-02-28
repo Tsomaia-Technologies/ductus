@@ -8,7 +8,7 @@
 Implement the `SessionProcessor` (The Librarian). Its sole purpose is context genesis. When the initial spark event (`SYSTEM_START`) is fired, this processor scans the active workspace, loads the `ductus.config.ts`, attempts to locate previous session checkpoints, and yields the initial unified `CONTEXT_LOADED` payload.
 
 ## 2. Invariants & Global Contracts (The Happy Path)
-- **The True Beginning:** The State Machine Reducer relies *completely* on the output of this processor to initialize its internal logic tree. The `CONTEXT_LOADED` event must carry the definitive project configuration (`DuctusConfig`) and the starting state metadata (Genesis vs Continuation).
+- **The True Beginning:** The Type Machine Reducer relies *completely* on the output of this processor to initialize its internal logic tree. The `CONTEXT_LOADED` event must carry the definitive project configuration (`DuctusConfig`) and the starting state metadata (Genesis vs Continuation).
 
 ## 3. I/O Boundaries & Dependencies
 - **Hardware Abstraction:** You must inject `FileAdapter`. You are strictly forbidden from writing `fs.existsSync`.

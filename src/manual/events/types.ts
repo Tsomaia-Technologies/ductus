@@ -125,8 +125,6 @@ export type TaskStartEvent = BaseEvent<'task-start', {
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
   taskId: number
 }>
 
@@ -135,8 +133,6 @@ export type TaskImplementationReportEvent = BaseEvent<'task-implementation-repor
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
   taskId: number
   taskRevisionId: number
   report: ImplementationReport
@@ -147,8 +143,6 @@ export type TaskUserReviewRequest = BaseEvent<'task-user-review-request', {
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
   taskId: number
   taskRevisionId: number
   taskReviewId: number
@@ -162,7 +156,6 @@ export type TaskUserApproval = BaseEvent<'task-user-approval', {
   taskRevisionId: number
   reportId: number
   reviewId: number
-  comment?: string
 }>
 
 export type TaskUserRejection = BaseEvent<'task-user-rejection', {
@@ -170,34 +163,37 @@ export type TaskUserRejection = BaseEvent<'task-user-rejection', {
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
   taskId: number
   taskRevisionId: number
   taskReviewId: number
   reason: string
 }>
 
-export type TaskReviewerApproval = BaseEvent<'task-agent-approval', {
+export type TaskAgentReviewRequest = BaseEvent<'task-agent-review-request', {
   planId: string
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
   taskId: number
   taskRevisionId: number
   taskReviewId: number
-  comment?: string
 }>
 
-export type TaskReviewerRejection = BaseEvent<'task-agent-rejection', {
+export type TaskAgentApproval = BaseEvent<'task-agent-approval', {
   planId: string
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
+  taskId: number
+  taskRevisionId: number
+  taskReviewId: number
+}>
+
+export type TaskAgentRejection = BaseEvent<'task-agent-rejection', {
+  planId: string
+  planRevisionId: number
+  breakdownId: number
+  breakdownRevisionId: number
   taskId: number
   taskRevisionId: number
   taskReviewId: number
@@ -209,73 +205,58 @@ export type TaskCompletedEvent = BaseEvent<'task-agent-completed', {
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
   taskId: number
   taskRevisionId: number
 }>
 
-export type FeatureUserReviewRequest = BaseEvent<'feature-user-review-request', {
+export type PlanUserVerificationRequest = BaseEvent<'plan-user-verification-request', {
   planId: string
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
-  featureReviewId: number
+  verificationId: number
 }>
 
-export type FeatureUserApproval = BaseEvent<'feature-user-review-approval', {
+export type PlanUserVerificationApproval = BaseEvent<'plan-user-verification-approval', {
   planId: string
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
-  featureReviewId: number
-  comment?: string
+  verificationId: number
 }>
 
-export type FeatureUserRejection = BaseEvent<'feature-user-rejection', {
+export type PlanUserVerificationRejection = BaseEvent<'plan-user-verification-rejection', {
   planId: string
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
-  featureReviewId: number
+  verificationId: number
   reason: string
 }>
 
-export type FeatureAgentApproval = BaseEvent<'feature-agent-review-request', {
+export type PlanAgentVerificationRequest = BaseEvent<'plan-agent-verification-request', {
   planId: string
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
-  featureReviewId: number
-  comment?: string
+  verificationId: number
 }>
 
-export type FeatureAgentRejection = BaseEvent<'feature-agent-rejection', {
+export type PlanAgentVerificationApproval = BaseEvent<'plan-agent-verification-approval', {
   planId: string
   planRevisionId: number
   breakdownId: number
   breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
-  featureReviewId: number
+  verificationId: number
+}>
+
+export type PlanAgentVerificationRejection = BaseEvent<'plan-agent-verification-rejection', {
+  planId: string
+  planRevisionId: number
+  breakdownId: number
+  breakdownRevisionId: number
+  verificationId: number
   reason: string
-}>
-
-export type FeatureCompletedEvent = BaseEvent<'feature-agent-completed', {
-  planId: string
-  planRevisionId: number
-  breakdownId: number
-  breakdownRevisionId: number
-  featureId: number
-  featureRevisionId: number
 }>
 
 export type AgentStartedReasoningEvent = BaseEvent<'agent-started-reasoning', {
@@ -303,3 +284,41 @@ export type AgentCompletedResponseEvent = BaseEvent<'agent-completed-response', 
   agentId: string
   responseId: string
 }>
+
+export type DuctusEvent =
+  | FeatureRequestEvent
+  | PlanQuestionEvent
+  | PlanAnswer
+  | PlanProposalEvent
+  | PlanConcernEvent
+  | PlanConcernResolutionEvent
+  | PlanUserApprovalEvent
+  | PlanUserRejectionEvent
+  | TaskBreakdownRequestEvent
+  | TaskBreakdownQuestionEvent
+  | TaskBreakdownAnswerEvent
+  | TaskBreakdownProposalEvent
+  | TaskBreakdownConcernEvent
+  | TaskBreakdownConcernResolutionEvent
+  | TaskBreakdownUserApprovalEvent
+  | TaskBreakdownUserRejectionEvent
+  | TaskStartEvent
+  | TaskImplementationReportEvent
+  | TaskUserReviewRequest
+  | TaskUserApproval
+  | TaskUserRejection
+  | TaskAgentReviewRequest
+  | TaskAgentApproval
+  | TaskAgentRejection
+  | TaskCompletedEvent
+  | PlanUserVerificationRequest
+  | PlanUserVerificationApproval
+  | PlanUserVerificationRejection
+  | PlanAgentVerificationRequest
+  | PlanAgentVerificationApproval
+  | PlanAgentVerificationRejection
+  | AgentStartedReasoningEvent
+  | AgentCompletedReasoningEvent
+  | AgentStartedResponseEvent
+  | AgentResponseChunkEvent
+  | AgentCompletedResponseEvent

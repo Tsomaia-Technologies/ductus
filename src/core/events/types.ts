@@ -54,7 +54,7 @@ export interface AgentTokenEvent extends BaseEvent<"AGENT_TOKEN", { token: strin
 
 export interface InputReceivedEvent extends BaseEvent<"INPUT_RECEIVED", { id: string; answer: string }> { }
 
-// --- State Machine Events ---
+// --- Type Machine Events ---
 
 export interface AutoRejectionEvent
     extends BaseEvent<"AUTO_REJECTION", { isHallucination: boolean; type?: string }> { }

@@ -19,7 +19,7 @@ Advanced models often try to "help" by adding extra features, helpful wrapper cl
 - If you are asked to write a `Processor`, you must strictly adhere to the `Definition of Done` edge cases defined in the task.
 
 ### 3. Strict Coding Constraints (The "Do Nots")
-- **DO NOT** use `Array.map`, `Array.filter`, or `Array.reduce` inside Hot Paths (e.g., inside the Hub broadcast loops or the core State Machine reducers). Use native `for` loops.
+- **DO NOT** use `Array.map`, `Array.filter`, or `Array.reduce` inside Hot Paths (e.g., inside the Hub broadcast loops or the core Type Machine reducers). Use native `for` loops.
 - **DO NOT** use `console.log` anywhere in the core engine. All UI outputs go through the `LoggerProcessor` yielding events.
 - **DO NOT** use `fs`, `child_process`, or `readline` anywhere except inside their dedicated Adapter implementations.
 - **DO NOT** wrap the main processing loops in massive `try/catch` blocks unless specifically instructed to handle an expected network/IO fail state. If a purely internal logic error occurs, let the Node process crash (Fail-Fast).

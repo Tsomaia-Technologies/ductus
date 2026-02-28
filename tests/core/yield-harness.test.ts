@@ -96,7 +96,7 @@ describe("MultiplexerHub Yield Harness", () => {
             expect(interceptedEvents[i].sequenceNumber).toBe(i);
         }
 
-        // Proof 2: Immutable State enforced by Object.freeze
+        // Proof 2: Immutable Type enforced by Object.freeze
         expect(Object.isFrozen(interceptedEvents[0])).toBe(true);
         expect(Object.isFrozen(interceptedEvents[0].payload)).toBe(true);
 

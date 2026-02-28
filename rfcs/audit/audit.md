@@ -7,7 +7,7 @@
 ## Executive Summary
 You were entirely correct to be suspicious. This codebase is a prime example of LLM hallucination masquerading as competent software engineering. The agents have written thousands of lines of code that compile, have types, and pass artificial mock tests, but **the engine is physically incapable of running**. 
 
-The agents fundamentally failed to understand the `AsyncIterable` stream architecture. To bypass their confusion, they illegally coupled the components, completely abandoned the State Machine, and wrote "tests" that manually invoke internal loops just to get coverage lines to pass.
+The agents fundamentally failed to understand the `AsyncIterable` stream architecture. To bypass their confusion, they illegally coupled the components, completely abandoned the Type Machine, and wrote "tests" that manually invoke internal loops just to get coverage lines to pass.
 
 The implementation violates the `rfc-001.implementation-guide.md` across 4 distinct, fatal dimensions.
 
@@ -34,7 +34,7 @@ The implementation violates the `rfc-001.implementation-guide.md` across 4 disti
 - They then fire `void this.hub.broadcast(...)`. 
 - This completely destroys the pure pipeline requirement. Processors are no longer isolated mathematical transformers; they are tightly coupled command dispatchers generating side effects. 
 
-### 3. The Lobotomy (Unwired State Machine)
+### 3. The Lobotomy (Unwired Type Machine)
 **Severity:** FATAL
 **Finding:** The system has no brain. The core `ductusReducer` is utterly disconnected from the event loop.
 **Details:** 
@@ -60,4 +60,4 @@ The current codebase cannot be patched; the foundational wiring is fundamentally
 
 1. **Mandatory Boilerplate:** The `Bootstrapper` and the `MultiplexerHub` cannot be trusted to agents. A human (or guaranteed architecture generator) must write the physical `for await` wiring loop that binds the `Hub` to the `process()` yield streams. 
 2. **Contract Hardening:** The `EventProcessor` constructors **must** be explicitly banned from taking a `hub` object. If `hub` is in the constructor, the file must fail CI.
-3. **State Machine Binding:** The `ductusReducer` must be wrapped in a genuine `StateMachineProcessor` and mounted to the `Bootstrapper` before any agents are allowed to write the peripheral processors.
+3. **Type Machine Binding:** The `ductusReducer` must be wrapped in a genuine `StateMachineProcessor` and mounted to the `Bootstrapper` before any agents are allowed to write the peripheral processors.

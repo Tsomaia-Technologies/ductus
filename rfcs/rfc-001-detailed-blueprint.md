@@ -106,7 +106,7 @@ sequenceDiagram
     participant AD as Agent Dispatcher
     participant OP as Orchestration Processor
     participant TP as Tool Processor
-    participant SM as State Machine
+    participant SM as Type Machine
     
     AD->>Hub: Yield AGENT_REPORT_RECEIVED (files: ["a.ts"])
     Hub->>OP: Broadcaster signals OP
@@ -186,7 +186,7 @@ To ensure that replaying a log from 3 days ago doesn't trigger "real-time" timeo
 - **Replay Mode:** Dispatches a `TICK` event synchronized with the timestamp of the event currently being replayed from the ledger.
 
 ### 7.2 Bootstrapping Algorithm
-1. **Hydrate:** Load the latest `Snapshot` (State + Sequence Number `N`).
+1. **Hydrate:** Load the latest `Snapshot` (Type + Sequence Number `N`).
 2. **Filter:** Pull events from Ledger where `Sequence > N`.
 3. **Muted Replay:** The Hub broadcasts the missed events. The `AgentDispatcher` is placed in "Muted Mode" (it listens but performs no I/O).
 4. **Ignite:** Once the StateMachine catches up, Muted Mode is disabled and the engine is live.
@@ -220,4 +220,4 @@ export interface DuctusConfig {
 ---
 
 ## 9. Conclusion
-This architecture transforms Ductus from a simple scripting tool into a mathematically verifiable **Agentic OS**. By decoupling Memory (State), Executive Function (Orchestration), and Intelligence (Agents), we create a system that is robust against AI failure modes and ready for complex, long-lived engineering automation.
+This architecture transforms Ductus from a simple scripting tool into a mathematically verifiable **Agentic OS**. By decoupling Memory (Type), Executive Function (Orchestration), and Intelligence (Agents), we create a system that is robust against AI failure modes and ready for complex, long-lived engineering automation.

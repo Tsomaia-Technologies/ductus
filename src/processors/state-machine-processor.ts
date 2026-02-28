@@ -1,5 +1,5 @@
 /**
- * The State Machine Processor
+ * The Type Machine Processor
  * Wraps the pure `ductusReducer` into a Reactive Stream Processor.
  * It strictly adheres to `AsyncIterable<Incoming> -> AsyncIterable<Outgoing>`.
  */

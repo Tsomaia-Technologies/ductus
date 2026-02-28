@@ -1,6 +1,6 @@
 /**
  * AuditorAgent - Feature Reviewer.
- * Compares finalized Codebase State against original SPEC.md. Read-Only.
+ * Compares finalized Codebase Type against original SPEC.md. Read-Only.
  * RFC-001 Task 018, Rev 06 Section 8.2.
  */
 

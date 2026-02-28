@@ -28,7 +28,7 @@ export const createContextLoaded = createEvent("CONTEXT_LOADED", "durable-draft"
 export const createTick = createEvent("TICK", "volatile-draft");
 export const createCircuitInterrupted = createEvent("CIRCUIT_INTERRUPTED", "durable-draft");
 
-// --- Planning & State (Durable) ---
+// --- Planning & Type (Durable) ---
 export const createRequestPlanning = createEvent("REQUEST_PLANNING", "durable-draft");
 export const createSpecApproved = createEvent("SPEC_APPROVED", "durable-draft");
 export const createRequestTaskBreakdown = createEvent("REQUEST_TASK_BREAKDOWN", "durable-draft");
@@ -63,7 +63,7 @@ export const createTelemetryUpdated = createEvent("TELEMETRY_UPDATED", "volatile
 
 export const createFeatureRejected = createEvent("FEATURE_REJECTED", "durable-draft");
 
-// --- State Machine Internals (Durable) ---
+// --- Type Machine Internals (Durable) ---
 export const createAutoRejection = createEvent("AUTO_REJECTION", "durable-draft");
 export const createKillAgent = createEvent("KILL_AGENT", "durable-draft");
 export const createHallucinationDetected = createEvent("HALLUCINATION_DETECTED", "durable-draft");

@@ -1,7 +1,7 @@
 /**
  * TelemetryProcessor - The Accountant / Metabolism.
  * Strictly observational: compiles aggregate metrics from event stream.
- * Zero power over State Machine. Yields only volatile events.
+ * Zero power over Type Machine. Yields only volatile events.
  * RFC-001 Task 019-telemetry-processor, Rev 06 Section 2.1, 5.1.
  */
 

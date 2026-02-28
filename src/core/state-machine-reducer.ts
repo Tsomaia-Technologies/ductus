@@ -1,6 +1,6 @@
 /**
- * Pure State Machine Reducer - The Memory & Limbic System.
- * (State, Event) -> [NewState, PendingEffects]. Zero I/O.
+ * Pure Type Machine Reducer - The Memory & Limbic System.
+ * (Type, Event) -> [NewState, PendingEffects]. Zero I/O.
  * Enforces Zero-Trust constraints (e.g. Hallucination limit quarantine).
  */
 
@@ -43,7 +43,7 @@ export const GENESIS_STATE: StateMachineContext = {
 };
 
 /**
- * Pure reducer: (State, Event) -> [NewState, Effects].
+ * Pure reducer: (Type, Event) -> [NewState, Effects].
  * Never mutates state. Deterministic: same inputs => same outputs.
  */
 export function ductusReducer(
