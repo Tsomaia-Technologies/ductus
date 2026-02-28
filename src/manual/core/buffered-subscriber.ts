@@ -2,12 +2,10 @@ import { CommittedEvent } from '../interfaces/event.js'
 import { LinkedList } from './linked-list.js'
 import { EventSubscriber } from '../interfaces/event-subscriber.js'
 
-type EventResolver = (event: CommittedEvent) => void
-
 export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
   private readonly eventQueue = new LinkedList<CommittedEvent>()
   private readonly pushResolverQueue = new LinkedList<() => void>()
-  private readonly processorResolverQueue = new LinkedList<EventResolver>()
+  private readonly processorWakeUpQueue = new LinkedList<() => void>()
   private isTerminated = false
   private isPushPending = false
 
@@ -20,14 +18,14 @@ export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
       throw new Error('Cannot push, the previous push operation has not been resolved yet')
     }
 
-    const resolve = this.processorResolverQueue.removeFirst()
+    this.eventQueue.insertLast(event)
+    const wakeUp = this.processorWakeUpQueue.removeFirst()
 
-    if (resolve) {
-      resolve(event)
+    if (wakeUp) {
+      wakeUp()
       return
     } else {
       this.isPushPending = true
-      this.eventQueue.insertLast(event)
 
       return await new Promise<void>(resolve => {
         this.pushResolverQueue.insertLast(() => {
@@ -49,33 +47,21 @@ export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
       } else {
         if (this.isTerminated) return
 
-        yield await new Promise(resolve => {
-          this.processorResolverQueue.insertLast(resolve)
+        await new Promise<void>(resolve => {
+          this.processorWakeUpQueue.insertLast(resolve)
         })
       }
     }
   }
 
   terminate(drain = true): CommittedEvent[] {
-    let resolveProcessor: EventResolver | null = null
+    let wakeUp: (() => void) | null = null
     let releasePush: (() => void) | null = null
 
     this.isTerminated = true
 
-    while (resolveProcessor = this.processorResolverQueue.removeFirst()) {
-      resolveProcessor({
-        type: 'terminate-processor',
-        payload: undefined,
-        authorId: 'system',
-        volatility: 'volatile',
-        timestamp: Date.now(),
-
-        eventId: '',
-        sequenceNumber: -1,
-        prevHash: '',
-        isCommited: true,
-        hash: '',
-      })
+    while (wakeUp = this.processorWakeUpQueue.removeFirst()) {
+      wakeUp()
     }
 
     while (releasePush = this.pushResolverQueue.removeFirst()) {
