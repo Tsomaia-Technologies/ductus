@@ -112,7 +112,7 @@ export class NodeFileAdapter implements FileAdapter {
 
   async appendLineJsonl(absolutePath: string, content: Json): Promise<void> {
     const jsonString = JSON.stringify(content)
-    await this.append(absolutePath, jsonString)
+    await this.appendLine(absolutePath, jsonString)
   }
 
   async createDirectory(absolutePath: string): Promise<boolean> {
