@@ -3,7 +3,9 @@ export interface SystemProcessAdapter {
 
   write(input: string): Promise<void>
 
-  terminate(): void
+  gracefullyShutdown(drain?: boolean): Promise<void>
+
+  kill(drain?: boolean): void
 }
 
 export interface SystemProcessBaseEvent {
