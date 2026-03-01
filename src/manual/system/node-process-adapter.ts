@@ -35,19 +35,19 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     }
 
     while (true) {
-      if (this.errors.length > 0) {
-        if (this.errors.length === 1) {
-          throw this.errors[0]
-        }
-
-        throw new AggregateError(this.errors, `Process encountered errors mid-stream`)
-      }
-
       const event = this.eventQueue.removeFirst()
 
       if (event) {
         yield event
       } else if (this.isTerminated) {
+        if (this.errors.length > 0) {
+          if (this.errors.length === 1) {
+            throw this.errors[0]
+          }
+
+          throw new AggregateError(this.errors, `Process encountered errors mid-stream`)
+        }
+
         return
       } else {
         await new Promise<void>((resolve) => {
@@ -196,14 +196,23 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
       this.wakeUpAll()
     })
 
-    const handleStreamError = (error: Error) => {
-      const nodeError = error as NodeJS.ErrnoException
-      if (nodeError?.code !== 'EPIPE') this.errors.push(error)
+    const handleError = (error: Error) => {
+      this.pushError(error)
+
+      if (!this.isTerminationRequested) {
+        this.gracefullyShutdown(true).catch(error => {
+          this.pushError(error)
+          this.kill(true)
+        })
+      }
     }
 
-    process.on('error', (error: Error) => {
-      this.errors.push(error)
-    })
+    const handleStreamError = (error: Error) => {
+      const nodeError = error as NodeJS.ErrnoException
+      if (nodeError?.code !== 'EPIPE') handleError(error)
+    }
+
+    process.on('error', handleError)
     process.stdout?.on('error', handleStreamError)
     process.stderr?.on('error', handleStreamError)
   }
