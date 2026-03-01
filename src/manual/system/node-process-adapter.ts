@@ -10,7 +10,7 @@ export interface NodeProcessOptions {
   cwd: string
   timeoutMs?: number
   shutdownTimeoutMs?: number
-  env?: Record<string, string>
+  env?: Record<string, string | undefined>
   canceller?: CancellationToken
 }
 
@@ -24,6 +24,8 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
   private isWritePending = false
   private dismissTerminationTimeout: (() => void) | null = null
   private dismissCancellationListener: Disposer | null = null
+  private readonly terminationRequestedListeners: Array<() => void> = []
+  private readonly terminationListeners: Array<() => void> = []
   private errors: Error[] = []
 
   constructor(private readonly options: NodeProcessOptions) {
@@ -115,6 +117,14 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     }
   }
 
+  onTerminationRequested(callback: () => void): void {
+    this.terminationRequestedListeners.push(callback)
+  }
+
+  onTerminated(callback: () => void) {
+    this.terminationListeners.push(callback)
+  }
+
   private requestTermination(drain: boolean) {
     if (this.isTerminationRequested || this.isTerminated) {
       return false
@@ -125,6 +135,8 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     if (!drain) {
       this.eventQueue.clear()
     }
+
+    this.terminationRequestedListeners.forEach(listener => listener())
 
     return true
   }
@@ -209,6 +221,7 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     })
 
     this.isTerminated = true
+    this.terminationListeners.forEach(listener => listener())
     this.wakeUpAll()
   }
 

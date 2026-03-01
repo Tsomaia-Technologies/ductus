@@ -5,7 +5,7 @@ export interface SystemAdapter {
   /**
    * Returns a clone of the default environment variables passed to every command, unless overridden
    */
-  getEnv(): Record<string, string>
+  getDefaultEnv(): Record<string, string | undefined>
 
   /**
    * Returns default working directory for commands and processes
@@ -13,6 +13,11 @@ export interface SystemAdapter {
    * If it's null, then cwd() is determined dynamically based on the current context
    */
   getDefaultCwd(): string | null
+
+  /**
+   * Returns default max buffer
+   */
+  getDefaultMaxBuffer(): number
 
   /**
    * Resolves absolute path based on the given segments and the current default cwd (@see {getDefaultCwd()}).
@@ -37,20 +42,20 @@ export interface SystemAdapter {
   /**
    * Spawns an executable process with the given arguments and options
    *
-   * @param {string} executable
+   * @param {string} command
    * @param {string[]} args
-   * @param {SystemCommandOptions} options
+   * @param {SystemProcessOptions} options
    */
   spawn(
-    executable: string,
+    command: string,
     args: string[],
-    options?: SystemCommandOptions,
+    options?: SystemProcessOptions,
   ): SystemProcessAdapter
 
   /**
    * Terminates all commands and processes being run by this adapter
    */
-  terminate(): Promise<void>
+  terminate(params?: { force?: boolean }): Promise<void>
 }
 
 export interface SystemCommandOptions {
@@ -65,6 +70,11 @@ export interface SystemCommandOptions {
   timeoutMs?: number
 
   /**
+   * Max buffer size
+   */
+  maxBuffer?: number
+
+  /**
    * Environment variables adding to and/or overriding default variables
    */
   env?: Record<string, string>
@@ -73,6 +83,13 @@ export interface SystemCommandOptions {
    * Cancellation token for the command
    */
   canceller?: CancellationToken
+}
+
+export interface SystemProcessOptions extends Omit<SystemCommandOptions, 'maxBuffer'> {
+  /**
+   * The maximum allowed graceful shutdown time in milliseconds
+   */
+  shutdownTimeoutMs?: number
 }
 
 export interface SystemCommandResult {

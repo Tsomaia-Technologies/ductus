@@ -31,6 +31,20 @@ export interface SystemProcessAdapter {
    * @param params
    */
   kill(params?: { drain?: boolean }): void
+
+  /**
+   * Registers callback that gets invoked when the process terminated is requested
+   *
+   * @param callback
+   */
+  onTerminationRequested(callback: () => void): void
+
+  /**
+   * Registers callback that gets invoked when the process is terminated
+   *
+   * @param callback
+   */
+  onTerminated(callback: () => void): void
 }
 
 export interface SystemProcessBaseEvent {
