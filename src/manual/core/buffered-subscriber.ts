@@ -6,6 +6,7 @@ export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
   private readonly eventQueue = new LinkedList<CommittedEvent>()
   private readonly pushResolverQueue = new LinkedList<() => void>()
   private readonly processorWakeUpQueue = new LinkedList<() => void>()
+  private readonly terminationListeners: Array<() => void> = []
   private isTerminated = false
   private isPushPending = false
 
@@ -18,22 +19,18 @@ export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
       throw new Error('Cannot push, the previous push operation has not been resolved yet')
     }
 
+    this.isPushPending = true
     this.eventQueue.insertLast(event)
-    const wakeUp = this.processorWakeUpQueue.removeFirst()
 
-    if (wakeUp) {
-      wakeUp()
-      return
-    } else {
-      this.isPushPending = true
-
-      return await new Promise<void>(resolve => {
-        this.pushResolverQueue.insertLast(() => {
-          this.isPushPending = false
-          resolve()
-        })
+    return new Promise<void>(resolve => {
+      this.pushResolverQueue.insertLast(() => {
+        this.isPushPending = false
+        resolve()
       })
-    }
+
+      const wakeUp = this.processorWakeUpQueue.removeFirst()
+      wakeUp?.()
+    })
   }
 
   async *streamEvents(): AsyncIterable<CommittedEvent> {
@@ -41,9 +38,9 @@ export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
       const event = this.eventQueue.removeFirst()
 
       if (event) {
+        yield event
         const releasePush = this.pushResolverQueue.removeFirst()
         releasePush?.()
-        yield event
       } else {
         if (this.isTerminated) return
 
@@ -54,7 +51,7 @@ export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
     }
   }
 
-  terminate({ drain = true }: { drain?: boolean }): CommittedEvent[] {
+  unsubscribe({ drain = true }: { drain?: boolean }): CommittedEvent[] {
     let wakeUp: (() => void) | null = null
     let releasePush: (() => void) | null = null
 
@@ -68,13 +65,21 @@ export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
       releasePush()
     }
 
-    if (!drain) {
-      const queue = this.eventQueue.toArray()
-      this.eventQueue.clear()
+    this.isPushPending = false
 
-      return queue
+    let discardedEvents: CommittedEvent[] = []
+
+    if (!drain) {
+      discardedEvents = this.eventQueue.toArray()
+      this.eventQueue.clear()
     }
 
-    return []
+    this.terminationListeners.forEach(listener => listener())
+
+    return discardedEvents
+  }
+
+  onUnsubscribe(callback: () => void) {
+    this.terminationListeners.push(callback)
   }
 }

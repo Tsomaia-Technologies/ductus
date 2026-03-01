@@ -20,26 +20,40 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
     const bridge = new BufferedSubscriber()
     this.bridges.push(bridge)
 
+    bridge.onUnsubscribe(() => {
+      const index = this.bridges.indexOf(bridge)
+
+      if (index > -1) {
+        this.bridges.splice(index, 1)
+      }
+    })
+
     return bridge
   }
 
-  broadcast(event: DuctusEvent): Promise<void> {
-    const turn = this.broadcastLock.then(async () => {
+  async broadcast(event: DuctusEvent): Promise<void> {
+    return await this.lock(async () => {
       const commitedEvent = this.commitEvent(event)
       await this.invokeBridges(commitedEvent)
     })
-    this.broadcastLock = turn
-
-    return turn
   }
 
   async replay(event: CommittedEvent): Promise<void> {
-    const replayEvent = Object.freeze({
-      ...event,
-      isReplay: true,
-    })
+    return await this.lock(async () => {
+      const replayEvent = Object.freeze({
+        ...event,
+        isReplay: true,
+      })
 
-    await this.invokeBridges(replayEvent)
+      await this.invokeBridges(replayEvent)
+    })
+  }
+
+  private lock(callback: () => void | Promise<void>): Promise<void> {
+    const turn = this.broadcastLock.then(callback)
+    this.broadcastLock = turn
+
+    return turn
   }
 
   private commitEvent(event: DuctusEvent): CommittedEvent {
