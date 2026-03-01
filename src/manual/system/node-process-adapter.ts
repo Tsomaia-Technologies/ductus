@@ -22,7 +22,7 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
   private isTerminationRequested = false
   private isTerminated = false
   private isWritePending = false
-  private terminationTimeoutHandle: NodeJS.Timeout | null = null
+  private dismissTerminationTimeout: (() => void) | null = null
   private dismissCancellationListener: Disposer | null = null
   private errors: Error[] = []
 
@@ -72,13 +72,14 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
       const process = this.process
 
       if (!process.stdin) {
+        this.isWritePending = false
         throw new Error('Cannot write to process - broken stdin pipe')
       }
 
       process.stdin.write(input, (error) => {
+        this.isWritePending = false
         if (error) reject(error)
         else {
-          this.isWritePending = false
           resolve()
         }
       })
@@ -91,10 +92,15 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
 
       await new Promise<void>(resolve => {
         const timeout = this.options.shutdownTimeoutMs ?? NodeProcessAdapter.DEFAULT_SHUTDOWN_TIMEOUT_MS
-        this.terminationTimeoutHandle = setTimeout(() => {
+        const timeoutHandle = setTimeout(() => {
           this.process.kill('SIGKILL')
           resolve()
         }, timeout).unref()
+
+        this.dismissTerminationTimeout = () => {
+          clearTimeout(timeoutHandle)
+          resolve()
+        }
       })
     }
   }
@@ -177,18 +183,14 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
       })
     })
     process.on('close', (code, signal) => {
-      this.wakeUpAll()
-
-      if (this.terminationTimeoutHandle)
-        clearTimeout(this.terminationTimeoutHandle)
+      if (this.dismissTerminationTimeout)
+        this.dismissTerminationTimeout()
 
       if (this.dismissCancellationListener)
         this.dismissCancellationListener()
 
-      this.isTerminated = true
-
       if (code !== null && code !== 0) {
-        this.pushError(new Error(`Process existed with code: ${code}`))
+        this.pushError(new Error(`Process exited with code: ${code}`))
       } else {
         this.pushEvent({
           type: 'exit',
@@ -197,6 +199,9 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
           signal,
         })
       }
+
+      this.wakeUpAll()
+      this.isTerminated = true
     })
 
     const handleStreamError = (error: Error) => {
