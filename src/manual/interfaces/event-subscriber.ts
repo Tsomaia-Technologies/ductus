@@ -1,8 +1,10 @@
-export interface EventSubscriber<TCommitedEvent> {
+import { CommittedEvent } from './event.js'
+
+export interface EventSubscriber<TEvent> {
   /**
    * Returns asynchronous stream of events
    */
-  streamEvents(): AsyncIterable<TCommitedEvent>
+  streamEvents(): AsyncIterable<CommittedEvent<TEvent>>
 
   /**
    * Unsubscribes the subscriber from the source

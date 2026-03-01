@@ -1,3 +1,5 @@
-export interface EventLedger<TCommitedEvent> {
-  readEvents(): AsyncIterable<TCommitedEvent>
+import { CommittedEvent } from './event.js'
+
+export interface EventLedger<TEvent> {
+  readEvents(): AsyncIterable<CommittedEvent<TEvent>>
 }

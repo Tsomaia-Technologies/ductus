@@ -1,15 +1,16 @@
 import { LinkedList } from './linked-list.js'
 import { EventSubscriber } from '../interfaces/event-subscriber.js'
+import { CommittedEvent } from '../interfaces/event.js'
 
 export class BufferedSubscriber<TEvent> implements EventSubscriber<TEvent> {
-  private readonly eventQueue = new LinkedList<TEvent>()
+  private readonly eventQueue = new LinkedList<CommittedEvent<TEvent>>()
   private readonly pushResolverQueue = new LinkedList<() => void>()
   private readonly processorWakeUpQueue = new LinkedList<() => void>()
   private readonly terminationListeners: Array<() => void> = []
   private isTerminated = false
   private isPushPending = false
 
-  async push(event: TEvent): Promise<void> {
+  async push(event: CommittedEvent<TEvent>): Promise<void> {
     if (this.isTerminated) {
       throw new Error('Cannot push to the terminated event bridge')
     }
@@ -32,7 +33,7 @@ export class BufferedSubscriber<TEvent> implements EventSubscriber<TEvent> {
     })
   }
 
-  async* streamEvents(): AsyncIterable<TEvent> {
+  async* streamEvents(): AsyncIterable<CommittedEvent<TEvent>> {
     while (true) {
       const event = this.eventQueue.removeFirst()
 

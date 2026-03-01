@@ -11,7 +11,7 @@ export interface BaseEvent<T extends string = string, P = unknown> {
   isCommited?: boolean
 }
 
-export type CommittedEvent<TEvent extends DuctusEvent = DuctusEvent> = TEvent & {
+export type CommittedEvent<TEvent = DuctusEvent> = TEvent & {
   eventId: string
   sequenceNumber: number
   prevHash: string

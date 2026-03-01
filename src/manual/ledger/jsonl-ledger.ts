@@ -1,40 +1,39 @@
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
 import { getInitialEventHash } from '../utils/crypto-utils.js'
+import { CommittedEvent } from '../interfaces/event.js'
 
-export type EventGuard<TCommitedEvent> = <T extends TCommitedEvent>(
+export type EventGuard<TEvent> = <T extends TEvent>(
   input: unknown,
   verifiedPrevHash: string,
 ) => input is T
 
-export type BaseCommitedEvent = { hash: string; prevHash: string }
-
-export interface JsonLedgerOptions<TCommitedEvent extends BaseCommitedEvent> {
+export interface JsonLedgerOptions<TEvent extends CommittedEvent<unknown>> {
   fileAdapter: FileAdapter
   ledgerFileAbsolutePath: string
-  eventGuard: EventGuard<TCommitedEvent>
+  eventGuard: EventGuard<TEvent>
 }
 
-export class JsonlLedger<TCommitedEvent extends BaseCommitedEvent> implements EventLedger<TCommitedEvent> {
+export class JsonlLedger<TEvent extends CommittedEvent<unknown>> implements EventLedger<TEvent> {
   private readonly fileAdapter: FileAdapter
   private readonly ledgerFileAbsolutePath: string
-  private readonly eventGuard: EventGuard<TCommitedEvent>
+  private readonly eventGuard: EventGuard<TEvent>
 
-  constructor(options: JsonLedgerOptions<TCommitedEvent>) {
+  constructor(options: JsonLedgerOptions<TEvent>) {
     const { fileAdapter, ledgerFileAbsolutePath, eventGuard } = options
     this.fileAdapter = fileAdapter
     this.ledgerFileAbsolutePath = ledgerFileAbsolutePath
     this.eventGuard = eventGuard
   }
 
-  async* readEvents(): AsyncIterable<TCommitedEvent> {
+  async* readEvents(): AsyncIterable<TEvent> {
     const events = this.fileAdapter.readLinesJsonl(this.ledgerFileAbsolutePath)
     let verifiedPrevHash = getInitialEventHash()
 
     for await (const event of events) {
       const typedEvent = event as unknown
 
-      if (!this.eventGuard<TCommitedEvent>(typedEvent, verifiedPrevHash)) {
+      if (!this.eventGuard<TEvent>(typedEvent, verifiedPrevHash)) {
         throw new Error('Fatal error: detected invalid entry in the ledger, terminating.')
       }
 
