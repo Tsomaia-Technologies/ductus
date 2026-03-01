@@ -182,25 +182,18 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
       })
     })
     process.on('close', (code, signal) => {
-      if (this.dismissTerminationTimeout)
-        this.dismissTerminationTimeout()
+      if (this.dismissTerminationTimeout) this.dismissTerminationTimeout()
+      if (this.dismissCancellationListener) this.dismissCancellationListener()
 
-      if (this.dismissCancellationListener)
-        this.dismissCancellationListener()
+      this.pushEvent({
+        type: 'exit',
+        timestamp: Date.now(),
+        exitCode: code ?? 1,
+        signal,
+      })
 
-      if (code !== null && code !== 0) {
-        this.pushError(new Error(`Process exited with code: ${code}`))
-      } else {
-        this.pushEvent({
-          type: 'exit',
-          timestamp: Date.now(),
-          exitCode: code ?? 1,
-          signal,
-        })
-      }
-
-      this.wakeUpAll()
       this.isTerminated = true
+      this.wakeUpAll()
     })
 
     const handleStreamError = (error: Error) => {
@@ -216,10 +209,6 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
   }
 
   private wakeUpNext(): void {
-    if (this.isTerminated) {
-      return
-    }
-
     const wakeUpResolver = this.wakeUpResolvers.removeFirst()
 
     if (wakeUpResolver) {
@@ -228,10 +217,6 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
   }
 
   private wakeUpAll(): void {
-    if (this.isTerminated) {
-      return
-    }
-
     let wakeUpResolver: (() => void) | null = null
 
     while (wakeUpResolver = this.wakeUpResolvers.removeFirst()) {
