@@ -66,17 +66,16 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
       throw new Error('Cannot write, the previous write operation has not been resolved yet')
     }
 
+    const process = this.process
+
+    if (!process.stdin) {
+      throw new Error('Cannot write to process - broken stdin pipe')
+    }
+
     this.isWritePending = true
 
     await new Promise<void>((resolve, reject) => {
-      const process = this.process
-
-      if (!process.stdin) {
-        this.isWritePending = false
-        throw new Error('Cannot write to process - broken stdin pipe')
-      }
-
-      process.stdin.write(input, (error) => {
+      process.stdin!.write(input, (error) => {
         this.isWritePending = false
         if (error) reject(error)
         else {
