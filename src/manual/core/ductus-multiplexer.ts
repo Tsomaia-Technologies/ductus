@@ -66,17 +66,6 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
     })
   }
 
-  async replay(event: CommittedEvent): Promise<void> {
-    return await this.lock(async () => {
-      const replayEvent = Object.freeze({
-        ...event,
-        isReplay: true,
-      })
-
-      await this.invokeBridges(replayEvent)
-    })
-  }
-
   private lock(callback: () => void | Promise<void>): Promise<void> {
     const turn = this.broadcastLock.then(callback)
     this.broadcastLock = turn
@@ -98,7 +87,6 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
     const hash = getEventHash(unhashedEvent)
     const commitedEvent = {
       ...unhashedEvent,
-      isReplay: false,
       hash,
     } as CommittedEvent
     this.lastHash = hash

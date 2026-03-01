@@ -1,6 +1,6 @@
 import { EventSubscriber } from './event-subscriber.js'
 
-export interface Multiplexer<TEventDraft, TCommitedEvent extends { isReplay?: boolean }> {
+export interface Multiplexer<TEventDraft, TCommitedEvent> {
   /**
    * Creates subscriber to the commited events and returns it
    */
@@ -20,11 +20,4 @@ export interface Multiplexer<TEventDraft, TCommitedEvent extends { isReplay?: bo
    * @param {TEventDraft} event
    */
   broadcast(event: TEventDraft): Promise<void>
-
-  /**
-   * Replays commited event to all subscribers with "isReplay: true"
-   *
-   * @param {TCommited} event
-   */
-  replay(event: TCommitedEvent): Promise<void>
 }

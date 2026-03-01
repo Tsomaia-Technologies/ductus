@@ -9,7 +9,6 @@ export interface BaseEvent<T extends string = string, P = unknown> {
   timestamp: number
   volatility: Volatility
   isCommited?: boolean
-  isReplay?: boolean
 }
 
 export type CommittedEvent<TEvent extends DuctusEvent = DuctusEvent> = TEvent & {

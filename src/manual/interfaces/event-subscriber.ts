@@ -1,4 +1,4 @@
-export interface EventSubscriber<TCommitedEvent extends { isReplay?: boolean }> {
+export interface EventSubscriber<TCommitedEvent> {
   /**
    * Returns asynchronous stream of events
    */
