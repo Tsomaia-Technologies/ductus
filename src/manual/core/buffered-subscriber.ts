@@ -54,7 +54,7 @@ export class BufferedSubscriber implements EventSubscriber<CommittedEvent> {
     }
   }
 
-  terminate(drain = true): CommittedEvent[] {
+  terminate({ drain = true }: { drain?: boolean }): CommittedEvent[] {
     let wakeUp: (() => void) | null = null
     let releasePush: (() => void) | null = null
 

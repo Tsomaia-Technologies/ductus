@@ -90,7 +90,7 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     })
   }
 
-  async gracefullyShutdown(drain = false): Promise<void> {
+  async gracefullyShutdown({ drain = true }): Promise<void> {
     if (this.requestTermination(drain)) {
       this.process.kill('SIGTERM')
 
@@ -109,7 +109,7 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     }
   }
 
-  kill(drain = false): void {
+  kill({ drain = false }): void {
     if (this.requestTermination(drain)) {
       this.process.kill('SIGKILL')
     }
@@ -159,9 +159,9 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     if (canceller) {
       this.dismissCancellationListener = canceller?.onCancel(async force => {
         if (force) {
-          this.kill(false)
+          this.kill({ drain: false })
         } else {
-          await this.gracefullyShutdown(true)
+          await this.gracefullyShutdown({ drain: true })
         }
       })
     }
@@ -224,10 +224,10 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     this.pushError(error)
 
     if (!this.isTerminationRequested) {
-      this.gracefullyShutdown(true).catch(error => {
+      this.gracefullyShutdown({ drain: true }).catch(error => {
         if (!this.isTerminated) {
           this.pushError(error)
-          this.kill(true)
+          this.kill({ drain: false })
         }
       })
     }
