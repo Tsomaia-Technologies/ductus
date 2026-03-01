@@ -4,13 +4,12 @@ import { CommittedEvent } from '../interfaces/event.js'
 import { freezeEvent } from '../utils/object.utils.js'
 import { getEventHash, getInitialEventHash } from '../utils/crypto-utils.js'
 import { Multiplexer } from '../interfaces/multiplexer.js'
-import { LinkedList } from './linked-list.js'
 
 export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEvent> {
   private lastHash = getInitialEventHash()
   private lastSequenceNumber = 0
-  private readonly bridges: BufferedSubscriber[] = []
-  private broadcastLock = Promise.resolve()
+  private readonly bridges: BufferedSubscriber<CommittedEvent>[] = []
+  private broadcastLock = Promise.resolve<unknown>(null)
   private commitListeners: Array<(event: CommittedEvent) => DuctusEvent[] | void> = []
 
   constructor(initialHash?: string, initialSequenceNumber?: number) {
@@ -18,8 +17,8 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
     if (initialSequenceNumber) this.lastSequenceNumber = initialSequenceNumber
   }
 
-  subscribe(): BufferedSubscriber {
-    const bridge = new BufferedSubscriber()
+  subscribe(): BufferedSubscriber<CommittedEvent> {
+    const bridge = new BufferedSubscriber<CommittedEvent>()
     this.bridges.push(bridge)
 
     bridge.onUnsubscribe(() => {
@@ -43,31 +42,13 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
 
   async broadcast(event: DuctusEvent): Promise<void> {
     return await this.lock(async () => {
-      const eventQueue = new LinkedList<DuctusEvent>()
-      eventQueue.insertLast(event)
-
-      let currentDraft: DuctusEvent | null = null
-
-      // @todo: think about better way to handle cascading events
-      while (currentDraft = eventQueue.removeFirst()) {
-        const commitedEvent = this.commitEvent(currentDraft)
-
-        for (const listener of this.commitListeners) {
-          const cascades = listener(commitedEvent)
-
-          if (Array.isArray(cascades) && cascades.length > 0) {
-            for (const cascadedEvent of cascades) {
-              eventQueue.insertLast(cascadedEvent)
-            }
-          }
-        }
-
-        await this.invokeBridges(commitedEvent)
-      }
+      const commitedEvent = this.commitEvent(event)
+      this.commitListeners.forEach(listener => listener(commitedEvent))
+      await this.invokeBridges(commitedEvent)
     })
   }
 
-  private lock(callback: () => void | Promise<void>): Promise<void> {
+  private lock<T>(callback: () => T | Promise<T>): Promise<T> {
     const turn = this.broadcastLock.then(callback)
     this.broadcastLock = turn
 

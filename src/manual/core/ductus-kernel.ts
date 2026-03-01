@@ -5,6 +5,7 @@ import { CommittedEvent } from '../interfaces/event.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { DuctusState } from '../state/state.js'
+import { LinkedList } from './linked-list.js'
 
 export type DuctusReducer = (state: DuctusState, event: DuctusEvent) => [DuctusState, DuctusEvent[]]
 export type DuctusEventProcessor = EventProcessor<DuctusState, DuctusEvent, CommittedEvent>
@@ -26,6 +27,8 @@ export class DuctusKernel {
   private reducer: DuctusReducer
   private state: DuctusState
   private getState = () => this.state
+  private readonly cascadingEvents = new LinkedList<DuctusEvent>()
+  private readonly cascadeWakeUpResolvers = new LinkedList<() => void>()
 
   constructor(options: KernelOptions) {
     const { initialState, reducer, multiplexer, processors, ledger } = options
@@ -40,9 +43,10 @@ export class DuctusKernel {
     await this.hydrateStore()
     this.mountStore()
 
-    this.mountResolver = Promise.all(
-      this.processors.map(processor => this.mountProcessor(processor))
-    )
+    this.mountResolver = Promise.all([
+      ...this.processors.map(processor => this.mountProcessor(processor)),
+      this.mountCascadingEvents(),
+    ])
   }
 
   async monitor() {
@@ -61,7 +65,12 @@ export class DuctusKernel {
       const [state, eventsOut] = this.reducer(this.state, commitedEvent)
       this.state = state
 
-      return eventsOut
+      for (const event of eventsOut) {
+        this.cascadingEvents.insertLast(event)
+      }
+
+      const wakeUpCascade = this.cascadeWakeUpResolvers.removeFirst()
+      wakeUpCascade?.()
     })
   }
 
@@ -72,6 +81,20 @@ export class DuctusKernel {
 
     for await (const event of eventsOut) {
       await this.multiplexer.broadcast(event)
+    }
+  }
+
+  private async mountCascadingEvents() {
+    while (true) {
+      const event = this.cascadingEvents.removeFirst()
+
+      if (event) {
+        await this.multiplexer.broadcast(event)
+      } else {
+        await new Promise<void>(resolve => {
+          this.cascadeWakeUpResolvers.insertLast(resolve)
+        })
+      }
     }
   }
 }

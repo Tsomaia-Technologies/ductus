@@ -12,7 +12,7 @@ export interface Multiplexer<TEventDraft, TCommitedEvent> {
    *
    * @param callback
    */
-  onCommit(callback: (event: TCommitedEvent) => TEventDraft[] | void): () => void
+  onCommit(callback: (event: TCommitedEvent) => void): () => void
 
   /**
    * Broadcasts event drafts as commited events to all subscribers
