@@ -14,7 +14,7 @@ export interface NodeProcessOptions {
   canceller?: CancellationToken
 }
 
-export class NodeProcess implements SystemProcessAdapter {
+export class NodeProcessAdapter implements SystemProcessAdapter {
   private static DEFAULT_SHUTDOWN_TIMEOUT_MS = 5000
   private readonly eventQueue = new LinkedList<SystemProcessEvent>()
   private readonly wakeUpResolvers = new LinkedList<() => void>()
@@ -90,7 +90,7 @@ export class NodeProcess implements SystemProcessAdapter {
       this.process.kill('SIGTERM')
 
       await new Promise<void>(resolve => {
-        const timeout = this.options.shutdownTimeoutMs ?? NodeProcess.DEFAULT_SHUTDOWN_TIMEOUT_MS
+        const timeout = this.options.shutdownTimeoutMs ?? NodeProcessAdapter.DEFAULT_SHUTDOWN_TIMEOUT_MS
         this.terminationTimeoutHandle = setTimeout(() => {
           this.process.kill('SIGKILL')
           resolve()
