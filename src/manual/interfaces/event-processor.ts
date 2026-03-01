@@ -1,6 +1,6 @@
-import { InputEventStream } from './input-event-stream.js'
-import { OutputEventStream } from './output-event-stream.js'
-
-export interface EventProcessor {
-    process(events: InputEventStream): OutputEventStream;
+export interface EventProcessor<TState, TEventDraft, TCommitedEvent extends { isReplay?: boolean }> {
+  process(
+    events: AsyncIterable<TCommitedEvent>,
+    getState: () => TState,
+  ): AsyncIterable<TEventDraft>;
 }

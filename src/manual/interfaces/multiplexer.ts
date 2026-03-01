@@ -7,6 +7,14 @@ export interface Multiplexer<TEventDraft, TCommitedEvent extends { isReplay?: bo
   subscribe(): EventSubscriber<TCommitedEvent>
 
   /**
+   * Registers synchronous listener that is invoked when event is commited and is about to be broadcasted,
+   * but right before broadcasting it.
+   *
+   * @param callback
+   */
+  onCommit(callback: (event: TCommitedEvent) => TEventDraft[] | void): () => void
+
+  /**
    * Broadcasts event drafts as commited events to all subscribers
    *
    * @param {TEventDraft} event

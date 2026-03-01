@@ -4,12 +4,14 @@ import { CommittedEvent } from '../interfaces/event.js'
 import { freezeEvent } from '../utils/object.utils.js'
 import { getEventHash, getInitialEventHash } from '../utils/crypto-utils.js'
 import { Multiplexer } from '../interfaces/multiplexer.js'
+import { LinkedList } from './linked-list.js'
 
 export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEvent> {
   private lastHash = getInitialEventHash()
   private lastSequenceNumber = 0
   private readonly bridges: BufferedSubscriber[] = []
   private broadcastLock = Promise.resolve()
+  private commitListeners: Array<(event: CommittedEvent) => DuctusEvent[] | void> = []
 
   constructor(initialHash?: string, initialSequenceNumber?: number) {
     if (initialHash) this.lastHash = initialHash
@@ -31,10 +33,36 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
     return bridge
   }
 
+  onCommit(callback: (event: CommittedEvent) => void) {
+    this.commitListeners.push(callback)
+
+    return () => {
+      this.commitListeners.splice(this.commitListeners.indexOf(callback), 1)
+    }
+  }
+
   async broadcast(event: DuctusEvent): Promise<void> {
     return await this.lock(async () => {
-      const commitedEvent = this.commitEvent(event)
-      await this.invokeBridges(commitedEvent)
+      const eventQueue = new LinkedList<DuctusEvent>()
+      eventQueue.insertLast(event)
+
+      let currentDraft: DuctusEvent | null = null
+
+      while (currentDraft = eventQueue.removeFirst()) {
+        const commitedEvent = this.commitEvent(currentDraft)
+
+        for (const listener of this.commitListeners) {
+          const cascades = listener(commitedEvent)
+
+          if (Array.isArray(cascades) && cascades.length > 0) {
+            for (const cascadedEvent of cascades) {
+              eventQueue.insertLast(cascadedEvent)
+            }
+          }
+        }
+
+        await this.invokeBridges(commitedEvent)
+      }
     })
   }
 
