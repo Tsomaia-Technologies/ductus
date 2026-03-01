@@ -48,6 +48,7 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
 
       let currentDraft: DuctusEvent | null = null
 
+      // @todo: think about better way to handle cascading events
       while (currentDraft = eventQueue.removeFirst()) {
         const commitedEvent = this.commitEvent(currentDraft)
 
