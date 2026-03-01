@@ -27,6 +27,11 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
   private errors: Error[] = []
 
   constructor(private readonly options: NodeProcessOptions) {
+    this.handleStdoutData = this.handleStdoutData.bind(this)
+    this.handleStderrData = this.handleStderrData.bind(this)
+    this.handleClose = this.handleClose.bind(this)
+    this.handleFatalError = this.handleFatalError.bind(this)
+    this.handleStreamError = this.handleStreamError.bind(this)
   }
 
   async *readStream(): AsyncIterableIterator<SystemProcessEvent> {
@@ -167,56 +172,65 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
   }
 
   private bindEvents(process: ChildProcess) {
-    process.stdout?.on('data', (data: Buffer) => {
-      this.pushEvent({
-        type: 'stdout',
-        timestamp: Date.now(),
-        content: data.toString('utf8'),
-      })
+    process.stdout?.on('data', this.handleStdoutData)
+    process.stderr?.on('data', this.handleStderrData)
+    process.on('close', this.handleClose)
+
+    process.on('error', this.handleFatalError)
+    process.stdout?.on('error', this.handleStreamError)
+    process.stderr?.on('error', this.handleStreamError)
+  }
+
+  private handleStdoutData(data: Buffer) {
+    this.pushEvent({
+      type: 'stdout',
+      timestamp: Date.now(),
+      content: data.toString('utf8'),
     })
-    process.stderr?.on('data', (data: Buffer) => {
-      this.pushEvent({
-        type: 'stderr',
-        timestamp: Date.now(),
-        content: data.toString('utf8'),
-      })
+  }
+
+  private handleStderrData(data: Buffer) {
+    this.pushEvent({
+      type: 'stderr',
+      timestamp: Date.now(),
+      content: data.toString('utf8'),
     })
-    process.on('close', (code, signal) => {
-      if (this.dismissTerminationTimeout) this.dismissTerminationTimeout()
-      if (this.dismissCancellationListener) this.dismissCancellationListener()
+  }
 
-      this.pushEvent({
-        type: 'exit',
-        timestamp: Date.now(),
-        exitCode: code ?? 1,
-        signal,
-      })
+  private handleClose(code: number | null, signal: NodeJS.Signals | null) {
+    if (this.dismissTerminationTimeout) this.dismissTerminationTimeout()
+    if (this.dismissCancellationListener) this.dismissCancellationListener()
 
-      this.isTerminated = true
-      this.wakeUpAll()
+    this.pushEvent({
+      type: 'exit',
+      timestamp: Date.now(),
+      exitCode: code ?? 1,
+      signal,
     })
 
-    const handleError = (error: Error) => {
-      this.pushError(error)
+    this.isTerminated = true
+    this.wakeUpAll()
+  }
 
-      if (!this.isTerminationRequested) {
-        this.gracefullyShutdown(true).catch(error => {
-          if (!this.isTerminated) {
-            this.pushError(error)
-            this.kill(true)
-          }
-        })
-      }
+  private handleStreamError(error: Error) {
+    const nodeError = error as NodeJS.ErrnoException
+
+    if (nodeError?.code !== 'EPIPE') {
+      this.handleFatalError(error)
     }
+  }
 
-    const handleStreamError = (error: Error) => {
-      const nodeError = error as NodeJS.ErrnoException
-      if (nodeError?.code !== 'EPIPE') handleError(error)
+  private handleFatalError(error: Error) {
+    this.pushError(error)
+
+    if (!this.isTerminationRequested) {
+      this.gracefullyShutdown(true).catch(error => {
+        if (!this.isTerminated) {
+          this.pushError(error)
+          this.kill(true)
+        }
+      })
     }
-
-    process.on('error', handleError)
-    process.stdout?.on('error', handleStreamError)
-    process.stderr?.on('error', handleStreamError)
   }
 
   private wakeUpNext(): void {
