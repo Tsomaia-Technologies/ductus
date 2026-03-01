@@ -59,22 +59,20 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
   private commitEvent(event: DuctusEvent): CommittedEvent {
     ++this.lastSequenceNumber
     const eventId = crypto.randomUUID()
-    const hash = getEventHash({
+    const unhashedEvent: Omit<CommittedEvent, 'hash'> = {
       ...event,
       eventId,
       sequenceNumber: this.lastSequenceNumber,
       prevHash: this.lastHash,
       isCommited: true,
-    })
-    const commitedEvent: CommittedEvent = {
-      ...event,
-      eventId,
-      sequenceNumber: this.lastSequenceNumber,
-      prevHash: this.lastHash,
-      isCommited: true,
+    }
+
+    const hash = getEventHash(unhashedEvent)
+    const commitedEvent = {
+      ...unhashedEvent,
       isReplay: false,
       hash,
-    }
+    } as CommittedEvent
     this.lastHash = hash
 
     return freezeEvent(commitedEvent)
