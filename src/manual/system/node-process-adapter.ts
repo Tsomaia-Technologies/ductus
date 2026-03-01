@@ -201,8 +201,10 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
 
       if (!this.isTerminationRequested) {
         this.gracefullyShutdown(true).catch(error => {
-          this.pushError(error)
-          this.kill(true)
+          if (!this.isTerminated) {
+            this.pushError(error)
+            this.kill(true)
+          }
         })
       }
     }
