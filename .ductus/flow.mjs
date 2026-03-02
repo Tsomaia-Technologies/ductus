@@ -6,6 +6,7 @@ import RootReducer from './reducers/RootReducer.mjs';
 import ImplementationReaction from './reactions/ImplementationReaction.mjs';
 import ResolveCommentsReaction from './reactions/ResolveCommentsReaction.mjs';
 import ReviewReaction from './reactions/ReviewReaction.mjs';
+import LogProcessor from "./processors/LogProcessor.js";
 
 export default Ductus.flow()
     .initialState(state)
@@ -18,4 +19,7 @@ export default Ductus.flow()
         ImplementationReaction,
         ReviewReaction,
         ResolveCommentsReaction,
+    )
+    .processors(
+        LogProcessor
     )
