@@ -1,7 +1,43 @@
+import { BUILD } from '../../interfaces/flow/builders/__internal__.js'
 import { SkillBuilder } from '../../interfaces/flow/builders/skill-builder.js'
-import { Schema } from 'node:inspector'
+import { SkillEntity } from '../../interfaces/flow/entities/skill-entity.js'
+import { Schema } from '../../interfaces/schema.js'
 
 export class DefaultSkillBuilder implements SkillBuilder {
+
+  private _name?: string
+  private _inputSchema?: Schema
+  private _inputTemplate?: string
+  private _outputSchema?: Schema
+
+  name(name: string): this {
+    this._name = name
+    return this
+  }
+
   input(schema: Schema, template?: string): this {
+    this._inputSchema = schema
+    this._inputTemplate = template
+    return this
+  }
+
+  output(schema: Schema): this {
+    this._outputSchema = schema
+    return this
+  }
+
+  [BUILD](): SkillEntity {
+    if (!this._name) throw new Error('Skill requires a name.')
+    if (!this._inputSchema) throw new Error('Skill requires an input schema.')
+    if (!this._outputSchema) throw new Error('Skill requires an output schema.')
+
+    return {
+      name: this._name,
+      input: {
+        schema: this._inputSchema,
+        payload: this._inputTemplate,
+      },
+      output: this._outputSchema,
+    }
   }
 }

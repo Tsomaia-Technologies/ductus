@@ -1,0 +1,22 @@
+import { BUILD } from '../../interfaces/flow/builders/__internal__.js'
+import { ProcessorBuilder } from '../../interfaces/flow/builders/processor-builder.js'
+import { ProcessorEntity } from '../../interfaces/flow/entities/processor-entity.js'
+import { EventGenerator } from '../../interfaces/event-generator.js'
+
+export class DefaultProcessorBuilder<TEvent, TState>
+    implements ProcessorBuilder<TEvent, TState> {
+    private _generator?: EventGenerator<TEvent, TState>
+
+    processor(generator: EventGenerator<TEvent, TState>): this {
+        this._generator = generator
+        return this
+    }
+
+    [BUILD](): ProcessorEntity<TEvent, TState> {
+        if (!this._generator) throw new Error('Processor requires a generator function.')
+
+        return {
+            processor: this._generator,
+        }
+    }
+}
