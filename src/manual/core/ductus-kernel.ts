@@ -8,19 +8,19 @@ import { DuctusState } from '../state/state.js'
 import { LinkedList } from './linked-list.js'
 
 export type DuctusReducer = (state: DuctusState, event: DuctusEvent) => [DuctusState, DuctusEvent[]]
-export type DuctusEventProcessor = EventProcessor<DuctusState, DuctusEvent, CommittedEvent>
+export type DuctusEventProcessor = EventProcessor<DuctusState, DuctusEvent>
 
 export interface KernelOptions {
   initialState: DuctusState
   reducer: DuctusReducer
-  multiplexer: Multiplexer<DuctusEvent, CommittedEvent>
+  multiplexer: Multiplexer<DuctusEvent>
   processors: DuctusEventProcessor[]
   fileAdapter: FileAdapter
   ledger: EventLedger<CommittedEvent>
 }
 
 export class DuctusKernel {
-  private readonly multiplexer: Multiplexer<DuctusEvent, CommittedEvent>
+  private readonly multiplexer: Multiplexer<DuctusEvent>
   private readonly processors: DuctusEventProcessor[] = []
   private readonly ledger: EventLedger<CommittedEvent>
   private mountResolver: Promise<void[]> = Promise.resolve<void[]>([])
