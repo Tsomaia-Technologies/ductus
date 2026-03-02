@@ -10,7 +10,6 @@ import { DefaultModelBuilder } from './manual/flow/builders/default-model-builde
 import { FlowEntity } from './manual/interfaces/flow/entities/flow-entity.js'
 import { Multiplexer } from './manual/interfaces/multiplexer.js'
 import { EventLedger } from './manual/interfaces/event-ledger.js'
-import { FileAdapter } from './manual/interfaces/file-adapter.js'
 import { EventProcessor } from './manual/interfaces/event-processor.js'
 import { ReactionEntity } from './manual/interfaces/flow/entities/reaction-entity.js'
 import { AgentEntity } from './manual/interfaces/flow/entities/agent-entity.js'
