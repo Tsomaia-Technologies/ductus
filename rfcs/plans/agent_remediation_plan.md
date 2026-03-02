@@ -3,7 +3,7 @@
 ## The Problem
 The current `AgentDispatcher` implementation violates the Single Responsibility Principle and ignores the RFC-001 mapping for execution lifecycles (`single-shot` vs `session`). Currently, the system over-indexes on stateless API calls (HTTP logic), entirely omitting the ability to support stateful, long-running CLI agents (like `cursor` or `claude-code`) via raw process pipes. 
 
-`src/interfaces/agent.ts` was correctly drafted to represent this execution layer but was orphaned.
+`src/interfaces/agent-builder.ts` was correctly drafted to represent this execution layer but was orphaned.
 
 ## The Strategy: The Adapter Pattern
 We must decouple the Orchestrator (`AgentDispatcher`) from the Execution Physics (CLI vs REST). We will implement a rigid class hierarchy that explicitly separates the `Lifecycle Strategy` from the `Transport Mechanism`.
@@ -34,7 +34,7 @@ export interface AgentChannel {
 }
 ```
 
-#### [MODIFY] `src/interfaces/agent.ts`
+#### [MODIFY] `src/interfaces/agent-builder.ts`
 The state layer defining *what* the Agent does (managing history, parsing JSON, deciding when the turn ends).
 ```typescript
 import { AgentContext } from './agent-context.js'
@@ -80,12 +80,12 @@ export interface Agent {
 
 ### 3. Implement the Logical Agents (The Lifecycle)
 
-#### [NEW] `src/agents/implementations/single-shot-agent.ts`
+#### [NEW] `src/agents/implementations/single-shot-agent-builder.ts`
 - Implements `Agent`.
 - **Contract:** Atomic execution. 
 - In `process()`, it calls `channel.connect()`, writes the full formatted prompt via `channel.send()`, yields the tokens, and immediately calls `channel.disconnect()` before returning. 
 
-#### [NEW] `src/agents/implementations/session-agent.ts`
+#### [NEW] `src/agents/implementations/session-agent-builder.ts`
 - Implements `Agent`.
 - **Contract:** Persistent execution.
 - `initialize()` calls `channel.connect()` *once* to establish the long-lived process.
