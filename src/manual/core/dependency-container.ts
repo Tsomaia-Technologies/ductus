@@ -1,7 +1,7 @@
 import { Type } from '../interfaces/event-generator.js'
 import { DependencyContainer } from '../interfaces/dependency-container.js'
 
-export class DefaultDependencyInjector implements DependencyContainer {
+export class DefaultDependencyContainer implements DependencyContainer {
   private instances = new Map<Type, InstanceType<Type>>()
 
   register<T extends Type>(type: T, instance: InstanceType<Type>): void {

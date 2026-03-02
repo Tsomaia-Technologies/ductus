@@ -7,14 +7,14 @@ export class DefaultReducerBuilder<TEvent extends BaseEvent, TState>
     implements ReducerBuilder<TEvent, TState> {
     private readonly _handlers: {
         event: TEvent
-        reduce: (state: TState, event: TEvent) => Partial<TState>
+        reduce: (state: TState, event: TEvent) => [Partial<TState>, TEvent[]]
     }[] = []
 
     private readonly _combined: ReducerBuilder<TEvent, TState>[] = []
 
     when(
         event: TEvent,
-        reduce: (state: TState, event: TEvent) => Partial<TState>
+        reduce: (state: TState, event: TEvent) =>[Partial<TState>, TEvent[]]
     ): this {
         this._handlers.push({ event, reduce })
         return this
@@ -29,7 +29,7 @@ export class DefaultReducerBuilder<TEvent extends BaseEvent, TState>
         const combinedReducers = this._combined.map((r) => r[BUILD]())
 
         return {
-            reducer: (state: TState, event: TEvent): TState => {
+            reducer: (state: TState, event: TEvent): [TState, TEvent[]] => {
                 let newState = { ...state }
 
                 for (const handler of this._handlers) {
@@ -39,11 +39,15 @@ export class DefaultReducerBuilder<TEvent extends BaseEvent, TState>
                     }
                 }
 
+                const accumulatedEvents: TEvent[] = []
+
                 for (const child of combinedReducers) {
-                    newState = child.reducer(newState, event)
+                    const [s, eventsOut] = child.reducer(newState, event)
+                    newState = s
+                    accumulatedEvents.push(...eventsOut)
                 }
 
-                return newState
+                return [newState, accumulatedEvents]
             }
         }
     }

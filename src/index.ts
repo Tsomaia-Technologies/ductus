@@ -2,7 +2,7 @@ import { DefaultAgentBuilder } from './manual/flow/builders/default-agent-builde
 import { DefaultSkillBuilder } from './manual/flow/builders/default-skill-builder.js'
 import { DefaultEventBuilder } from './manual/flow/builders/default-event-builder.js'
 import { DefaultProcessorBuilder } from './manual/flow/builders/default-processor-builder.js'
-import { EventGenerator, Injector } from './manual/interfaces/event-generator.js'
+import { EventGenerator } from './manual/interfaces/event-generator.js'
 import { DefaultReactionBuilder } from './manual/flow/builders/default-reaction-builder.js'
 import { DefaultReducerBuilder } from './manual/flow/builders/default-reducer-builder.js'
 import { DefaultFlowBuilder } from './manual/flow/builders/default-flow-builder.js'
@@ -16,6 +16,7 @@ import { AgentEntity } from './manual/interfaces/flow/entities/agent-entity.js'
 import { ModelEntity } from './manual/interfaces/flow/entities/model-entity.js'
 import { BaseEvent, CommittedEvent } from './manual/interfaces/event.js'
 import { DuctusKernel } from './manual/core/ductus-kernel.js'
+import { DependencyContainer } from './manual/interfaces/dependency-container.js'
 
 export function createDuctus<TEvent extends BaseEvent, TState>() {
   return {
@@ -35,7 +36,7 @@ export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
   flow: FlowEntity<TEvent, TState>
   multiplexer: Multiplexer<TEvent>
   ledger: EventLedger<CommittedEvent<TEvent>>
-  injector: Injector
+  injector: DependencyContainer
 }
 
 export function createKernel<TEvent extends BaseEvent, TState>(

@@ -3,14 +3,14 @@ import { Multiplexer } from '../interfaces/multiplexer.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { LinkedList } from './linked-list.js'
-import { Injector } from '../interfaces/event-generator.js'
+import { DependencyContainer } from '../interfaces/dependency-container.js'
 
 export type DuctusReducer<TEvent extends BaseEvent, TState> = (state: TState, event: TEvent) => [TState, TEvent[]]
 
 export interface KernelOptions<TEvent extends BaseEvent, TState> {
   initialState: TState
   reducer: DuctusReducer<TEvent, TState>
-  injector: Injector
+  injector: DependencyContainer
   multiplexer: Multiplexer<TEvent>
   processors: EventProcessor<TEvent, TState>[]
   ledger: EventLedger<CommittedEvent<TEvent>>
@@ -20,7 +20,7 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
   private readonly multiplexer: Multiplexer<TEvent>
   private readonly processors: EventProcessor<TEvent, TState>[] = []
   private readonly ledger: EventLedger<CommittedEvent<TEvent>>
-  private readonly injector: Injector
+  private readonly injector: DependencyContainer
   private mountResolver: Promise<void[]> = Promise.resolve<void[]>([])
   private reducer: DuctusReducer<TEvent, TState>
   private state: TState
@@ -86,7 +86,7 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
     const eventsOut = processor.process(
       eventsIn,
       this.getState,
-      this.injector,
+      this.injector.use.bind(this.injector),
     )
 
     for await (const event of eventsOut) {

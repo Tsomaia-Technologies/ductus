@@ -10,6 +10,7 @@ import { DuctusEvent } from './events/types.js'
 import { ConsumerTwoProcessor } from './processors/consumer-two-processor.js'
 import { ConsumerOneProcessor } from './processors/consumer-one-processor.js'
 import { NodeSystemAdapter } from './system/node-system-adapter.js'
+import { DefaultDependencyContainer } from './core/dependency-container.js'
 
 async function main() {
   const initialState: DuctusState = {
@@ -23,7 +24,7 @@ async function main() {
     currentPlanVerifications: {},
   }
 
-  const multiplexer = new DuctusMultiplexer()
+  const multiplexer = new DuctusMultiplexer<DuctusEvent>()
   const fileAdapter = new NodeFileAdapter()
   const systemAdapter = new NodeSystemAdapter({
     defaultCwd: '/Users/torniketsomaia/projects/@tsomaia.tech/ductus',
@@ -33,10 +34,9 @@ async function main() {
     ledgerFileAbsolutePath: systemAdapter.resolveAbsolutePath('research/ledger.jsonl'),
     eventGuard: isCommitedEvent as any,
   })
-  const kernel = new DuctusKernel({
+  const kernel = new DuctusKernel<DuctusEvent, DuctusState>({
     initialState,
     reducer: ductusReducer,
-    fileAdapter,
     multiplexer,
     ledger,
     processors: [
@@ -44,6 +44,7 @@ async function main() {
       new ConsumerOneProcessor(),
       new ConsumerTwoProcessor(),
     ],
+    injector: new DefaultDependencyContainer(),
   })
 
   kernel.boot().then(() => {
