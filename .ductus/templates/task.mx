@@ -1,0 +1,7 @@
+Execute this task: {{ description }}
+
+Requirements:
+
+@for (requirement of requirements)
+    - {{ requirement }}
+@endfor
