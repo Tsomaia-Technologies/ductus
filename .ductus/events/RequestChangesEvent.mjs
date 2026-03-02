@@ -1,6 +1,5 @@
-import { Event } from 'ductus'
-import TaskSchema from "../schemas/TaskSchema.mjs";
-import RejectionSchema from "../schemas/RejectionSchema.mjs";
+import Ductus from 'ductus'
+import RejectionSchema from '../schemas/RejectionSchema.mjs';
 
-export default Event.define('ResolveReviewCommentsEvent')
+export default Ductus.event('ResolveReviewCommentsEvent')
     .payload(RejectionSchema)

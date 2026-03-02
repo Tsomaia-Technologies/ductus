@@ -1,5 +1,5 @@
-import { Event } from 'ductus'
-import ImplementationReport from "../schemas/implementation-report.mjs";
+import Ductus from 'ductus'
+import ImplementationReportSchema from '../schemas/ImplementationReportSchema.mjs';
 
-export default Event.define('ImplementationReport')
-    .payload(ImplementationReport)
+export default Ductus.event('ImplementationReportEvent')
+    .payload(ImplementationReportSchema)
