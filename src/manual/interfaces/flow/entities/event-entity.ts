@@ -1,5 +1,4 @@
-export interface EventEntity<TPayload> {
-  name: string
-  payload: TPayload
-  volatility: 'durable' | 'volatile'
+import { BaseEvent } from '../../event.js'
+
+export interface EventEntity<T extends string, P> extends BaseEvent<T, P> {
 }

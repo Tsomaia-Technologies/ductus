@@ -1,1 +1,3 @@
-export type OutputEventStream<TEvent> = AsyncIterable<TEvent>;
+import { BaseEvent } from './event.js'
+
+export type OutputEventStream<TEvent extends BaseEvent> = AsyncIterable<TEvent>;

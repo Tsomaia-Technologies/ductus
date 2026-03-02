@@ -1,16 +1,14 @@
-import { DuctusEvent } from '../events/types.js'
-
 export type Volatility = 'durable' | 'volatile'
 
 export interface BaseEvent<T extends string = string, P = unknown> {
   type: T
   payload: P
-  authorId?: string
   volatility: Volatility
+  authorId?: string
   isCommited?: boolean
 }
 
-export type CommittedEvent<TEvent = DuctusEvent> = TEvent & {
+export type CommittedEvent<TEvent extends BaseEvent> = TEvent & {
   eventId: string
   sequenceNumber: number
   prevHash: string

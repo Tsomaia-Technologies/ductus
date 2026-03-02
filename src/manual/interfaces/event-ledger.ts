@@ -1,5 +1,5 @@
-import { CommittedEvent } from './event.js'
+import { BaseEvent, CommittedEvent } from './event.js'
 
-export interface EventLedger<TEvent> {
+export interface EventLedger<TEvent extends BaseEvent> {
   readEvents(): AsyncIterable<CommittedEvent<TEvent>>
 }

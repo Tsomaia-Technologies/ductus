@@ -4,8 +4,8 @@ import { DuctusState } from '../state/state.js'
 import { DuctusEvent } from '../events/types.js'
 import { tick } from '../events/creators.js'
 
-export class TimerProcessor implements EventProcessor<DuctusState, DuctusEvent> {
-  async* process(): OutputEventStream {
+export class TimerProcessor implements EventProcessor<DuctusEvent, DuctusState> {
+  async* process(): OutputEventStream<DuctusEvent> {
     while (true) {
       await new Promise(resolve => setTimeout(resolve, 1000))
       yield tick()

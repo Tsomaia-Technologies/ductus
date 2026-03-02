@@ -1,8 +1,8 @@
 import { LinkedList } from './linked-list.js'
 import { EventSubscriber } from '../interfaces/event-subscriber.js'
-import { CommittedEvent } from '../interfaces/event.js'
+import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 
-export class BufferedSubscriber<TEvent> implements EventSubscriber<TEvent> {
+export class BufferedSubscriber<TEvent extends BaseEvent> implements EventSubscriber<TEvent> {
   private readonly eventQueue = new LinkedList<CommittedEvent<TEvent>>()
   private readonly pushResolverQueue = new LinkedList<() => void>()
   private readonly processorWakeUpQueue = new LinkedList<() => void>()

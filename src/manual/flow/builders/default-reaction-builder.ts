@@ -2,8 +2,9 @@ import { BUILD } from '../../interfaces/flow/builders/__internal__.js'
 import { ReactionBuilder } from '../../interfaces/flow/builders/reaction-builder.js'
 import { ReactionEntity } from '../../interfaces/flow/entities/reaction-entity.js'
 import { Action } from '../../interfaces/action.js'
+import { BaseEvent } from '../../interfaces/event.js'
 
-export class DefaultReactionBuilder<TEvent> implements ReactionBuilder<TEvent> {
+export class DefaultReactionBuilder<TEvent extends BaseEvent> implements ReactionBuilder<TEvent> {
     private readonly _events: TEvent[] = []
     private readonly _actions: Action<TEvent>[] = []
     private readonly _emits: TEvent[] = []
@@ -35,7 +36,7 @@ export class DefaultReactionBuilder<TEvent> implements ReactionBuilder<TEvent> {
         }
 
         return {
-            events: this._events,
+            events: this._events.map(event => event.type),
             reactions: this._actions,
         }
     }

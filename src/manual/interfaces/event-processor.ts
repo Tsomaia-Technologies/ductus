@@ -1,8 +1,10 @@
-import { CommittedEvent } from './event.js'
+import { BaseEvent, CommittedEvent } from './event.js'
+import { Injector } from './event-generator.js'
 
-export interface EventProcessor<TState, TEventDraft> {
+export interface EventProcessor<TEvent extends BaseEvent, TState> {
   process(
-    events: AsyncIterable<CommittedEvent<TEventDraft>>,
+    events: AsyncIterable<CommittedEvent<TEvent>>,
     getState: () => TState,
-  ): AsyncIterable<TEventDraft>;
+    injector: Injector,
+  ): AsyncIterable<TEvent>;
 }

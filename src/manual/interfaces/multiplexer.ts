@@ -1,7 +1,7 @@
 import { EventSubscriber } from './event-subscriber.js'
-import { CommittedEvent } from './event.js'
+import { BaseEvent, CommittedEvent } from './event.js'
 
-export interface Multiplexer<TEvent> {
+export interface Multiplexer<TEvent extends BaseEvent> {
   /**
    * Creates subscriber to the commited events and returns it
    */
@@ -18,7 +18,7 @@ export interface Multiplexer<TEvent> {
   /**
    * Broadcasts event drafts as commited events to all subscribers
    *
-   * @param {TEventDraft} event
+   * @param {TEvent} event
    */
   broadcast(event: TEvent): Promise<void>
 }

@@ -1,20 +1,20 @@
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
 import { getInitialEventHash } from '../utils/crypto-utils.js'
-import { CommittedEvent } from '../interfaces/event.js'
+import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 
-export type EventGuard<TEvent> = <T extends TEvent>(
+export type EventGuard<TEvent extends BaseEvent> = <T extends TEvent>(
   input: unknown,
   verifiedPrevHash: string,
 ) => input is T
 
-export interface JsonLedgerOptions<TEvent> {
+export interface JsonLedgerOptions<TEvent extends BaseEvent> {
   fileAdapter: FileAdapter
   ledgerFileAbsolutePath: string
   eventGuard: EventGuard<TEvent>
 }
 
-export class JsonlLedger<TEvent> implements EventLedger<TEvent> {
+export class JsonlLedger<TEvent extends BaseEvent> implements EventLedger<TEvent> {
   private readonly fileAdapter: FileAdapter
   private readonly ledgerFileAbsolutePath: string
   private readonly eventGuard: EventGuard<TEvent>

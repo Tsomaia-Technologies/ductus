@@ -6,8 +6,9 @@ import { ModelBuilder } from '../../interfaces/flow/builders/model-builder.js'
 import { ReactionBuilder } from '../../interfaces/flow/builders/reaction-builder.js'
 import { ProcessorBuilder } from '../../interfaces/flow/builders/processor-builder.js'
 import { FlowEntity } from '../../interfaces/flow/entities/flow-entity.js'
+import { BaseEvent } from '../../interfaces/event.js'
 
-export class DefaultFlowBuilder<TEvent, TState> implements FlowBuilder<TEvent, TState> {
+export class DefaultFlowBuilder<TEvent extends BaseEvent, TState> implements FlowBuilder<TEvent, TState> {
     private _initialState?: TState
     private _reducer?: ReducerBuilder<TEvent, TState>
     private readonly _agents: { agent: AgentBuilder; model: ModelBuilder }[] = []

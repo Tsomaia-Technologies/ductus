@@ -1,42 +1,48 @@
 import { EventProcessor } from '../interfaces/event-processor.js'
 import { Multiplexer } from '../interfaces/multiplexer.js'
-import { DuctusEvent } from '../events/types.js'
-import { CommittedEvent } from '../interfaces/event.js'
-import { FileAdapter } from '../interfaces/file-adapter.js'
+import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
-import { DuctusState } from '../state/state.js'
 import { LinkedList } from './linked-list.js'
+import { Injector } from '../interfaces/event-generator.js'
 
-export type DuctusReducer = (state: DuctusState, event: DuctusEvent) => [DuctusState, DuctusEvent[]]
-export type DuctusEventProcessor = EventProcessor<DuctusState, DuctusEvent>
+export type DuctusReducer<TEvent extends BaseEvent, TState> = (state: TState, event: TEvent) => [TState, TEvent[]]
 
-export interface KernelOptions {
-  initialState: DuctusState
-  reducer: DuctusReducer
-  multiplexer: Multiplexer<DuctusEvent>
-  processors: DuctusEventProcessor[]
-  fileAdapter: FileAdapter
-  ledger: EventLedger<CommittedEvent>
+export interface KernelOptions<TEvent extends BaseEvent, TState> {
+  initialState: TState
+  reducer: DuctusReducer<TEvent, TState>
+  injector: Injector
+  multiplexer: Multiplexer<TEvent>
+  processors: EventProcessor<TEvent, TState>[]
+  ledger: EventLedger<CommittedEvent<TEvent>>
 }
 
-export class DuctusKernel {
-  private readonly multiplexer: Multiplexer<DuctusEvent>
-  private readonly processors: DuctusEventProcessor[] = []
-  private readonly ledger: EventLedger<CommittedEvent>
+export class DuctusKernel<TEvent extends BaseEvent, TState> {
+  private readonly multiplexer: Multiplexer<TEvent>
+  private readonly processors: EventProcessor<TEvent, TState>[] = []
+  private readonly ledger: EventLedger<CommittedEvent<TEvent>>
+  private readonly injector: Injector
   private mountResolver: Promise<void[]> = Promise.resolve<void[]>([])
-  private reducer: DuctusReducer
-  private state: DuctusState
+  private reducer: DuctusReducer<TEvent, TState>
+  private state: TState
   private getState = () => this.state
-  private readonly cascadingEvents = new LinkedList<DuctusEvent>()
+  private readonly cascadingEvents = new LinkedList<TEvent>()
   private readonly cascadeWakeUpResolvers = new LinkedList<() => void>()
 
-  constructor(options: KernelOptions) {
-    const { initialState, reducer, multiplexer, processors, ledger } = options
+  constructor(options: KernelOptions<TEvent, TState>) {
+    const {
+      initialState,
+      reducer,
+      multiplexer,
+      processors,
+      ledger,
+      injector,
+    } = options
     this.state = initialState
     this.reducer = reducer
     this.multiplexer = multiplexer
     this.processors = processors
     this.ledger = ledger
+    this.injector = injector
   }
 
   async boot() {
@@ -74,10 +80,14 @@ export class DuctusKernel {
     })
   }
 
-  private async mountProcessor(processor: DuctusEventProcessor) {
+  private async mountProcessor(processor: EventProcessor<TEvent, TState>) {
     const subscriber = this.multiplexer.subscribe()
     const eventsIn = subscriber.streamEvents()
-    const eventsOut = processor.process(eventsIn, this.getState)
+    const eventsOut = processor.process(
+      eventsIn,
+      this.getState,
+      this.injector,
+    )
 
     for await (const event of eventsOut) {
       await this.multiplexer.broadcast(event)

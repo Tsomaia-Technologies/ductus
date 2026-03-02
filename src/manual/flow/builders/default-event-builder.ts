@@ -2,17 +2,17 @@ import { BUILD } from '../../interfaces/flow/builders/__internal__.js'
 import { EventBuilder } from '../../interfaces/flow/builders/event-builder.js'
 import { EventEntity } from '../../interfaces/flow/entities/event-entity.js'
 
-export class DefaultEventBuilder<TPayload> implements EventBuilder<TPayload> {
-    private _name?: string
-    private _payload?: TPayload
+export class DefaultEventBuilder<T extends string, P> implements EventBuilder<T, P> {
+    private _type?: T
+    private _payload?: P
     private _volatility: 'durable' | 'volatile' = 'volatile'
 
-    name(name: string): this {
-        this._name = name
+    type(name: T): this {
+        this._type = name
         return this
     }
 
-    payload(payload: TPayload): this {
+    payload(payload: P): this {
         this._payload = payload
         return this
     }
@@ -27,12 +27,12 @@ export class DefaultEventBuilder<TPayload> implements EventBuilder<TPayload> {
         return this
     }
 
-    [BUILD](): EventEntity<TPayload> {
-        if (!this._name) throw new Error('Event requires a name.')
+    [BUILD](): EventEntity<T, P> {
+        if (!this._type) throw new Error('Event requires a type.')
         if (this._payload === undefined) throw new Error('Event requires a payload.')
 
         return {
-            name: this._name,
+            type: this._type,
             payload: this._payload,
             volatility: this._volatility,
         }

@@ -1,10 +1,13 @@
-import { DuctusEvent } from '../events/types.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 
-export function freezeEvent<T extends DuctusEvent>(event: T): DeeplyReadonly<T> {
+export function freezeEvent<TEvent>(event: TEvent): DeeplyReadonly<TEvent> {
   Object.freeze(event)
-  if (typeof event.payload === 'object' && event.payload !== null)
+  if (typeof event === 'object'
+    && event !== null
+    && 'payload' in event
+    && typeof event.payload === 'object'
+    && event.payload !== null)
     Object.freeze(event.payload)
 
-  return event as unknown as DeeplyReadonly<T>
+  return event as unknown as DeeplyReadonly<TEvent>
 }

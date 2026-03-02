@@ -6,7 +6,7 @@ import { ProcessorBuilder } from './processor-builder.js'
 import { Buildable } from './__internal__.js'
 import { FlowEntity } from '../entities/flow-entity.js'
 
-export interface FlowBuilder<TEvent, TState>
+export interface FlowBuilder<TEvent extends BaseEvent, TState>
   extends Buildable<FlowEntity<TEvent, TState>> {
   initialState(state: TState): this
   reducer(reducer: ReducerBuilder<TEvent, TState>): this

@@ -1,6 +1,6 @@
-import { CommittedEvent } from './event.js'
+import { BaseEvent, CommittedEvent } from './event.js'
 
-export interface EventSubscriber<TEvent> {
+export interface EventSubscriber<TEvent extends BaseEvent> {
   /**
    * Returns asynchronous stream of events
    */

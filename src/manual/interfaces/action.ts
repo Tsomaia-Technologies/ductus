@@ -1,8 +1,10 @@
+import { BaseEvent } from './event.js'
+
 export interface BaseAction {
   type: string
 }
 
-export interface EmitAction<TEvent> extends BaseAction {
+export interface EmitAction<TEvent extends BaseEvent> extends BaseAction {
   type: 'emit'
   payload: TEvent
 }
@@ -12,6 +14,6 @@ export interface InvokeAction {
   skill: string
 }
 
-export type Action<TEvent> =
+export type Action<TEvent extends BaseEvent> =
   | EmitAction<TEvent>
   | InvokeAction

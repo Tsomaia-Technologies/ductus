@@ -1,8 +1,9 @@
 import { BUILD } from '../../interfaces/flow/builders/__internal__.js'
 import { ReducerBuilder } from '../../interfaces/flow/builders/reducer-builder.js'
 import { ReducerEntity } from '../../interfaces/flow/entities/reducer-entity.js'
+import { BaseEvent } from '../../interfaces/event.js'
 
-export class DefaultReducerBuilder<TEvent, TState>
+export class DefaultReducerBuilder<TEvent extends BaseEvent, TState>
     implements ReducerBuilder<TEvent, TState> {
     private readonly _handlers: {
         event: TEvent

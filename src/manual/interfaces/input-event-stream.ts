@@ -1,3 +1,3 @@
-import type { CommittedEvent } from './event.js'
+import { BaseEvent, CommittedEvent } from './event.js'
 
-export type InputEventStream<TEvent> = AsyncIterable<CommittedEvent<TEvent>>;
+export type InputEventStream<TEvent extends BaseEvent> = AsyncIterable<CommittedEvent<TEvent>>;

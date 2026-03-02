@@ -2,8 +2,9 @@ import { BUILD } from '../../interfaces/flow/builders/__internal__.js'
 import { ProcessorBuilder } from '../../interfaces/flow/builders/processor-builder.js'
 import { ProcessorEntity } from '../../interfaces/flow/entities/processor-entity.js'
 import { EventGenerator } from '../../interfaces/event-generator.js'
+import { BaseEvent } from '../../interfaces/event.js'
 
-export class DefaultProcessorBuilder<TEvent, TState>
+export class DefaultProcessorBuilder<TEvent extends BaseEvent, TState>
     implements ProcessorBuilder<TEvent, TState> {
     private _generator?: EventGenerator<TEvent, TState>
 

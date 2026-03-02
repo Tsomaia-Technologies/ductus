@@ -1,9 +1,10 @@
 import { InputEventStream } from './input-event-stream.js'
 import { OutputEventStream } from './output-event-stream.js'
+import { BaseEvent } from './event.js'
 
 export type Injector = <T extends { new(...args: any[]): any }>(type: T) => InstanceType<T>
 
-export type EventGenerator<TEvent, TState> = (
+export type EventGenerator<TEvent extends BaseEvent, TState> = (
   events: InputEventStream<TEvent>,
   getState: () => TState,
   use: Injector,
