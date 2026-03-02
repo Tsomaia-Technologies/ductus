@@ -5,8 +5,7 @@ export type Volatility = 'durable' | 'volatile'
 export interface BaseEvent<T extends string = string, P = unknown> {
   type: T
   payload: P
-  authorId: string
-  timestamp: number
+  authorId?: string
   volatility: Volatility
   isCommited?: boolean
 }
@@ -17,4 +16,5 @@ export type CommittedEvent<TEvent = DuctusEvent> = TEvent & {
   prevHash: string
   isCommited: true
   hash: string
+  timestamp: number
 }

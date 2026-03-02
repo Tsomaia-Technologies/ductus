@@ -8,13 +8,13 @@ export type EventGuard<TEvent> = <T extends TEvent>(
   verifiedPrevHash: string,
 ) => input is T
 
-export interface JsonLedgerOptions<TEvent extends CommittedEvent<unknown>> {
+export interface JsonLedgerOptions<TEvent> {
   fileAdapter: FileAdapter
   ledgerFileAbsolutePath: string
   eventGuard: EventGuard<TEvent>
 }
 
-export class JsonlLedger<TEvent extends CommittedEvent<unknown>> implements EventLedger<TEvent> {
+export class JsonlLedger<TEvent> implements EventLedger<TEvent> {
   private readonly fileAdapter: FileAdapter
   private readonly ledgerFileAbsolutePath: string
   private readonly eventGuard: EventGuard<TEvent>
@@ -26,14 +26,14 @@ export class JsonlLedger<TEvent extends CommittedEvent<unknown>> implements Even
     this.eventGuard = eventGuard
   }
 
-  async* readEvents(): AsyncIterable<TEvent> {
+  async* readEvents(): AsyncIterable<CommittedEvent<TEvent>> {
     const events = this.fileAdapter.readLinesJsonl(this.ledgerFileAbsolutePath)
     let verifiedPrevHash = getInitialEventHash()
 
     for await (const event of events) {
       const typedEvent = event as unknown
 
-      if (!this.eventGuard<TEvent>(typedEvent, verifiedPrevHash)) {
+      if (!this.eventGuard<CommittedEvent<TEvent>>(typedEvent, verifiedPrevHash)) {
         throw new Error('Fatal error: detected invalid entry in the ledger, terminating.')
       }
 

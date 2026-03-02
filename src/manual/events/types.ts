@@ -17,6 +17,8 @@ export type PlanVerificationQuestionID = `${PlanVerificationID}-question-${numbe
 
 export type TerminateProcessorEvent = BaseEvent<'terminate-processor', void>
 
+export type TickEvent = BaseEvent<'tick', void>
+
 export type FeatureRequestEvent = BaseEvent<'feature-request', {
   description: string
 }>
@@ -403,6 +405,7 @@ export type AgentCompletedResponseEvent = BaseEvent<'agent-completed-response', 
 }>
 
 export type DuctusEvent =
+  | TickEvent
   | TerminateProcessorEvent
   | FeatureRequestEvent
   | PlanCreatedEvent

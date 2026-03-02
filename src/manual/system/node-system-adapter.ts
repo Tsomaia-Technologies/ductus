@@ -10,7 +10,6 @@ import {
 import { SystemProcessAdapter } from '../interfaces/system-process-adapter.js'
 import { NodeProcessAdapter } from './node-process-adapter.js'
 import { Canceller } from './canceller.js'
-import { Disposer } from '../interfaces/cancellation-token.js'
 
 export interface NodeSystemAdapterOptions {
   defaultEnv?: Record<string, string>
@@ -29,7 +28,7 @@ export class NodeSystemAdapter implements SystemAdapter {
   private readonly activeProcesses = new Set<SystemProcessAdapter>()
   private readonly baseCanceller = new Canceller({ forceByDefault: true })
 
-  constructor(options: NodeSystemAdapterOptions) {
+  constructor(options: NodeSystemAdapterOptions = {}) {
     const {
       defaultEnv = process.env,
       defaultCwd = process.cwd(),

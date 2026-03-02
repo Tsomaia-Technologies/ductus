@@ -5,7 +5,7 @@ import { freezeEvent } from '../utils/object.utils.js'
 import { getEventHash, getInitialEventHash } from '../utils/crypto-utils.js'
 import { Multiplexer } from '../interfaces/multiplexer.js'
 
-export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEvent> {
+export class DuctusMultiplexer implements Multiplexer<DuctusEvent> {
   private lastHash = getInitialEventHash()
   private lastSequenceNumber = 0
   private readonly bridges: BufferedSubscriber<CommittedEvent>[] = []
@@ -58,12 +58,14 @@ export class DuctusMultiplexer implements Multiplexer<DuctusEvent, CommittedEven
   private commitEvent(event: DuctusEvent): CommittedEvent {
     ++this.lastSequenceNumber
     const eventId = crypto.randomUUID()
+    const timestamp = Date.now()
     const unhashedEvent: Omit<CommittedEvent, 'hash'> = {
       ...event,
       eventId,
       sequenceNumber: this.lastSequenceNumber,
       prevHash: this.lastHash,
       isCommited: true,
+      timestamp,
     }
 
     const hash = getEventHash(unhashedEvent)
