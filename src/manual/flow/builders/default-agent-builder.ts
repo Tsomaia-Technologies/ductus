@@ -2,6 +2,7 @@ import { BUILD } from '../../interfaces/flow/builders/__internal__.js'
 import { AgentBuilder } from '../../interfaces/flow/builders/agent-builder.js'
 import { SkillBuilder } from '../../interfaces/flow/builders/skill-builder.js'
 import { AgentEntity } from '../../interfaces/flow/entities/agent-entity.js'
+import { RulesetBuilder } from '../../interfaces/flow/builders/ruleset-builder.js'
 
 export class DefaultAgentBuilder implements AgentBuilder {
     private _name?: string
@@ -9,6 +10,7 @@ export class DefaultAgentBuilder implements AgentBuilder {
     private _persona?: string
     private readonly _skills: SkillBuilder[] = []
     private readonly _rules: string[] = []
+    private readonly _rulesets: RulesetBuilder[] = []
 
     name(name: string): this {
         this._name = name
@@ -35,6 +37,11 @@ export class DefaultAgentBuilder implements AgentBuilder {
         return this
     }
 
+    ruleset(ruleset: RulesetBuilder): this {
+        this._rulesets.push(ruleset)
+        return this
+    }
+
     [BUILD](): AgentEntity {
         if (!this._name) throw new Error('Agent requires a name.')
         if (!this._role) throw new Error('Agent requires a role.')
@@ -44,8 +51,9 @@ export class DefaultAgentBuilder implements AgentBuilder {
             name: this._name,
             role: this._role,
             persona: this._persona,
-            skill: this._skills.map((s) => s[BUILD]()),
+            skill: this._skills.map(skill => skill[BUILD]()),
             rules: this._rules,
+            rulesets: this._rulesets.map(ruleset => ruleset[BUILD]()),
         }
     }
 }

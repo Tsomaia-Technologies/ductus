@@ -17,6 +17,7 @@ import { ModelEntity } from './manual/interfaces/flow/entities/model-entity.js'
 import { BaseEvent, CommittedEvent } from './manual/interfaces/event.js'
 import { DuctusKernel } from './manual/core/ductus-kernel.js'
 import { DependencyContainer } from './manual/interfaces/dependency-container.js'
+import { DefaultRulesetBuilder } from './manual/flow/builders/default-ruleset-builder.js'
 
 export function createDuctus<TEvent extends BaseEvent, TState>() {
   return {
@@ -26,6 +27,7 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
     model: (modelId: string) => new DefaultModelBuilder().model(modelId),
     reaction: () => new DefaultReactionBuilder<TEvent>(),
     reducer: () => new DefaultReducerBuilder<TEvent, TState>(),
+    ruleset: (name: string) => new DefaultRulesetBuilder().name(name),
     skill: (name: string) => new DefaultSkillBuilder().name(name),
     processor: (generator: EventGenerator<TEvent, TState>) =>
       new DefaultProcessorBuilder<TEvent, TState>().processor(generator),
