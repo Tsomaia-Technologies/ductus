@@ -1,7 +1,6 @@
-import { BaseEvent } from '../src/interfaces/event.js'
+import { AgentChunk, BaseEvent } from '../src/index.js'
 import { Task } from './schema/task.js'
 import { ImplementationReport } from './schema/implementation-report.js'
-import { AgentChunk } from '../src/interfaces/agent-chunk.js'
 
 export type PlanID = `plan-${string}`
 export type PlanRevisionID = `${PlanID}-revision-${number}`

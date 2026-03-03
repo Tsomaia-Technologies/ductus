@@ -1,5 +1,5 @@
 import { z } from 'zod/v3'
-import { toJsonSchema } from '../../src/utils/schema-utils.js'
+import { toJsonSchema } from 'ductus'
 
 export const TaskSchema = z.object({
   taskId: z.string().describe('Kebab-case slug, e.g. db-setup, auth-api'),

@@ -1,5 +1,5 @@
 import { z } from 'zod/v3'
-import { toJsonSchema } from '../../src/utils/schema-utils.js'
+import { toJsonSchema } from 'ductus'
 
 export const RequestedCheckSchema = z.object({
   checkId: z.string().describe('Id of a check defined in .ductus/config.json'),
@@ -11,7 +11,7 @@ export const ImplementationReportSchema = z.object({
   self_review_status: z.enum([
     'manually_reviewed_and_confirmed',
     'manually_reviewed_and_ignored_issues',
-    'did_not_review_got_lazy'
+    'did_not_review_got_lazy',
   ]).describe('Implementation\'s self-assessment of the code quality before submission.'),
   requested_checks: z.array(RequestedCheckSchema).describe('Check IDs to run from .ductus/config.json (e.g. build, test). Only these are executed.'),
   coverage_status: z.enum(['new_functionality_fully_covered', 'got_lazy']).describe('Confirmation of test coverage for new logic.'),

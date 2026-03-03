@@ -1,14 +1,18 @@
 import {
   PlanID,
   PlanQuestionID,
-  PlanRevisionID, PlanVerificationID, PlanVerificationQuestionID,
+  PlanRevisionID,
+  PlanVerificationID,
+  PlanVerificationQuestionID,
   TaskBreakdownID,
-  TaskBreakdownQuestionID, TaskBreakdownRevisionID, TaskID,
+  TaskBreakdownQuestionID,
+  TaskBreakdownRevisionID,
+  TaskID,
   TaskRevisionID,
 } from '../types.js'
 import { Task } from '../schema/task.js'
 import { ImplementationReport } from '../schema/implementation-report.js'
-import { DeeplyReadonly } from '../../src/interfaces/helpers.js'
+import { DeeplyReadonly } from 'ductus'
 
 export type DuctusState = DeeplyReadonly<{
   plansRevisions: Record<PlanRevisionID, PlanRevisionState>
