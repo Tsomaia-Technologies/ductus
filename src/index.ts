@@ -1,96 +1,80 @@
-import { DefaultAgentBuilder } from './flow/builders/default-agent-builder.js'
-import { DefaultSkillBuilder } from './flow/builders/default-skill-builder.js'
-import { DefaultEventBuilder } from './flow/builders/default-event-builder.js'
-import { DefaultProcessorBuilder } from './flow/builders/default-processor-builder.js'
-import { EventGenerator } from './interfaces/event-generator.js'
-import { DefaultReactionBuilder } from './flow/builders/default-reaction-builder.js'
-import { DefaultReducerBuilder } from './flow/builders/default-reducer-builder.js'
-import { DefaultFlowBuilder } from './flow/builders/default-flow-builder.js'
-import { DefaultModelBuilder } from './flow/builders/default-model-builder.js'
-import { FlowEntity } from './interfaces/flow/entities/flow-entity.js'
-import { Multiplexer } from './interfaces/multiplexer.js'
-import { EventLedger } from './interfaces/event-ledger.js'
-import { EventProcessor } from './interfaces/event-processor.js'
-import { ReactionEntity } from './interfaces/flow/entities/reaction-entity.js'
-import { AgentEntity } from './interfaces/flow/entities/agent-entity.js'
-import { ModelEntity } from './interfaces/flow/entities/model-entity.js'
-import { BaseEvent, CommittedEvent } from './interfaces/event.js'
-import { DuctusKernel } from './core/ductus-kernel.js'
-import { DependencyContainer } from './interfaces/dependency-container.js'
-import { DefaultRulesetBuilder } from './flow/builders/default-ruleset-builder.js'
+export * from './builders/default-agent-builder.js'
+export * from './builders/default-event-builder.js'
+export * from './builders/default-flow-builder.js'
+export * from './builders/default-model-builder.js'
+export * from './builders/default-processor-builder.js'
+export * from './builders/default-reaction-builder.js'
+export * from './builders/default-reducer-builder.js'
+export * from './builders/default-ruleset-builder.js'
+export * from './builders/default-skill-builder.js'
 
-export function createDuctus<TEvent extends BaseEvent, TState>() {
-  return {
-    agent: (name: string) => new DefaultAgentBuilder().name(name),
-    event: (name: string) => new DefaultEventBuilder().type(name),
-    flow: () => new DefaultFlowBuilder<TEvent, TState>(),
-    model: (modelId: string) => new DefaultModelBuilder().model(modelId),
-    reaction: () => new DefaultReactionBuilder<TEvent>(),
-    reducer: () => new DefaultReducerBuilder<TEvent, TState>(),
-    ruleset: (name: string) => new DefaultRulesetBuilder().name(name),
-    skill: (name: string) => new DefaultSkillBuilder().name(name),
-    processor: (generator: EventGenerator<TEvent, TState>) =>
-      new DefaultProcessorBuilder<TEvent, TState>().processor(generator),
-  }
-}
+export * from './core/buffered-subscriber.js'
+export * from './core/dependency-container.js'
+export * from './core/ductus-kernel.js'
+export * from './core/ductus-multiplexer.js'
+export * from './core/linked-list.js'
 
-export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
-  flow: FlowEntity<TEvent, TState>
-  multiplexer: Multiplexer<TEvent>
-  ledger: EventLedger<CommittedEvent<TEvent>>
-  injector: DependencyContainer
-}
+export * from './events/creators.js'
+export * from '../sample/types.js'
 
-export function createKernel<TEvent extends BaseEvent, TState>(
-  options: CreateKernelOptions<TEvent, TState>,
-) {
-  const { flow, multiplexer, ledger, injector } = options
+export * from './interfaces/builders/agent-builder.js'
+export * from './interfaces/builders/event-builder.js'
+export * from './interfaces/builders/flow-builder.js'
+export * from './interfaces/builders/model-builder.js'
+export * from './interfaces/builders/processor-builder.js'
+export * from './interfaces/builders/reaction-builder.js'
+export * from './interfaces/builders/reducer-builder.js'
+export * from './interfaces/builders/ruleset-builder.js'
+export * from './interfaces/builders/skill-builder.js'
 
-  const processors = flow.processors.map(entity => {
-    return createProcessorAdapter(entity.processor)
-  })
+export * from './interfaces/entities/agent-entity.js'
+export * from './interfaces/entities/event-entity.js'
+export * from './interfaces/entities/flow-entity.js'
+export * from './interfaces/entities/model-entity.js'
+export * from './interfaces/entities/processor-entity.js'
+export * from './interfaces/entities/reaction-entity.js'
+export * from './interfaces/entities/reducer-entity.js'
+export * from './interfaces/entities/ruleset-entity.js'
+export * from './interfaces/entities/skill-entity.js'
 
-  const reactionProcessors = flow.reactions.map(entity => {
-    return createReactionAdapter(entity, flow.agents)
-  })
+export * from './interfaces/action.js'
+export * from './interfaces/agent.js'
+export * from './interfaces/agent-channel.js'
+export * from './interfaces/agent-chunk.js'
+export * from './interfaces/agent-context.js'
+export * from './interfaces/agent-dispatcher.js'
+export * from './interfaces/agent-role.js'
+export * from './interfaces/agent-tool-call.js'
+export * from './interfaces/agentic-message.js'
+export * from './interfaces/cache-adapter.js'
+export * from './interfaces/cancellation-token.js'
+export * from './interfaces/dependency-container.js'
+export * from './interfaces/event.js'
+export * from './interfaces/event-generator.js'
+export * from './interfaces/event-ledger.js'
+export * from './interfaces/event-processor.js'
+export * from './interfaces/event-subscriber.js'
+export * from './interfaces/file-adapter.js'
+export * from './interfaces/helpers.js'
+export * from './interfaces/input-event-stream.js'
+export * from './interfaces/json.js'
+export * from './interfaces/logger-adapter.js'
+export * from './interfaces/multiplexer.js'
+export * from './interfaces/output-event-stream.js'
+export * from './interfaces/schema.js'
+export * from './interfaces/system-adapter.js'
+export * from './interfaces/system-process-adapter.js'
 
-  return new DuctusKernel({
-    initialState: flow.initialState,
-    reducer: flow.reducer.reducer,
-    multiplexer,
-    processors: [...processors, ...reactionProcessors],
-    ledger,
-    injector,
-  })
-}
+export * from './ledger/jsonl-ledger.js'
 
-export function createProcessorAdapter<TEvent extends BaseEvent, TState>(
-  generator: EventGenerator<TEvent, TState>,
-): EventProcessor<TEvent, TState> {
-  return {
-    process: generator,
-  }
-}
+export * from './system/canceller.js'
+export * from './system/node-file-adapter.js'
+export * from './system/node-process-adapter.js'
+export * from './system/node-system-adapter.js'
 
-export function createReactionAdapter<TEvent extends BaseEvent, TState>(
-  reaction: ReactionEntity<TEvent>,
-  agents: Array<{ agent: AgentEntity; model: ModelEntity }>,
-): EventProcessor<TEvent, TState> {
-  return createProcessorAdapter(async function* (events, getState) {
-    for await (const event of events) {
-      if (!reaction.events.includes(event.type)) continue
+export * from './utils/crypto-utils.js'
+export * from './utils/guards.js'
+export * from './utils/object.utils.js'
+export * from './utils/schema-utils.js'
 
-      for (const action of reaction.reactions) {
-        switch (action.type) {
-          case 'emit':
-            yield action.payload
-            break
-
-          case 'invoke':
-            // handle LLM request
-            break
-        }
-      }
-    }
-  })
-}
+export * from './factories.js'

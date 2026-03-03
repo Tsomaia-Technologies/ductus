@@ -11,9 +11,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "ductus": ["src/index.ts"]
+    }
   },
   "isolatedModules": true,
-  "include": ["src/**/*", "v2/**/*"],
+  "include": ["src/**/*", "sample/**/*"],
   "exclude": ["node_modules", "dist"]
 }
