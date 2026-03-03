@@ -64,7 +64,7 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     }
   }
 
-  async write(input: string): Promise<void> {
+  async write(input: string, options?: { end?: boolean }): Promise<void> {
     if (this.isTerminationRequested || this.isTerminated) {
       throw new Error('Cannot write to terminated process')
     }
@@ -82,13 +82,19 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     this.isWritePending = true
 
     await new Promise<void>((resolve, reject) => {
-      process.stdin!.write(input, (error) => {
+      const cb = (error?: Error | null) => {
         this.isWritePending = false
         if (error) reject(error)
-        else {
+        else if (options?.end) {
+          process.stdin!.end((error: unknown) => {
+            if (error) reject(error)
+            else resolve()
+          })
+        } else {
           resolve()
         }
-      })
+      }
+      process.stdin!.write(input, cb)
     })
   }
 

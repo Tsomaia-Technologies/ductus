@@ -2,6 +2,7 @@ import {
     TransportEntity,
     TransportProcessOptions,
 } from '../interfaces/entities/transport-entity.js'
+import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { ModelEntity } from '../interfaces/entities/model-entity.js'
 import { AgentContext } from '../interfaces/agent-context.js'
 import { NodeSystemAdapter } from '../system/node-system-adapter.js'
@@ -16,17 +17,25 @@ export interface CliTransportConfig {
 }
 
 export class CliTransport implements TransportEntity {
+    private agent: AgentEntity | null = null
+    private model: ModelEntity | null = null
+    private context: AgentContext | undefined
     private processAdapter: SystemProcessAdapter | null = null
 
     constructor(private readonly config: CliTransportConfig) {}
 
     async initialize(
+        _agent: AgentEntity,
         _model: ModelEntity,
         _context?: AgentContext,
     ): Promise<void> {
         if (this.processAdapter) {
             throw new Error('Transport already initialized.')
         }
+
+        this.agent = _agent
+        this.model = _model
+        this.context = _context
 
         const { command, args, cwd, env, timeoutMs } = this.config
 

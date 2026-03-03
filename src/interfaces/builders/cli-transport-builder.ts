@@ -9,4 +9,8 @@ export interface CliTransportBuilder extends Buildable<TransportEntity> {
   timeoutMs(timeoutMs: number): this
   command(command: string): this
   args(...args: string[]): this
+
+  scope(type: 'feature'): this
+  scope(type: 'task' | 'turn', amount: number): this
+  ephemeral(): this
 }

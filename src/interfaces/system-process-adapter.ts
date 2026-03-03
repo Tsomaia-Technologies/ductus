@@ -1,7 +1,7 @@
 export interface SystemProcessAdapter {
   readStream(): AsyncIterable<SystemProcessEvent>
 
-  write(input: string): Promise<void>
+  write(input: string, options?: { end?: boolean }): Promise<void>
 
   /**
    * Lets the process finalize its current work and shutdown, using SIGTERM.
