@@ -3,6 +3,9 @@ import { ModelEntity } from '../interfaces/entities/model-entity.js'
 import { AdapterEntity, AgentAdapter } from '../interfaces/entities/adapter-entity.js'
 import { AgentChunk } from '../interfaces/agent-chunk.js'
 import { SkillEntity } from '../interfaces/entities/skill-entity.js'
+import { AgentContext } from '../interfaces/agent-context.js'
+import { AgenticMessage, UserMessage, AssistantMessage } from '../interfaces/agentic-message.js'
+import { DEFAULT_SUMMARIZATION_PROMPT } from '../system/system-prompts.js'
 
 export interface AgentTuple {
     agent: AgentEntity
@@ -10,12 +13,25 @@ export interface AgentTuple {
     adapter: AdapterEntity
 }
 
+/**
+ * Render function signature matching Moxite's render().
+ * Injected as a dependency — decouples Ductus from Moxite import.
+ */
+export type TemplateRenderer = (template: string, context: Record<string, any>) => string
+
 interface AgentLifecycleState {
     tokensUsed: number
     failures: number
     hallucinations: number
     turns: number
     adapter: AgentAdapter
+    messages: AgenticMessage[]
+}
+
+export interface AgentDispatcherOptions {
+    agents: AgentTuple[]
+    templateRenderer?: TemplateRenderer
+    summarizationPrompt?: string
 }
 
 /**
@@ -28,11 +44,15 @@ interface AgentLifecycleState {
 export class AgentDispatcher {
     private readonly agents: Map<string, AgentTuple> = new Map()
     private readonly lifecycle: Map<string, AgentLifecycleState> = new Map()
+    private readonly templateRenderer?: TemplateRenderer
+    private readonly summarizationPrompt: string
 
-    constructor(agentTuples: AgentTuple[]) {
-        for (const tuple of agentTuples) {
+    constructor(options: AgentDispatcherOptions) {
+        for (const tuple of options.agents) {
             this.agents.set(tuple.agent.name, tuple)
         }
+        this.templateRenderer = options.templateRenderer
+        this.summarizationPrompt = options.summarizationPrompt ?? DEFAULT_SUMMARIZATION_PROMPT
     }
 
     /**
@@ -58,10 +78,15 @@ export class AgentDispatcher {
         // Validate input against skill schema
         const validatedInput = skill.input.schema.parse(input)
 
-        // Render prompt — if skill has a template payload, use it; otherwise JSON-stringify the input
-        const prompt = skill.input.payload
-            ? skill.input.payload // TODO: integrate Moxite renderer here
-            : JSON.stringify(validatedInput)
+        // Render prompt
+        const prompt = this.renderPrompt(skill, validatedInput)
+
+        // Track user message
+        state.messages.push({
+            role: 'user',
+            content: prompt,
+            timestamp: Date.now(),
+        } satisfies UserMessage)
 
         // Call the adapter
         state.turns++
@@ -70,7 +95,6 @@ export class AgentDispatcher {
         for await (const chunk of state.adapter.process(prompt)) {
             yield chunk
 
-            // Track metrics from chunks
             switch (chunk.type) {
                 case 'text':
                     accumulatedText += chunk.content
@@ -83,6 +107,14 @@ export class AgentDispatcher {
                     break
             }
         }
+
+        // Track assistant message
+        state.messages.push({
+            role: 'assistant',
+            content: accumulatedText,
+            agentId: agentName,
+            timestamp: Date.now(),
+        } satisfies AssistantMessage)
     }
 
     /**
@@ -117,6 +149,17 @@ export class AgentDispatcher {
         this.lifecycle.clear()
     }
 
+    private renderPrompt(skill: SkillEntity, validatedInput: unknown): string {
+        if (skill.input.payload && this.templateRenderer) {
+            const context = typeof validatedInput === 'object' && validatedInput !== null
+                ? validatedInput as Record<string, any>
+                : { input: validatedInput }
+            return this.templateRenderer(skill.input.payload, context)
+        }
+
+        return JSON.stringify(validatedInput)
+    }
+
     private async getOrCreateLifecycleState(agentName: string): Promise<AgentLifecycleState> {
         let state = this.lifecycle.get(agentName)
         if (!state) {
@@ -130,6 +173,7 @@ export class AgentDispatcher {
                 hallucinations: 0,
                 turns: 0,
                 adapter,
+                messages: [],
             }
             this.lifecycle.set(agentName, state)
         }
@@ -171,17 +215,76 @@ export class AgentDispatcher {
 
     private async replaceAdapter(agentName: string, policy: ContextOverflowPolicy): Promise<void> {
         const oldState = this.lifecycle.get(agentName)
+        const tuple = this.agents.get(agentName)!
+        let initialContext: AgentContext | undefined
+
+        switch (policy) {
+            case 'summarize': {
+                if (oldState && oldState.messages.length > 0) {
+                    // Ask the existing adapter to summarize before we terminate it
+                    let summary = ''
+                    for await (const chunk of oldState.adapter.process(this.summarizationPrompt)) {
+                        if (chunk.type === 'text') {
+                            summary += chunk.content
+                        }
+                    }
+
+                    initialContext = {
+                        messages: [{
+                            role: 'system' as const,
+                            content: `Previous conversation summary:\n${summary}`,
+                            timestamp: Date.now(),
+                        }],
+                        stats: {
+                            inputTokens: 0,
+                            outputTokens: 0,
+                            turns: 0,
+                        },
+                    }
+                }
+                break
+            }
+
+            case 'truncate': {
+                if (oldState && oldState.messages.length > 0) {
+                    // Estimate tokens: ~4 chars per token, keep last messages within half the budget
+                    const budget = tuple.agent.maxContextTokens?.value ?? Infinity
+                    const charBudget = (budget / 2) * 4
+                    let charCount = 0
+                    const truncated: AgenticMessage[] = []
+
+                    for (let i = oldState.messages.length - 1; i >= 0; i--) {
+                        const msg = oldState.messages[i]
+                        charCount += msg.content.length
+                        if (charCount > charBudget) break
+                        truncated.unshift(msg)
+                    }
+
+                    initialContext = {
+                        messages: truncated,
+                        stats: {
+                            inputTokens: 0,
+                            outputTokens: 0,
+                            turns: 0,
+                        },
+                    }
+                }
+                break
+            }
+
+            case 'fresh':
+                // No context carried over
+                break
+        }
+
+        // Terminate old adapter
         if (oldState) {
             await oldState.adapter.terminate()
         }
 
-        const tuple = this.agents.get(agentName)!
+        // Create fresh adapter
         const newAdapter = tuple.adapter.create(tuple.agent, tuple.model)
-
-        // TODO: for 'summarize' policy, call old adapter with summarization prompt before terminating
-        // TODO: for 'truncate' policy, pass truncated context to new adapter's initialize()
-
-        await newAdapter.initialize()
+        await newAdapter.initialize(initialContext)
 
         this.lifecycle.set(agentName, {
             tokensUsed: 0,
@@ -189,11 +292,11 @@ export class AgentDispatcher {
             hallucinations: 0,
             turns: 0,
             adapter: newAdapter,
+            messages: initialContext?.messages ? [...initialContext.messages] : [],
         })
     }
 
     private parseStructuredOutput(rawText: string, skill: SkillEntity): unknown {
-        // Extract JSON from the raw text response
         const jsonMatch = rawText.match(/[\[{][\s\S]*[\]}]/)
         if (!jsonMatch) {
             throw new Error(`Failed to extract JSON from agent response for skill '${skill.name}'.`)

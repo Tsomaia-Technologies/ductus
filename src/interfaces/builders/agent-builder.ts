@@ -3,6 +3,15 @@ import { Buildable } from './__internal__.js'
 import { AgentEntity } from '../entities/agent-entity.js'
 import { RulesetBuilder } from './ruleset-builder.js'
 
+/**
+ * Reference tuple for use in reaction builder .invoke() calls.
+ * Produced by AgentBuilder.skills proxy at builder-time.
+ */
+export interface SkillRef {
+  agent: string
+  skill: string
+}
+
 export interface AgentBuilder extends Buildable<AgentEntity> {
   name(name: string): this
   role(role: string): this
@@ -10,6 +19,12 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
   skill(skill: SkillBuilder): this
   rule(rule: string): this
   ruleset(ruleset: RulesetBuilder): this
+
+  /**
+   * Returns a proxy that produces SkillRef tuples.
+   * Usage: EngineerAgent.skills.implement → { agent: 'engineer', skill: 'implement' }
+   */
+  readonly skills: Record<string, SkillRef>
 
   /**
    * Agent leaves for the duration of feature, unless reaches any of the hard limitations (see below).

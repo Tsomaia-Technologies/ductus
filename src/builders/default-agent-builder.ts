@@ -1,5 +1,5 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
-import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
+import { AgentBuilder, SkillRef } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
 import { AgentEntity, AgentScope, ContextOverflowPolicy } from '../interfaces/entities/agent-entity.js'
 import { RulesetBuilder } from '../interfaces/builders/ruleset-builder.js'
@@ -16,6 +16,23 @@ export class DefaultAgentBuilder implements AgentBuilder {
     private _maxFailures?: number
     private _maxRecognizedHallucinations?: number
     private _timeout?: number
+    private _skillsProxy?: Record<string, SkillRef>
+
+    get skills(): Record<string, SkillRef> {
+        if (!this._name) {
+            throw new Error('Cannot access skills before setting agent name.')
+        }
+
+        if (!this._skillsProxy) {
+            const agentName = this._name
+            this._skillsProxy = new Proxy({} as Record<string, SkillRef>, {
+                get(_target, prop: string): SkillRef {
+                    return { agent: agentName, skill: prop }
+                },
+            })
+        }
+        return this._skillsProxy
+    }
 
     name(name: string): this {
         this._name = name
