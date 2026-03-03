@@ -1,3 +1,5 @@
+export * from './adapters/cli-agent-adapter.js'
+
 export * from './builders/default-agent-builder.js'
 export * from './builders/default-cli-adapter-builder.js'
 export * from './builders/default-event-builder.js'
@@ -9,6 +11,7 @@ export * from './builders/default-reducer-builder.js'
 export * from './builders/default-ruleset-builder.js'
 export * from './builders/default-skill-builder.js'
 
+export * from './core/agent-dispatcher.js'
 export * from './core/buffered-subscriber.js'
 export * from './core/dependency-container.js'
 export * from './core/ductus-kernel.js'
@@ -45,7 +48,7 @@ export * from './interfaces/agent.js'
 export * from './interfaces/agent-channel.js'
 export * from './interfaces/agent-chunk.js'
 export * from './interfaces/agent-context.js'
-export * from './interfaces/agent-dispatcher.js'
+// agent-dispatcher.ts is deprecated — use core/agent-dispatcher.ts instead
 export * from './interfaces/agent-role.js'
 export * from './interfaces/agent-tool-call.js'
 export * from './interfaces/agentic-message.js'

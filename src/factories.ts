@@ -12,15 +12,13 @@ import { FlowEntity } from './interfaces/entities/flow-entity.js'
 import { Multiplexer } from './interfaces/multiplexer.js'
 import { EventLedger } from './interfaces/event-ledger.js'
 import { EventProcessor } from './interfaces/event-processor.js'
-import { ReactionEntity } from './interfaces/entities/reaction-entity.js'
-import { AgentEntity } from './interfaces/entities/agent-entity.js'
-import { ModelEntity } from './interfaces/entities/model-entity.js'
-import { AdapterEntity } from './interfaces/entities/adapter-entity.js'
+import { ReactionEntity, PipelineStep } from './interfaces/entities/reaction-entity.js'
 import { BaseEvent, CommittedEvent } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { DependencyContainer } from './interfaces/dependency-container.js'
 import { DefaultRulesetBuilder } from './builders/default-ruleset-builder.js'
 import { CancellationToken } from './interfaces/cancellation-token.js'
+import { AgentDispatcher } from './core/agent-dispatcher.js'
 
 export function createDuctus<TEvent extends BaseEvent, TState>() {
   return {
@@ -51,15 +49,17 @@ export function createKernel<TEvent extends BaseEvent, TState>(
 ) {
   const { flow, multiplexer, ledger, injector, canceller } = options
 
+  const dispatcher = new AgentDispatcher(flow.agents)
+
   const processors = flow.processors.map(entity => {
     return createProcessorAdapter(entity.processor)
   })
 
   const reactionProcessors = flow.reactions.map(entity => {
-    return createReactionAdapter(entity, flow.agents)
+    return createReactionAdapter(entity, dispatcher)
   })
 
-  return new DuctusKernel({
+  const kernel = new DuctusKernel({
     initialState: flow.initialState,
     reducer: flow.reducer.reducer,
     multiplexer,
@@ -68,6 +68,8 @@ export function createKernel<TEvent extends BaseEvent, TState>(
     injector,
     canceller,
   })
+
+  return { kernel, dispatcher }
 }
 
 export function createProcessorAdapter<TEvent extends BaseEvent, TState>(
@@ -80,27 +82,46 @@ export function createProcessorAdapter<TEvent extends BaseEvent, TState>(
 
 export function createReactionAdapter<TEvent extends BaseEvent, TState>(
   reaction: ReactionEntity<TEvent>,
-  agents: Array<{ agent: AgentEntity; model: ModelEntity; adapter: AdapterEntity }>,
+  dispatcher: AgentDispatcher,
 ): EventProcessor<TEvent, TState> {
   return createProcessorAdapter(async function* (events, getState) {
     for await (const event of events) {
       if (!reaction.triggers.includes(event.type)) continue
 
-      for (const step of reaction.pipeline) {
-        switch (step.type) {
-          case 'emit':
-            yield step.event
-            break
-
-          case 'invoke':
-            // TODO: Wire through AgentDispatcher — call adapter.process() via dispatcher
-            break
-
-          case 'case':
-            // TODO: Match schema against last invoke output, execute nested pipeline
-            break
-        }
-      }
+      yield* executePipeline<TEvent>(reaction.pipeline, event.payload, dispatcher)
     }
   })
+}
+
+async function* executePipeline<TEvent extends BaseEvent>(
+  steps: PipelineStep<TEvent>[],
+  input: unknown,
+  dispatcher: AgentDispatcher,
+): AsyncIterable<TEvent> {
+  let lastInvokeResult: unknown = input
+
+  for (const step of steps) {
+    switch (step.type) {
+      case 'emit':
+        yield step.event
+        break
+
+      case 'invoke':
+        lastInvokeResult = await dispatcher.invokeAndParse(
+          step.agent,
+          step.skill,
+          lastInvokeResult,
+        )
+        break
+
+      case 'case':
+        try {
+          const matched = step.schema.parse(lastInvokeResult)
+          yield* executePipeline<TEvent>(step.then, matched, dispatcher)
+        } catch {
+          // Schema didn't match — skip this case branch
+        }
+        break
+    }
+  }
 }

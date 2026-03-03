@@ -1,8 +1,9 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { CliAdapterBuilder } from '../interfaces/builders/cli-adapter-builder.js'
-import { AdapterEntity, AgentAdapter } from '../interfaces/entities/adapter-entity.js'
+import { AdapterEntity } from '../interfaces/entities/adapter-entity.js'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { ModelEntity } from '../interfaces/entities/model-entity.js'
+import { CliAgentAdapter } from '../adapters/cli-agent-adapter.js'
 
 export class DefaultCliAdapterBuilder implements CliAdapterBuilder {
     private _apiKey?: string
@@ -70,14 +71,8 @@ export class DefaultCliAdapterBuilder implements CliAdapterBuilder {
         }
 
         return {
-            create(_agent: AgentEntity, _model: ModelEntity): AgentAdapter {
-                // Adapter runtime to be implemented — currently returns a stub.
-                // The factory closure captures `config` for use when constructing the real adapter.
-                return {
-                    async initialize() { },
-                    async *process(_input: string) { },
-                    async terminate() { },
-                }
+            create(_agent: AgentEntity, _model: ModelEntity) {
+                return new CliAgentAdapter(config)
             },
         }
     }
