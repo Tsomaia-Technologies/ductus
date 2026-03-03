@@ -1,0 +1,150 @@
+# Ductus — Open Issues & Remediation Tracker
+
+## Critical
+
+### 1. Reducer Event Matching is Broken
+**File:** [default-reducer-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/default-reducer-builder.ts#L36-L38)
+
+Uses reference equality + `as any` fallback on `.name`. Should match on `event.type` string only.
+
+```diff
+-if (handler.event === event || (handler.event as any).name === (event as any).name)
++if (handler.event.type === event.type)
+```
+
+---
+
+### 2. Agent Execution Not Wired
+**Files:** [factories.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/factories.ts), [flow-entity.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/entities/flow-entity.ts)
+
+`FlowEntity.agents` populated by builder but never consumed by `createKernel`. `invoke` action in `createReactionAdapter` is a stub.
+
+> [!IMPORTANT]
+> Partially resolved by adapter + reaction pipeline design (see #7). Still needs: wiring in `createReactionAdapter` to instantiate adapters and execute skills on `invoke` actions.
+
+---
+
+### 3. Agent Builder Missing Entity Fields ✅ Designed
+**Files:** [agent-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/builders/agent-builder.ts), [default-agent-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/default-agent-builder.ts), [agent-entity.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/entities/agent-entity.ts)
+
+**Agreed design:**
+- Add `scope`, `maxContextTokens`, `maxFailures`, `maxRecognizedHallucinations`, `timeout` fields to `AgentEntity`
+- Store them in `DefaultAgentBuilder`, serialize in `[BUILD]()`
+- **Lifecycle enforcement via AgentDispatcher** (modernized concept):
+  - Created by `createKernel` from flow's `{ agent, model, adapter }[]` tuples
+  - Owns adapter registry (agent name → live adapter instance)
+  - Exposes: `invoke(agentName, skillName, input): AsyncIterable<AgentChunk>`
+  - Internally tracks per-agent ephemeral state: tokens, failures, hallucinations, turns
+  - Enforces limits — handles replacement per overflow policy (summarize/truncate/fresh)
+  - Directly injected into reaction adapter factory (not via DI — framework internal)
+  - **Ephemeral state by design** — lifecycle counters reset on restart, same as UI state. Domain events are persisted via ledger; operational agent state is not.
+
+---
+
+### 4. EventLedger Has No Write Path ✅ Designed
+**Files:** [event-ledger.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/event-ledger.ts), [ductus-multiplexer.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/core/ductus-multiplexer.ts)
+
+**Agreed design:**
+- Add `appendEvent(event: CommittedEvent<TEvent>): Promise<void>` to `EventLedger` interface
+- Inject ledger into `DuctusMultiplexer` as **optional** dependency (constructor param)
+- Persist in `broadcast()`, after `commitEvent()`, before `invokeBridges()` — write-ahead pattern
+- If no ledger provided → purely in-memory (useful for testing / ephemeral flows)
+- `Multiplexer` interface updated to accept optional ledger
+
+---
+
+### 5. No Graceful Shutdown in Kernel ✅ Designed
+**File:** [ductus-kernel.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/core/ductus-kernel.ts#L97-L109)
+
+**Agreed design:**
+
+- **Chained cancellers**: kernel owns an internal `CancellationToken`. Optional external canceller in `KernelOptions` — internal listens to external, either can trigger shutdown.
+- **`shutdown(options?: { force?: boolean }): Promise<void>`** — cancels internal token, returns promise that resolves when all loops exit.
+- **Drain vs Force**:
+  - **Drain** (`force: false`): subscribers emit already-buffered events, processors finish processing them, then exit.
+  - **Force** (`force: true`): subscribers discard buffers, processors exit immediately.
+- **Cascade cutoff**: on *any* shutdown (drain or force), `mountCascadingEvents()` stops immediately. No new cascading events rebroadcast. Reducer still updates state synchronously on committed events, but downstream propagation is silenced.
+- **Subscriber tracking**: `mountProcessor()` stashes subscriber references in `this.subscribers[]` so `shutdown()` can call `unsubscribe()` on all.
+- **`onCommit` cleanup**: deregister the reducer's commit listener on shutdown.
+- **`monitor()` resolves** cleanly on shutdown (not reject — shutdown is expected lifecycle).
+
+---
+
+## Medium
+
+### 6. Reaction System Redesign
+**File:** [default-reaction-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/default-reaction-builder.ts)
+
+Current `ReactionEntity` is a flat `{ events, reactions }`. Needs full redesign:
+
+**Agreed design:**
+- `ReactionEntity` becomes a **pipeline**: `triggers → steps (invoke/case/emit)`
+- `.invoke()` uses a **cursor builder** — enters invoke-scoped context with `.case()`, escape methods to return to main builder
+- `.case(schema, action)` is its own action type for **conditional output branching**
+- `.emit()` and `.invoke()` on the current builder are dead code — will be replaced by pipeline model
+- `agent.skills.x` produces a **reference tuple** `{ agent, skill }` at builder time
+
+```ts
+type PipelineStep<TEvent> =
+  | { type: 'invoke', agent: string, skill: string }
+  | { type: 'case', schema: Schema, then: PipelineStep<TEvent>[] }
+  | { type: 'emit', event: TEvent }
+
+interface ReactionEntity<TEvent> {
+  triggers: string[]
+  pipeline: PipelineStep<TEvent>[]
+}
+```
+
+---
+
+### 7. ~~Transport~~ → Adapter Redesign ✅ Designed
+**Files:** [cli-transport-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/builders/cli-transport-builder.ts), [transport-entity.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/entities/transport-entity.ts)
+
+**Agreed design:**
+- Rename transport → **adapter**
+- `AdapterEntity` holds a **factory closure**: `create(agent, model) → AgentAdapter`
+- `AgentAdapter` is the runtime interface: `initialize()`, `process()`, `terminate()`
+- Builder collects config declaratively; `[BUILD]()` captures config in closure
+- Adapter is **3rd param** on `flow.agent(agent, model, adapter)`
+- `scope()` / `ephemeral()` **removed** from adapter — agent-only concerns
+- Existing transport interfaces/implementations marked **outdated**
+
+```ts
+interface AdapterEntity {
+  create(agent: AgentEntity, model: ModelEntity): AgentAdapter
+}
+
+interface AgentAdapter {
+  initialize(context?: AgentContext): Promise<void>
+  process(input: string): AsyncIterable<AgentChunk>
+  terminate(): Promise<void>
+}
+```
+
+---
+
+### 8. Outdated Agent Interfaces
+**Files:** `src/interfaces/agent.ts`, `agent-dispatcher.ts`, `agent-channel.ts`, `agent-role.ts`, `agent-chunk.ts`, `agent-context.ts`
+
+Superseded by builder/entity model. Mark deprecated or remove.
+
+> [!WARNING]
+> `AgentRole` imports `zod/v3` — only Zod dependency in the interfaces layer.
+
+---
+
+## Low
+
+### 9. `LinkedList.clear()` Bug
+**File:** [linked-list.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/core/linked-list.ts#L78-L83)
+
+- `this.last.next = null` should be `this.last.previous = null`
+- `this.length` not reset to `0`
+
+---
+
+### 10. Barrel Export Leaks Sample Types
+**File:** [index.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/index.ts#L18)
+
+`export * from '../sample/types.js'` — remove from framework public API.

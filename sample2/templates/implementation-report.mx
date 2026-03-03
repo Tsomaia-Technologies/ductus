@@ -1,0 +1,6 @@
+I implemented {{ summary }}
+Here is the inventory of changes:
+
+@for (file of inventory)
+    {{ file }}
+@endfor
