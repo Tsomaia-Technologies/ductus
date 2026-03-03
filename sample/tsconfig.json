@@ -4,16 +4,19 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "../",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "ductus": ["src/index.ts"]
+    }
   },
   "isolatedModules": true,
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "sample/**/*"],
   "exclude": ["node_modules", "dist"]
 }
