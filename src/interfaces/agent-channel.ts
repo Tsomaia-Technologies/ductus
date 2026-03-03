@@ -7,6 +7,10 @@ export interface AgentChannelProcessOptions {
   canceller?: CancellationToken
 }
 
+/**
+ * @deprecated Superseded by AdapterEntity + AgentAdapter pattern.
+ * Will be removed in a future version.
+ */
 export interface AgentChannel<TInput> {
   initialize(): Promise<void>
   process(

@@ -77,8 +77,9 @@ export class LinkedList<T> {
 
   clear(): void {
     if (this.first) this.first.next = null
-    if (this.last) this.last.next = null
+    if (this.last) this.last.previous = null
     this.first = null
     this.last = null
+    this.length = 0
   }
 }

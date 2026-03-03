@@ -4,6 +4,13 @@ import { freezeEvent } from '../utils/object.utils.js'
 import { getEventHash, getInitialEventHash } from '../utils/crypto-utils.js'
 import { Multiplexer } from '../interfaces/multiplexer.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
+import { EventLedger } from '../interfaces/event-ledger.js'
+
+export interface DuctusMultiplexerOptions<TEvent extends BaseEvent> {
+  initialHash?: string
+  initialSequenceNumber?: number
+  ledger?: EventLedger<TEvent>
+}
 
 export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<TEvent> {
   private lastHash = getInitialEventHash()
@@ -11,10 +18,12 @@ export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<
   private readonly bridges: BufferedSubscriber<CommittedEvent<TEvent>>[] = []
   private broadcastLock = Promise.resolve<unknown>(null)
   private commitListeners: Array<(event: CommittedEvent<TEvent>) => TEvent[] | void> = []
+  private readonly ledger?: EventLedger<TEvent>
 
-  constructor(initialHash?: string, initialSequenceNumber?: number) {
-    if (initialHash) this.lastHash = initialHash
-    if (initialSequenceNumber) this.lastSequenceNumber = initialSequenceNumber
+  constructor(options?: DuctusMultiplexerOptions<TEvent>) {
+    if (options?.initialHash) this.lastHash = options.initialHash
+    if (options?.initialSequenceNumber) this.lastSequenceNumber = options.initialSequenceNumber
+    this.ledger = options?.ledger
   }
 
   subscribe(): BufferedSubscriber<CommittedEvent<TEvent>> {
@@ -43,6 +52,9 @@ export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<
   async broadcast(event: TEvent): Promise<void> {
     return await this.lock(async () => {
       const commitedEvent = this.commitEvent(event)
+      if (this.ledger) {
+        await this.ledger.appendEvent(commitedEvent as unknown as CommittedEvent<TEvent>)
+      }
       this.commitListeners.forEach(listener => {
         listener(commitedEvent as unknown as CommittedEvent<TEvent>)
       })

@@ -45,4 +45,8 @@ export class JsonlLedger<TEvent extends BaseEvent> implements EventLedger<TEvent
       yield typedEvent
     }
   }
+
+  async appendEvent(event: CommittedEvent<TEvent>): Promise<void> {
+    await this.fileAdapter.appendLineJsonl(this.ledgerFileAbsolutePath, event as any)
+  }
 }

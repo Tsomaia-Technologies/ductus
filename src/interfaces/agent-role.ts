@@ -9,6 +9,9 @@ export type AgentType =
   | 'reviewer'
   | 'auditor'
 
+/**
+ * @deprecated Superseded by AgentBuilder roles/persona. Only Zod dependency in interfaces layer.
+ */
 export interface AgentRole<
   TType extends AgentType | unknown = unknown,
   TContext extends object | unknown = unknown,

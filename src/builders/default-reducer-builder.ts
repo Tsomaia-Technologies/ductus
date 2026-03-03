@@ -14,7 +14,7 @@ export class DefaultReducerBuilder<TEvent extends BaseEvent, TState>
 
     when(
         event: TEvent,
-        reduce: (state: TState, event: TEvent) =>[Partial<TState>, TEvent[]]
+        reduce: (state: TState, event: TEvent) => [Partial<TState>, TEvent[]]
     ): this {
         this._handlers.push({ event, reduce })
         return this
@@ -31,15 +31,15 @@ export class DefaultReducerBuilder<TEvent extends BaseEvent, TState>
         return {
             reducer: (state: TState, event: TEvent): [TState, TEvent[]] => {
                 let newState = { ...state }
+                const accumulatedEvents: TEvent[] = []
 
                 for (const handler of this._handlers) {
-                    if (handler.event === event
-                      || (handler.event as any).name === (event as any).name) {
-                        newState = { ...newState, ...handler.reduce(newState, event) }
+                    if (handler.event.type === event.type) {
+                        const [partial, eventsOut] = handler.reduce(newState, event)
+                        newState = { ...newState, ...partial }
+                        accumulatedEvents.push(...eventsOut)
                     }
                 }
-
-                const accumulatedEvents: TEvent[] = []
 
                 for (const child of combinedReducers) {
                     const [s, eventsOut] = child.reducer(newState, event)

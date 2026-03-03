@@ -7,6 +7,9 @@ export interface AgentExecutionOptions {
   abort?: CancellationToken
 }
 
+/**
+ * @deprecated Superseded by AgentBuilder + AgentEntity + AgentAdapter pattern.
+ */
 export interface Agent<TEvent extends BaseEvent> {
   initialize(context: AgentContext): Promise<void>
 

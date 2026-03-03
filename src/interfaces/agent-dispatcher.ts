@@ -9,6 +9,9 @@ export interface AgentDispatcherProcessOptions {
   canceller?: CancellationToken;
 }
 
+/**
+ * @deprecated Will be replaced by a modernized AgentDispatcher for lifecycle management.
+ */
 export interface AgentDispatcher<TEvent extends BaseEvent> {
   process<TRole extends AgentRole>(
     input: string,

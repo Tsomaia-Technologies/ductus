@@ -3,6 +3,7 @@ import { FlowBuilder } from '../interfaces/builders/flow-builder.js'
 import { ReducerBuilder } from '../interfaces/builders/reducer-builder.js'
 import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
 import { ModelBuilder } from '../interfaces/builders/model-builder.js'
+import { AdapterBuilder } from '../interfaces/builders/adapter-builder.js'
 import { ReactionBuilder } from '../interfaces/builders/reaction-builder.js'
 import { ProcessorBuilder } from '../interfaces/builders/processor-builder.js'
 import { FlowEntity } from '../interfaces/entities/flow-entity.js'
@@ -11,7 +12,7 @@ import { BaseEvent } from '../interfaces/event.js'
 export class DefaultFlowBuilder<TEvent extends BaseEvent, TState> implements FlowBuilder<TEvent, TState> {
     private _initialState?: TState
     private _reducer?: ReducerBuilder<TEvent, TState>
-    private readonly _agents: { agent: AgentBuilder; model: ModelBuilder }[] = []
+    private readonly _agents: { agent: AgentBuilder; model: ModelBuilder; adapter: AdapterBuilder }[] = []
     private readonly _reactions: ReactionBuilder<TEvent>[] = []
     private readonly _processors: ProcessorBuilder<TEvent, TState>[] = []
 
@@ -25,8 +26,8 @@ export class DefaultFlowBuilder<TEvent extends BaseEvent, TState> implements Flo
         return this
     }
 
-    agent(agent: AgentBuilder, model: ModelBuilder): this {
-        this._agents.push({ agent, model })
+    agent(agent: AgentBuilder, model: ModelBuilder, adapter: AdapterBuilder): this {
+        this._agents.push({ agent, model, adapter })
         return this
     }
 
@@ -50,6 +51,7 @@ export class DefaultFlowBuilder<TEvent extends BaseEvent, TState> implements Flo
             agents: this._agents.map((a) => ({
                 agent: a.agent[BUILD](),
                 model: a.model[BUILD](),
+                adapter: a.adapter[BUILD](),
             })),
             reactions: this._reactions.map((r) => r[BUILD]()),
             processors: this._processors.map((p) => p[BUILD]()),

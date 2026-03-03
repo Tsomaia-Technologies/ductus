@@ -7,6 +7,7 @@ import { DefaultReactionBuilder } from './builders/default-reaction-builder.js'
 import { DefaultReducerBuilder } from './builders/default-reducer-builder.js'
 import { DefaultFlowBuilder } from './builders/default-flow-builder.js'
 import { DefaultModelBuilder } from './builders/default-model-builder.js'
+import { DefaultCliAdapterBuilder } from './builders/default-cli-adapter-builder.js'
 import { FlowEntity } from './interfaces/entities/flow-entity.js'
 import { Multiplexer } from './interfaces/multiplexer.js'
 import { EventLedger } from './interfaces/event-ledger.js'
@@ -14,11 +15,12 @@ import { EventProcessor } from './interfaces/event-processor.js'
 import { ReactionEntity } from './interfaces/entities/reaction-entity.js'
 import { AgentEntity } from './interfaces/entities/agent-entity.js'
 import { ModelEntity } from './interfaces/entities/model-entity.js'
+import { AdapterEntity } from './interfaces/entities/adapter-entity.js'
 import { BaseEvent, CommittedEvent } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { DependencyContainer } from './interfaces/dependency-container.js'
 import { DefaultRulesetBuilder } from './builders/default-ruleset-builder.js'
-import { DefaultCliTransportBuilder } from './builders/default-cli-transport-builder.js'
+import { CancellationToken } from './interfaces/cancellation-token.js'
 
 export function createDuctus<TEvent extends BaseEvent, TState>() {
   return {
@@ -32,7 +34,7 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
     skill: (name: string) => new DefaultSkillBuilder().name(name),
     processor: (generator: EventGenerator<TEvent, TState>) =>
       new DefaultProcessorBuilder<TEvent, TState>().processor(generator),
-    transport: (type: 'cli') => new DefaultCliTransportBuilder(),
+    adapter: (type: 'cli') => new DefaultCliAdapterBuilder(),
   }
 }
 
@@ -41,12 +43,13 @@ export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
   multiplexer: Multiplexer<TEvent>
   ledger: EventLedger<CommittedEvent<TEvent>>
   injector: DependencyContainer
+  canceller?: CancellationToken
 }
 
 export function createKernel<TEvent extends BaseEvent, TState>(
   options: CreateKernelOptions<TEvent, TState>,
 ) {
-  const { flow, multiplexer, ledger, injector } = options
+  const { flow, multiplexer, ledger, injector, canceller } = options
 
   const processors = flow.processors.map(entity => {
     return createProcessorAdapter(entity.processor)
@@ -63,6 +66,7 @@ export function createKernel<TEvent extends BaseEvent, TState>(
     processors: [...processors, ...reactionProcessors],
     ledger,
     injector,
+    canceller,
   })
 }
 
@@ -76,20 +80,24 @@ export function createProcessorAdapter<TEvent extends BaseEvent, TState>(
 
 export function createReactionAdapter<TEvent extends BaseEvent, TState>(
   reaction: ReactionEntity<TEvent>,
-  agents: Array<{ agent: AgentEntity; model: ModelEntity }>,
+  agents: Array<{ agent: AgentEntity; model: ModelEntity; adapter: AdapterEntity }>,
 ): EventProcessor<TEvent, TState> {
   return createProcessorAdapter(async function* (events, getState) {
     for await (const event of events) {
-      if (!reaction.events.includes(event.type)) continue
+      if (!reaction.triggers.includes(event.type)) continue
 
-      for (const action of reaction.reactions) {
-        switch (action.type) {
+      for (const step of reaction.pipeline) {
+        switch (step.type) {
           case 'emit':
-            yield action.payload
+            yield step.event
             break
 
           case 'invoke':
-            // handle LLM request
+            // TODO: Wire through AgentDispatcher — call adapter.process() via dispatcher
+            break
+
+          case 'case':
+            // TODO: Match schema against last invoke output, execute nested pipeline
             break
         }
       }

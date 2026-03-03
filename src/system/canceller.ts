@@ -20,7 +20,8 @@ export class Canceller implements CancellationToken {
     return this.cancelled
   }
 
-  cancel({ force }: { force?: boolean }): void {
+  cancel({ force }: { force?: boolean } = {}): void {
+    this.cancelled = true
     this.cancellationListeners.forEach(listener => {
       listener(force ?? this.forceByDefault)
     })
