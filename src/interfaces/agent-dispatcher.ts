@@ -1,20 +1,20 @@
 import type { AgentContext } from "./agent-context.js";
-import type { AgentRole } from "./agent-role.js";
-import type { AgentStreamEvent } from "./agent-stream-event.js";
+import type { AgentRole, AgentType } from './agent-role.js'
+import { CancellationToken } from './cancellation-token.js'
+import { OutputEventStream } from './output-event-stream.js'
+import { BaseEvent } from './event.js'
 
 export interface AgentDispatcherProcessOptions {
-  signal?: AbortSignal;
-  maxTokens: number;
-  maxRetries?: number;
+  context?: AgentContext | undefined
+  canceller?: CancellationToken;
 }
 
-export interface AgentDispatcher {
-  process<TOutput>(
+export interface AgentDispatcher<TEvent extends BaseEvent> {
+  process<TRole extends AgentRole>(
     input: string,
-    role: AgentRole<TOutput>,
-    context: AgentContext | undefined,
+    role: TRole,
     options: AgentDispatcherProcessOptions
-  ): AsyncIterableIterator<AgentStreamEvent<TOutput>>;
+  ): OutputEventStream<TEvent>;
 
-  terminate(role: AgentRole<unknown>): void;
+  terminate(type: AgentType): void;
 }

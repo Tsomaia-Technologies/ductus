@@ -3,11 +3,11 @@
  * Task 016-development-processor.
  */
 
-import { DevelopmentProcessor } from "../../src/processors/development-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { DuctusConfig } from "../../src/core/ductus-config-schema.js";
-import type { EventQueue } from "../../src/interfaces/event-queue.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
+import { DevelopmentProcessor } from "../../research/processors/development-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { DuctusConfig } from "../../research/core/ductus-config-schema.js";
+import type { EventQueue } from "../../research/interfaces/event-queue.js";
+import type { InputEventStream } from "../../research/interfaces/input-event-stream.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
@@ -19,7 +19,7 @@ async function flushStream<T>(stream: AsyncIterable<T>): Promise<void> {
   }
 }
 
-import type { BaseEvent } from "../../src/interfaces/event.js";
+import type { BaseEvent } from "../../research/interfaces/event.js";
 
 async function runMockToolResponder(
   outStream: AsyncIterable<BaseEvent>,

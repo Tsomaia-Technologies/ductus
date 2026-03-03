@@ -3,8 +3,8 @@
  * Task 018-quality-processor (Auditor role).
  */
 
-import { AuditorAgent } from "../../src/agents/auditor-agent.js";
-import { AgentParseError } from "../../src/agents/agent-parse-error.js";
+import { AuditorAgent } from "../../research/agents/auditor-agent.js";
+import { AgentParseError } from "../../research/agents/agent-parse-error.js";
 
 describe("AuditorAgent", () => {
   const agent = new AuditorAgent();

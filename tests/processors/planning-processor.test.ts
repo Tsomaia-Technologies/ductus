@@ -3,10 +3,10 @@
  * Task 017-planning-processor.
  */
 
-import { PlanningProcessor } from "../../src/processors/planning-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
-import type { EventQueue } from "../../src/interfaces/event-queue.js";
+import { PlanningProcessor } from "../../research/processors/planning-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { InputEventStream } from "../../research/interfaces/input-event-stream.js";
+import type { EventQueue } from "../../research/interfaces/event-queue.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";

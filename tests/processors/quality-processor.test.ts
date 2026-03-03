@@ -3,10 +3,10 @@
  * Task 018-quality-processor.
  */
 
-import { QualityProcessor } from "../../src/processors/quality-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { DuctusConfig } from "../../src/core/ductus-config-schema.js";
-import type { InputEventStream } from "../../src/interfaces/event-processor.js";
+import { QualityProcessor } from "../../research/processors/quality-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { DuctusConfig } from "../../research/core/ductus-config-schema.js";
+import type { InputEventStream } from "../../research/interfaces/event-processor.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
@@ -19,9 +19,9 @@ async function flushStream<T>(stream: AsyncIterable<T>): Promise<void> {
 }
 
 async function runMockToolResponder(
-  outStream: AsyncIterable<import("../../src/interfaces/event.js").BaseEvent>,
+  outStream: AsyncIterable<import("../../research/interfaces/event.js").BaseEvent>,
   queue: AsyncEventQueue,
-  yieldedOut: import("../../src/interfaces/event.js").BaseEvent[],
+  yieldedOut: import("../../research/interfaces/event.js").BaseEvent[],
   toolStdout: string,
   checkExitCode = 0
 ) {

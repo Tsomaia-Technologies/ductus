@@ -3,10 +3,10 @@
  * Task 010-tool-processor.
  */
 
-import { ToolProcessor } from "../../src/processors/tool-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { OSAdapter } from "../../src/interfaces/adapters.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
+import { ToolProcessor } from "../../research/processors/tool-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { OSAdapter } from "../../research/interfaces/adapters.js";
+import type { InputEventStream } from "../../research/interfaces/input-event-stream.js";
 
 async function flushStream<T>(stream: AsyncIterable<T>): Promise<void> {
   for await (const _ of stream) {

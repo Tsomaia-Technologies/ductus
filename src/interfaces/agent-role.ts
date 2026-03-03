@@ -1,12 +1,21 @@
-/**
- * AgentRole - pure, stateless contract for Agent personas.
- * Defines persona, allowed tools, and output parsing. No I/O.
- * RFC-001 Task 013-agent-role-contracts, Rev 06 Section 3.1.
- */
+import { ZodSchema } from 'zod/v3'
 
-export interface AgentRole<TOutput = unknown> {
-  readonly name: string;
-  readonly systemPrompt: string;
-  readonly allowedTools: readonly string[];
-  parse(response: string): TOutput;
+export type AgentType =
+  | 'plan-creator'
+  | 'plan-auditor'
+  | 'task-creator'
+  | 'task-auditor'
+  | 'engineer'
+  | 'reviewer'
+  | 'auditor'
+
+export interface AgentRole<
+  TType extends AgentType | unknown = unknown,
+  TContext extends object | unknown = unknown,
+  TOutput extends ZodSchema | unknown = unknown
+> {
+  type(): TType
+  persona(context: TContext): string
+  allowedTools(): string[]
+  schema(): TOutput
 }

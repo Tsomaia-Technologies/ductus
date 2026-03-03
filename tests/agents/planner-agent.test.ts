@@ -3,7 +3,7 @@
  * Task 013-agent-role-contracts.
  */
 
-import { PlannerAgent } from "../../src/agents/planner-agent.js";
+import { PlannerAgent } from "../../research/agents/planner-agent.js";
 
 const FORBIDDEN_STATE_KEYS = ["history", "messages", "context", "tokens", "buffer"];
 

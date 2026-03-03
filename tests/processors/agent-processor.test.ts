@@ -3,11 +3,11 @@
  * Task 015-agent-processor.
  */
 
-import { AgentProcessor } from "../../src/processors/agent-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { FileAdapter } from "../../src/interfaces/adapters.js";
-import type { CacheAdapter } from "../../src/interfaces/cache-adapter.js";
-import type { AgentDispatcher } from "../../src/interfaces/agent-dispatcher.js";
+import { AgentProcessor } from "../../research/processors/agent-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { FileAdapter } from "../../research/interfaces/adapters.js";
+import type { CacheAdapter } from "../../research/interfaces/cache-adapter.js";
+import type { AgentDispatcher } from "../../research/interfaces/agent-dispatcher.js";
 
 async function flushStream<T>(stream: AsyncIterable<T>): Promise<T[]> {
   const out: T[] = [];
@@ -105,8 +105,8 @@ describe("AgentProcessor", () => {
 
   describe("The Panic Sequence Proof", () => {
     it("CIRCUIT_INTERRUPTED aborts stream; no durable events emitted", async () => {
-      const { AgentDispatcherImpl } = await import("../../src/agents/agent-dispatcher.js");
-      const { MockLLMProvider } = await import("../../src/agents/mock-llm-provider.js");
+      const { AgentDispatcherImpl } = await import("../../research/agents/agent-dispatcher.js");
+      const { MockLLMProvider } = await import("../../research/agents/mock-llm-provider.js");
 
       const dispatcher = new AgentDispatcherImpl({
         tokenCounter: () => 50,

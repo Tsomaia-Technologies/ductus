@@ -1,34 +1,18 @@
-export type VolatilityDraft = "durable-draft" | "volatile-draft";
-export type Volatility = "durable" | "volatile";
+export type Volatility = 'durable' | 'volatile'
 
-/**
- * BaseEvent: An intentional action or occurrence waiting to be stamped.
- * Pre-Hub state.
- */
 export interface BaseEvent<T extends string = string, P = unknown> {
-  type: T;
-  payload: P;
-  authorId: string;
-  timestamp: number;
-  volatility: Volatility | VolatilityDraft;
-  isReplay?: boolean;
-  eventId?: string;
+  type: T
+  payload: P
+  volatility: Volatility
+  authorId?: string
+  isCommited?: boolean
 }
 
-/**
- * CommittedEvent: An immutable historical fact after Hub processing.
- * Post-Hub state. Includes cryptographic ledger properties.
- */
-export interface CommittedEvent<T extends string = string, P = unknown>
-  extends Omit<BaseEvent<T, P>, "volatility"> {
-  eventId: string;
-  sequenceNumber: number;
-  prevHash: string;
-  hash: string;
-  volatility: Volatility;
+export type CommittedEvent<TEvent extends BaseEvent> = TEvent & {
+  eventId: string
+  sequenceNumber: number
+  prevHash: string
+  isCommited: true
+  hash: string
+  timestamp: number
 }
-
-/**
- * Alias for canonical ledger event shape.
- */
-export type DuctusEvent<T = unknown> = CommittedEvent<string, T>;

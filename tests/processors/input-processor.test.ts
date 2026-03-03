@@ -3,11 +3,11 @@
  * Task 011-input-processor.
  */
 
-import { InputProcessor } from "../../src/processors/input-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { TerminalAdapter } from "../../src/interfaces/adapters.js";
-import type { InputEventStream } from "../../src/interfaces/event-processor.js";
-import type { BaseEvent } from "../../src/interfaces/event.js";
+import { InputProcessor } from "../../research/processors/input-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { TerminalAdapter } from "../../research/interfaces/adapters.js";
+import type { InputEventStream } from "../../research/interfaces/event-processor.js";
+import type { BaseEvent } from "../../research/interfaces/event.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";

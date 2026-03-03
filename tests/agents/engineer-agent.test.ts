@@ -3,8 +3,8 @@
  * Task 013-agent-role-contracts.
  */
 
-import { EngineerAgent } from "../../src/agents/engineer-agent.js";
-import { AgentParseError } from "../../src/agents/agent-parse-error.js";
+import { EngineerAgent } from "../../research/agents/engineer-agent.js";
+import { AgentParseError } from "../../research/agents/agent-parse-error.js";
 
 describe("EngineerAgent", () => {
   const agent = new EngineerAgent();

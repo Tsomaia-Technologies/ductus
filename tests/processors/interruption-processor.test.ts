@@ -3,9 +3,9 @@
  * Task 009-interruption-processor.
  */
 
-import { InterruptionProcessor } from "../../src/processors/interruption-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { BaseEvent } from "../../src/interfaces/event.js";
+import { InterruptionProcessor } from "../../research/processors/interruption-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { BaseEvent } from "../../research/interfaces/event.js";
 
 describe("InterruptionProcessor", () => {
   let processor: InterruptionProcessor;

@@ -3,11 +3,11 @@
  * Task 004-persistence-processor.
  */
 
-import { PersistenceProcessor } from "../../src/processors/persistence-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { FileAdapter } from "../../src/interfaces/adapters.js";
-import type { CommittedEvent } from "../../src/interfaces/event.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
+import { PersistenceProcessor } from "../../research/processors/persistence-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { FileAdapter } from "../../research/interfaces/adapters.js";
+import type { CommittedEvent } from "../../research/interfaces/event.js";
+import type { InputEventStream } from "../../research/interfaces/input-event-stream.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";

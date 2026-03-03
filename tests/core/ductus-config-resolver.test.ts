@@ -3,7 +3,7 @@
  * Task 020-ductus-config-resolution.
  */
 
-import { resolveConfig } from "../../src/core/ductus-config-resolver.js";
+import { resolveConfig } from "../../research/core/ductus-config-resolver.js";
 import { ZodError } from "zod";
 
 describe("ductus-config-resolver", () => {

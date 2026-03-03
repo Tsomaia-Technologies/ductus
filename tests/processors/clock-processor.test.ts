@@ -3,10 +3,10 @@
  * Task 007-clock-processor.
  */
 
-import { ClockProcessor } from "../../src/processors/clock-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { InputEventStream } from "../../src/interfaces/event-processor.js";
-import type { BaseEvent } from "../../src/interfaces/event.js";
+import { ClockProcessor } from "../../research/processors/clock-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { InputEventStream } from "../../research/interfaces/event-processor.js";
+import type { BaseEvent } from "../../research/interfaces/event.js";
 
 const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
 const JAN_1_2024_MS = 1704067200000;

@@ -3,9 +3,9 @@
  * Task 002-multiplexer-hub.
  */
 
-import { MultiplexerHub } from "../../src/core/multiplexer-hub.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { EventProcessor } from "../../src/interfaces/event-processor.js";
+import { MultiplexerHub } from "../../research/core/multiplexer-hub.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { EventProcessor } from "../../research/interfaces/event-processor.js";
 
 // Removed mock setup for processors since hub only exposes subscribe() stream
 

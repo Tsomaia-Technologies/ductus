@@ -3,10 +3,10 @@
  * Task 008-bootstrapper.
  */
 
-import { Bootstrapper } from "../../src/bootstrapper/bootstrapper.js";
-import { LoggerProcessor } from "../../src/processors/logger-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { FileAdapter, OSAdapter, TerminalAdapter } from "../../src/interfaces/adapters.js";
+import { Bootstrapper } from "../../research/bootstrapper/bootstrapper.js";
+import { LoggerProcessor } from "../../research/processors/logger-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { FileAdapter, OSAdapter, TerminalAdapter } from "../../research/interfaces/adapters.js";
 import { join } from "node:path";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";

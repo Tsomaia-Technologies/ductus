@@ -1,6 +1,6 @@
-import { MultiplexerHub } from "../../src/core/multiplexer-hub.js";
-import type { EventProcessor, InputEventStream, OutputEventStream } from "../../src/interfaces/event-processor.js";
-import { createTick, createAgentToken } from "../../src/core/events/creators.js";
+import { MultiplexerHub } from "../../research/core/multiplexer-hub.js";
+import type { EventProcessor, InputEventStream, OutputEventStream } from "../../research/interfaces/event-processor.js";
+import { createTick, createAgentToken } from "../../research/core/events/creators.js";
 
 /**
  * Dummy Processor 1: Generating standard deterministic ticks.

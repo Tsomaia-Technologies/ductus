@@ -3,12 +3,12 @@
  * Task 014-agent-dispatcher.
  */
 
-import { AgentDispatcherImpl } from "../../src/agents/agent-dispatcher.js";
-import { EngineerAgent } from "../../src/agents/engineer-agent.js";
-import { MockLLMProvider } from "../../src/agents/mock-llm-provider.js";
-import type { AgentContext } from "../../src/interfaces/agent-context.js";
-import type { AgentStreamEvent } from "../../src/interfaces/agent-stream-event.js";
-import type { EngineerReportOutput } from "../../src/agents/engineer-agent.js";
+import { AgentDispatcherImpl } from "../../research/agents/agent-dispatcher.js";
+import { EngineerAgent } from "../../research/agents/engineer-agent.js";
+import { MockLLMProvider } from "../../research/agents/mock-llm-provider.js";
+import type { AgentContext } from "../../research/interfaces/agent-context.js";
+import type { AgentStreamEvent } from "../../research/interfaces/agent-stream-event.js";
+import type { EngineerReportOutput } from "../../research/agents/engineer-agent.js";
 
 function countTokensAlways100(_text: string): number {
   return 100;

@@ -3,10 +3,10 @@
  * Task 012-session-processor.
  */
 
-import { SessionProcessor } from "../../src/processors/session-processor.js";
-import { AsyncEventQueue } from "../../src/core/event-queue.js";
-import type { FileAdapter } from "../../src/interfaces/adapters.js";
-import type { InputEventStream } from "../../src/interfaces/input-event-stream.js";
+import { SessionProcessor } from "../../research/processors/session-processor.js";
+import { AsyncEventQueue } from "../../research/core/event-queue.js";
+import type { FileAdapter } from "../../research/interfaces/adapters.js";
+import type { InputEventStream } from "../../research/interfaces/input-event-stream.js";
 
 const VALID_SHA256 =
   "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";

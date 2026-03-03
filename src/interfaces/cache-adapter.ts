@@ -1,9 +1,15 @@
-/**
- * CacheAdapter - async Key-Value cache for Verifiable Caching (zero-cost replay).
- * RFC-001 Task 015-agent-processor, Section 4.3.
- */
+import { Json } from './json.js'
 
 export interface CacheAdapter {
-  get<T>(key: string): Promise<T | undefined>;
-  set(key: string, value: unknown): Promise<void>;
+  has(key: string): Promise<boolean>
+  get(key: string): Promise<Json | null>
+  getOrFresh(
+    key: string,
+    getFresh: () => Promise<Json>,
+    ttlSecond?: number,
+  ): Promise<Json>
+  set(key: string, value: Json, ttlSecond?: number): Promise<void>
+  invalidate(key: string): Promise<boolean>
+  clear(): Promise<void>
+  hash(content: Json | Buffer): Promise<string>
 }
