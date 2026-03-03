@@ -18,6 +18,7 @@ import { BaseEvent, CommittedEvent } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { DependencyContainer } from './interfaces/dependency-container.js'
 import { DefaultRulesetBuilder } from './builders/default-ruleset-builder.js'
+import { DefaultCliTransportBuilder } from './builders/default-cli-transport-builder.js'
 
 export function createDuctus<TEvent extends BaseEvent, TState>() {
   return {
@@ -31,6 +32,7 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
     skill: (name: string) => new DefaultSkillBuilder().name(name),
     processor: (generator: EventGenerator<TEvent, TState>) =>
       new DefaultProcessorBuilder<TEvent, TState>().processor(generator),
+    transport: (type: 'cli') => new DefaultCliTransportBuilder(),
   }
 }
 
