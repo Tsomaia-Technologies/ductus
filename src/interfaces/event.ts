@@ -10,6 +10,8 @@ export interface BaseEvent<T extends string = string, P = unknown> {
 
 export type CommittedEvent<TEvent extends BaseEvent> = TEvent & {
   eventId: string
+  causationId?: string
+  correlationId?: string
   sequenceNumber: number
   prevHash: string
   isCommited: true

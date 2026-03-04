@@ -198,7 +198,7 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
             expect(mockFileAdapter.read).toHaveBeenCalledWith('/absolute/test-template.mx')
             expect(mockTemplateRenderer).toHaveBeenCalledWith('FILE_CONTENT', expect.objectContaining({ userParam: 'hello' }))
 
-            expect(mockAdapter.process).toHaveBeenCalledWith('RENDERED[FILE_CONTENT]')
+            expect(mockAdapter.process).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'RENDERED[FILE_CONTENT]' }))
         })
 
         it('JSON strings the input if no skill payload template is provided', async () => {
@@ -209,11 +209,11 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
             const iterator = dispatcher.invoke('test-agent', 'no-template-skill', { userParam: 'hello' })[Symbol.asyncIterator]()
             await iterator.next()
 
-            expect(mockAdapter.process).toHaveBeenCalledWith('{"userParam":"hello"}')
+            expect(mockAdapter.process).toHaveBeenCalledWith(expect.objectContaining({ prompt: '{"userParam":"hello"}' }))
         })
     })
 
-    describe('invokeAndParse (Regex Extraction Brittleness)', () => {
+    describe('invokeAndParse (Pipeline ParsingInterceptor Extraction)', () => {
         it('extracts structured output when text contains markdown brackets', async () => {
             mockAdapter.process.mockImplementation(async function* () {
                 yield { type: 'text', content: 'Here is the data:\n```json\n{"key": "value", "arr": [1,2]}\n```', timestamp: 1 }
@@ -305,8 +305,8 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
         it('requests an agent summary before termination during a scope handoff', async () => {
             mockAgent.scope = { type: 'turn', amount: 1 } as any
 
-            mockAdapter.process.mockImplementation(async function* (prompt: string) {
-                if (prompt === 'Provide a concise summary of our conversation so far, including key decisions, context, and outputs.') {
+            mockAdapter.process.mockImplementation(async function* (ctx: any) {
+                if (ctx.prompt === 'Provide a concise summary of our conversation so far, including key decisions, context, and outputs.') {
                     yield { type: 'text', content: 'I am a self summary.', timestamp: 2 }
                 } else {
                     yield { type: 'text', content: '{}', timestamp: 1 }

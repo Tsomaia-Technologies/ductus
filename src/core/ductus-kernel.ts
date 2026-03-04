@@ -18,6 +18,7 @@ export interface KernelOptions<TEvent extends BaseEvent, TState> {
   ledger: EventLedger<CommittedEvent<TEvent>>
   store: StoreAdapter<TState, TEvent>
   canceller?: CancellationToken
+  snapshotPredicate?: (eventsProcessed: number) => boolean
 }
 
 export class DuctusKernel<TEvent extends BaseEvent, TState> {
@@ -30,9 +31,11 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
   private readonly canceller: Canceller
   private readonly subscribers: EventSubscriber<CommittedEvent<TEvent>>[] = []
   private mountResolver: Promise<void[]> = Promise.resolve<void[]>([])
-  private readonly cascadingEvents = new LinkedList<TEvent>()
+  private readonly cascadingEvents = new LinkedList<{ event: TEvent; context: { causationId: string; correlationId: string } }>()
   private readonly cascadeWakeUpResolvers = new LinkedList<() => void>()
   private unsubscribeCommit?: () => void
+  private readonly snapshotPredicate?: (eventsProcessed: number) => boolean
+  private eventsProcessedSinceSnapshot = 0
 
   constructor(options: KernelOptions<TEvent, TState>) {
     const {
@@ -42,6 +45,7 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
       store,
       injector,
       canceller,
+      snapshotPredicate,
     } = options
     this.multiplexer = multiplexer
     this.processors = processors
@@ -50,6 +54,7 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
     this.getState = this.store.getState.bind(this.store)
     this.use = injector
     this.canceller = new Canceller({ base: canceller })
+    this.snapshotPredicate = snapshotPredicate
   }
 
   async boot() {
@@ -89,8 +94,17 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
   }
 
   private async hydrateStore() {
-    for await (const event of this.ledger.readEvents()) {
+    let afterSequence = 0
+    if (this.store.loadSnapshot) {
+      const restoredSeq = await this.store.loadSnapshot()
+      if (restoredSeq != null) {
+        afterSequence = restoredSeq
+      }
+    }
+
+    for await (const event of this.ledger.readEvents({ afterSequence })) {
       this.store.dispatch(event)
+      this.eventsProcessedSinceSnapshot++
     }
   }
 
@@ -98,10 +112,24 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
     this.unsubscribeCommit = this.multiplexer.onCommit(commitedEvent => {
       const eventsOut = this.store.dispatch(commitedEvent)
 
+      this.eventsProcessedSinceSnapshot++
+      if (this.store.saveSnapshot && this.snapshotPredicate?.(this.eventsProcessedSinceSnapshot)) {
+        this.eventsProcessedSinceSnapshot = 0
+        this.store.saveSnapshot(commitedEvent.sequenceNumber).catch(console.error)
+      }
+
       if (this.canceller.isCancelled()) return
 
+      const correlationId = commitedEvent.correlationId || commitedEvent.eventId
+
       for (const event of eventsOut) {
-        this.cascadingEvents.insertLast(event)
+        this.cascadingEvents.insertLast({
+          event,
+          context: {
+            causationId: commitedEvent.eventId,
+            correlationId,
+          }
+        })
       }
 
       const wakeUpCascade = this.cascadeWakeUpResolvers.removeFirst()
@@ -128,10 +156,10 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
 
   private async mountCascadingEvents() {
     while (!this.canceller.isCancelled()) {
-      const event = this.cascadingEvents.removeFirst()
+      const wrapper = this.cascadingEvents.removeFirst()
 
-      if (event) {
-        await this.multiplexer.broadcast(event)
+      if (wrapper) {
+        await this.multiplexer.broadcast(wrapper.event, wrapper.context)
       } else {
         await new Promise<void>(resolve => {
           this.cascadeWakeUpResolvers.insertLast(resolve)

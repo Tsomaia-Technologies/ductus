@@ -2,6 +2,7 @@ import { AgentEntity } from './agent-entity.js'
 import { ModelEntity } from './model-entity.js'
 import { AgentContext } from '../agent-context.js'
 import { AgentChunk } from '../agent-chunk.js'
+import { InvocationContext } from '../../core/pipeline/agent-interceptor.js'
 
 /**
  * Runtime interface for communicating with an AI backend.
@@ -10,7 +11,7 @@ import { AgentChunk } from '../agent-chunk.js'
 export interface AgentAdapter {
   initialize(context?: AgentContext): Promise<void>
 
-  process(input: string): AsyncIterable<AgentChunk>
+  process(context: InvocationContext): AsyncIterable<AgentChunk>
 
   terminate(): Promise<void>
 }

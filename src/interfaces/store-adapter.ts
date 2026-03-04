@@ -11,4 +11,8 @@ export interface StoreAdapter<TState, TEvent extends BaseEvent> {
   getReducer(): Reducer<TState, TEvent>
 
   dispatch(event: TEvent): TEvent[]
+
+  loadSnapshot?(): Promise<number | null>
+
+  saveSnapshot?(sequenceNumber: number): Promise<void>
 }

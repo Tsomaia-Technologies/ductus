@@ -48,6 +48,8 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
         mockStore = {
             dispatch: jest.fn().mockReturnValue([]),
             getState: jest.fn().mockReturnValue({ val: 1 }),
+            loadSnapshot: jest.fn().mockResolvedValue(null),
+            saveSnapshot: jest.fn().mockResolvedValue(undefined),
         } as any
 
         mockInjector = {} as any
@@ -165,10 +167,16 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
             await new Promise(r => setImmediate(r))
             await new Promise(r => setTimeout(r, 10))
 
-            // The cascading loop pulls from the LinkedList and broadcasts
+            // The cascading loop pulls from the LinkedList and broadcasts WITH CAUSALITY
             expect(mockStore.dispatch).toHaveBeenCalledWith(incomingCommit)
-            expect(mockMultiplexer.broadcast).toHaveBeenCalledWith({ type: 'CascadeEventA' })
-            expect(mockMultiplexer.broadcast).toHaveBeenCalledWith({ type: 'CascadeEventB' })
+            expect(mockMultiplexer.broadcast).toHaveBeenCalledWith(
+                { type: 'CascadeEventA' },
+                { causationId: 'ROOT', correlationId: 'ROOT' }
+            )
+            expect(mockMultiplexer.broadcast).toHaveBeenCalledWith(
+                { type: 'CascadeEventB' },
+                { causationId: 'ROOT', correlationId: 'ROOT' }
+            )
 
             await kernel.shutdown({ force: true })
         })

@@ -31,6 +31,11 @@ export interface AgentChunkUsage extends AgentChunkBase {
   outputTokens: number
 }
 
+export interface AgentChunkData extends AgentChunkBase {
+  type: 'data'
+  data: any
+}
+
 export interface AgentChunkComplete extends AgentChunkBase {
   type: 'complete'
 }
@@ -41,4 +46,5 @@ export type AgentChunk =
   | AgentChunkToolCall
   | AgentChunkError
   | AgentChunkUsage
+  | AgentChunkData
   | AgentChunkComplete

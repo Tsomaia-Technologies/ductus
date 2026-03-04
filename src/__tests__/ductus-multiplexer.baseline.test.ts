@@ -26,6 +26,7 @@ describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
 
         mockLedger = {
             readEvents: jest.fn().mockImplementation(async function* () { }),
+            readLastEvent: jest.fn().mockResolvedValue(null),
             appendEvent: jest.fn().mockResolvedValue(undefined),
         } as any
 
@@ -77,18 +78,23 @@ describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
             })
         })
 
-        it('blindly overwrites existing ledgers if instanced without metadata (To Be Refactored)', async () => {
+        it('syncs with existing ledger using readLastEvent to resume sequence and hash chain', async () => {
             // Assume the user injects a ledger that already has 100 events.
-            // Under normal design, the Multiplexer MUST resume at sequence 101.
+            // Under new design, the Multiplexer MUST resume at sequence 101.
+            mockLedger.readLastEvent.mockResolvedValueOnce({
+                sequenceNumber: 100,
+                hash: 'HASH_OF_Evt100_SEQ_100',
+            } as any)
 
+            const multiplexer2 = new DuctusMultiplexer({ ledger: mockLedger })
             const e = { type: 'CrashRecoveryEvent' }
-            await multiplexer.broadcast(e)
+            await multiplexer2.broadcast(e)
 
             const commit = mockLedger.appendEvent.mock.calls[0][0]
 
-            // The flaw: It ignores the ledger contents and restarts the sequence and hashing
-            expect(commit.sequenceNumber).toBe(1)
-            expect(commit.prevHash).toBe('GENESIS_HASH_XYZ')
+            // Assert it successfully read history and chained off the latest hash
+            expect(commit.sequenceNumber).toBe(101)
+            expect(commit.prevHash).toBe('HASH_OF_Evt100_SEQ_100')
         })
     })
 
