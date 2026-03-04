@@ -4,5 +4,6 @@ import { SkillEntity } from '../entities/skill-entity.js'
 
 export interface SkillBuilder extends Buildable<SkillEntity> {
   input(schema: Schema, template?: string): this
+
   output(schema: Schema): this
 }

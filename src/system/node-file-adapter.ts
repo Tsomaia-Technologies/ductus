@@ -34,7 +34,7 @@ export class NodeFileAdapter implements FileAdapter {
   }
 
   async readJson(
-    absolutePath: string
+    absolutePath: string,
   ): Promise<Json | null>
   async readJson(
     absolutePath: string,
@@ -58,7 +58,7 @@ export class NodeFileAdapter implements FileAdapter {
   }
 
 
-  async *readLines(absolutePath: string): AsyncIterable<string> {
+  async* readLines(absolutePath: string): AsyncIterable<string> {
     const fileStream = createReadStream(absolutePath, {
       encoding: 'utf8',
     })
@@ -70,7 +70,7 @@ export class NodeFileAdapter implements FileAdapter {
     yield* lines
   }
 
-  async *readLinesJsonl(absolutePath: string): AsyncIterable<Json> {
+  async* readLinesJsonl(absolutePath: string): AsyncIterable<Json> {
     const lines = this.readLines(absolutePath)
     let currentLine = 0
 
@@ -134,7 +134,7 @@ export class NodeFileAdapter implements FileAdapter {
       await fs.rm(absolutePath, { recursive: true })
       return true
     } catch (error: any) {
-      if (error.code === 'ENOENT')  return false
+      if (error.code === 'ENOENT') return false
       throw error
     }
   }

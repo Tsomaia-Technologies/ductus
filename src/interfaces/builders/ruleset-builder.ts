@@ -3,5 +3,6 @@ import { RulesetEntity } from '../entities/ruleset-entity.js'
 
 export interface RulesetBuilder extends Buildable<RulesetEntity> {
   name(name: string): this
+
   rule(directive: string): this
 }

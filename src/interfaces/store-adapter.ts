@@ -7,6 +7,8 @@ export type Reducer<TState, TEvent extends BaseEvent> = (
 
 export interface StoreAdapter<TState, TEvent extends BaseEvent> {
   getState(): TState
+
   getReducer(): Reducer<TState, TEvent>
+
   dispatch(event: TEvent): TEvent[]
 }

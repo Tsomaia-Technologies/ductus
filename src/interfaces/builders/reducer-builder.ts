@@ -8,5 +8,6 @@ export interface ReducerBuilder<TEvent extends BaseEvent, TState>
     event: TEvent,
     reduce: (state: TState, event: TEvent) => [Partial<TState>, TEvent[]],
   ): this
+
   combine(reducer: ReducerBuilder<TEvent, TState>): this
 }

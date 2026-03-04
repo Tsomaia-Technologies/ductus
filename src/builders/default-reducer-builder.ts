@@ -4,51 +4,51 @@ import { ReducerEntity } from '../interfaces/entities/reducer-entity.js'
 import { BaseEvent } from '../interfaces/event.js'
 
 export class DefaultReducerBuilder<TEvent extends BaseEvent, TState>
-    implements ReducerBuilder<TEvent, TState> {
-    private readonly _handlers: {
-        event: TEvent
-        reduce: (state: TState, event: TEvent) => [Partial<TState>, TEvent[]]
-    }[] = []
+  implements ReducerBuilder<TEvent, TState> {
+  private readonly _handlers: {
+    event: TEvent
+    reduce: (state: TState, event: TEvent) => [Partial<TState>, TEvent[]]
+  }[] = []
 
-    private readonly _combined: ReducerBuilder<TEvent, TState>[] = []
+  private readonly _combined: ReducerBuilder<TEvent, TState>[] = []
 
-    when(
-        event: TEvent,
-        reduce: (state: TState, event: TEvent) => [Partial<TState>, TEvent[]]
-    ): this {
-        this._handlers.push({ event, reduce })
-        return this
-    }
+  when(
+    event: TEvent,
+    reduce: (state: TState, event: TEvent) => [Partial<TState>, TEvent[]],
+  ): this {
+    this._handlers.push({ event, reduce })
+    return this
+  }
 
-    combine(reducer: ReducerBuilder<TEvent, TState>): this {
-        this._combined.push(reducer)
-        return this
-    }
+  combine(reducer: ReducerBuilder<TEvent, TState>): this {
+    this._combined.push(reducer)
+    return this
+  }
 
-    [BUILD](): ReducerEntity<TEvent, TState> {
-        const combinedReducers = this._combined.map((r) => r[BUILD]())
+  [BUILD](): ReducerEntity<TEvent, TState> {
+    const combinedReducers = this._combined.map((r) => r[BUILD]())
 
-        return {
-            reducer: (state: TState, event: TEvent): [TState, TEvent[]] => {
-                let newState = { ...state }
-                const accumulatedEvents: TEvent[] = []
+    return {
+      reducer: (state: TState, event: TEvent): [TState, TEvent[]] => {
+        let newState = { ...state }
+        const accumulatedEvents: TEvent[] = []
 
-                for (const handler of this._handlers) {
-                    if (handler.event.type === event.type) {
-                        const [partial, eventsOut] = handler.reduce(newState, event)
-                        newState = { ...newState, ...partial }
-                        accumulatedEvents.push(...eventsOut)
-                    }
-                }
-
-                for (const child of combinedReducers) {
-                    const [s, eventsOut] = child.reducer(newState, event)
-                    newState = s
-                    accumulatedEvents.push(...eventsOut)
-                }
-
-                return [newState, accumulatedEvents]
-            }
+        for (const handler of this._handlers) {
+          if (handler.event.type === event.type) {
+            const [partial, eventsOut] = handler.reduce(newState, event)
+            newState = { ...newState, ...partial }
+            accumulatedEvents.push(...eventsOut)
+          }
         }
+
+        for (const child of combinedReducers) {
+          const [s, eventsOut] = child.reducer(newState, event)
+          newState = s
+          accumulatedEvents.push(...eventsOut)
+        }
+
+        return [newState, accumulatedEvents]
+      },
     }
+  }
 }

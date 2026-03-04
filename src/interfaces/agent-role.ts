@@ -18,7 +18,10 @@ export interface AgentRole<
   TOutput extends ZodSchema | unknown = unknown
 > {
   type(): TType
+
   persona(context: TContext): string
+
   allowedTools(): string[]
+
   schema(): TOutput
 }

@@ -13,7 +13,14 @@ export interface SkillRef {
 }
 
 export interface AgentBuilder extends Buildable<AgentEntity> {
+  /**
+   * Returns a proxy that produces SkillRef tuples.
+   * Usage: EngineerAgent.skills.implement → { agent: 'engineer', skill: 'implement' }
+   */
+  readonly skills: Record<string, SkillRef>
+
   name(name: string): this
+
   role(role: string): this
 
   /**
@@ -28,14 +35,10 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
   persona(value: PersonaValue): this
 
   skill(skill: SkillBuilder): this
-  rule(rule: string): this
-  ruleset(ruleset: RulesetBuilder): this
 
-  /**
-   * Returns a proxy that produces SkillRef tuples.
-   * Usage: EngineerAgent.skills.implement → { agent: 'engineer', skill: 'implement' }
-   */
-  readonly skills: Record<string, SkillRef>
+  rule(rule: string): this
+
+  ruleset(ruleset: RulesetBuilder): this
 
   /**
    * Defines situational context (WHAT you need to know).

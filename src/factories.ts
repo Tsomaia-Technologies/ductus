@@ -12,7 +12,7 @@ import { FlowEntity } from './interfaces/entities/flow-entity.js'
 import { Multiplexer } from './interfaces/multiplexer.js'
 import { EventLedger } from './interfaces/event-ledger.js'
 import { EventProcessor } from './interfaces/event-processor.js'
-import { ReactionEntity, PipelineStep } from './interfaces/entities/reaction-entity.js'
+import { EmitStep, InvokeStep, PipelineStep, ReactionEntity } from './interfaces/entities/reaction-entity.js'
 import { BaseEvent, CommittedEvent } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { DependencyContainer } from './interfaces/dependency-container.js'
@@ -22,9 +22,30 @@ import { AgentDispatcher, TemplateRenderer } from './core/agent-dispatcher.js'
 import { SystemAdapter } from './interfaces/system-adapter.js'
 import { FileAdapter } from '../research/interfaces/adapters.js'
 import { DuctusStore } from './core/ductus-store.js'
+import * as zod from 'zod/v3'
 
 export function createDuctus<TEvent extends BaseEvent, TState>() {
   return {
+    literal: zod.literal,
+    boolean: zod.boolean,
+    string: zod.string,
+    number: zod.number,
+    null: zod.null,
+    nullable: zod.nullable,
+    date: zod.date,
+    union: zod.union,
+    discriminatedUnion: zod.discriminatedUnion,
+    object: zod.object,
+    array: zod.array,
+    enum: zod.enum,
+
+    emit: (event: TEvent): EmitStep<TEvent> => ({ type: 'emit', event }),
+    invoke: (agent: string, skill: string): InvokeStep => ({
+      type: 'invoke',
+      agent,
+      skill,
+    }),
+
     agent: (name: string) => new DefaultAgentBuilder().name(name),
     event: (name: string) => new DefaultEventBuilder().type(name),
     flow: () => new DefaultFlowBuilder<TEvent, TState>(),

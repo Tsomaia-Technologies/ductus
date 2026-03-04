@@ -1,5 +1,5 @@
 import { SystemProcessAdapter, SystemProcessEvent } from '../interfaces/system-process-adapter.js'
-import { spawn, ChildProcess } from 'node:child_process'
+import { ChildProcess, spawn } from 'node:child_process'
 import { LinkedList } from '../core/linked-list.js'
 import { CancellationToken, Disposer } from '../interfaces/cancellation-token.js'
 import { clearTimeout } from 'node:timers'
@@ -18,7 +18,6 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
   private static DEFAULT_SHUTDOWN_TIMEOUT_MS = 5000
   private readonly eventQueue = new LinkedList<SystemProcessEvent>()
   private readonly wakeUpResolvers = new LinkedList<() => void>()
-  private _process: ChildProcess | null = null
   private isTerminationRequested = false
   private isTerminated = false
   private isWritePending = false
@@ -36,7 +35,17 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
     this.handleStreamError = this.handleStreamError.bind(this)
   }
 
-  async *readStream(): AsyncIterableIterator<SystemProcessEvent> {
+  private _process: ChildProcess | null = null
+
+  private get process() {
+    if (!this._process) {
+      this._process = this.createProcess()
+    }
+
+    return this._process
+  }
+
+  async* readStream(): AsyncIterableIterator<SystemProcessEvent> {
     if (!this._process) {
       this._process = this.createProcess()
     }
@@ -155,14 +164,6 @@ export class NodeProcessAdapter implements SystemProcessAdapter {
   private pushError(error: Error): void {
     this.errors.push(error)
     this.wakeUpNext()
-  }
-
-  private get process() {
-    if (!this._process) {
-      this._process = this.createProcess()
-    }
-
-    return this._process
   }
 
   private createProcess() {

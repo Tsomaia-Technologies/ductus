@@ -11,8 +11,12 @@ import { BaseEvent } from '../event.js'
 export interface FlowBuilder<TEvent extends BaseEvent, TState>
   extends Buildable<FlowEntity<TEvent, TState>> {
   initialState(state: TState): this
+
   reducer(reducer: ReducerBuilder<TEvent, TState>): this
+
   agent(agent: AgentBuilder, model: ModelBuilder, adapter: AdapterBuilder): this
+
   reaction(reaction: ReactionBuilder<TEvent>): this
+
   processor(processor: ProcessorBuilder<TEvent, TState>): this
 }

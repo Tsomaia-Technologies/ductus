@@ -1,4 +1,4 @@
-import type { AgentContext } from "./agent-context.js";
+import type { AgentContext } from './agent-context.js'
 import type { AgentRole, AgentType } from './agent-role.js'
 import { CancellationToken } from './cancellation-token.js'
 import { OutputEventStream } from './output-event-stream.js'
@@ -16,7 +16,7 @@ export interface AgentDispatcher<TEvent extends BaseEvent> {
   process<TRole extends AgentRole>(
     input: string,
     role: TRole,
-    options: AgentDispatcherProcessOptions
+    options: AgentDispatcherProcessOptions,
   ): OutputEventStream<TEvent>;
 
   terminate(type: AgentType): void;

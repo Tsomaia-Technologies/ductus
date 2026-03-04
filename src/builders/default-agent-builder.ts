@@ -1,140 +1,184 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { AgentBuilder, SkillRef } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
-import { AgentEntity, AgentScope, HandoffConfig, PersonaValue, SystemPromptValue } from '../interfaces/entities/agent-entity.js'
+import {
+  AgentEntity,
+  AgentScope,
+  HandoffConfig,
+  PersonaValue,
+  SystemPromptValue,
+} from '../interfaces/entities/agent-entity.js'
 import { RulesetBuilder } from '../interfaces/builders/ruleset-builder.js'
 
+interface AgentBuilderParams {
+  name?: string
+  role?: string
+  persona?: PersonaValue
+  readonly skills: SkillBuilder[]
+  readonly rules: string[]
+  readonly rulesets: RulesetBuilder[]
+  scope?: AgentScope
+  maxContextTokens?: number
+  maxFailures?: number
+  maxRecognizedHallucinations?: number
+  timeout?: number
+  readonly handoffs: HandoffConfig[]
+  systemPrompt?: SystemPromptValue
+  skillsProxy?: Record<string, SkillRef>
+}
+
 export class DefaultAgentBuilder implements AgentBuilder {
-    private _name?: string
-    private _role?: string
-    private _persona?: PersonaValue
-    private readonly _skills: SkillBuilder[] = []
-    private readonly _rules: string[] = []
-    private readonly _rulesets: RulesetBuilder[] = []
-    private _scope?: AgentScope
-    private _maxContextTokens?: number
-    private _maxFailures?: number
-    private _maxRecognizedHallucinations?: number
-    private _timeout?: number
-    private readonly _handoffs: HandoffConfig[] = []
-    private _systemPrompt?: SystemPromptValue
-    private _skillsProxy?: Record<string, SkillRef>
+  private params: AgentBuilderParams
 
-    get skills(): Record<string, SkillRef> {
-        if (!this._name) {
-            throw new Error('Cannot access skills before setting agent name.')
-        }
+  constructor(base?: DefaultAgentBuilder) {
+    this.params = {
+      name: undefined,
+      role: undefined,
+      persona: undefined,
+      skills: [],
+      rules: [],
+      rulesets: [],
+      scope: undefined,
+      maxContextTokens: undefined,
+      maxFailures: undefined,
+      maxRecognizedHallucinations: undefined,
+      timeout: undefined,
+      handoffs: [],
+      systemPrompt: undefined,
+      skillsProxy: undefined,
+      ...(base?.params ?? {}),
+    }
+  }
 
-        if (!this._skillsProxy) {
-            const agentName = this._name
-            this._skillsProxy = new Proxy({} as Record<string, SkillRef>, {
-                get(_target, prop: string): SkillRef {
-                    return { agent: agentName, skill: prop }
-                },
-            })
-        }
-        return this._skillsProxy
+  get skills(): Record<string, SkillRef> {
+    if (!this.params.name) {
+      throw new Error('Cannot access skills before setting agent name.')
     }
 
-    name(name: string): this {
-        this._name = name
-        return this
+    if (!this.params.skillsProxy) {
+      const agentName = this.params.name
+      this.params.skillsProxy = new Proxy({} as Record<string, SkillRef>, {
+        get(_target, prop: string): SkillRef {
+          return { agent: agentName, skill: prop }
+        },
+      })
+    }
+    return this.params.skillsProxy
+  }
+
+  name(name: string): this {
+    return this.clone({ name })
+  }
+
+  role(role: string): this {
+    return this.clone({ role })
+  }
+
+  persona(persona: PersonaValue): this {
+    return this.clone({ persona })
+  }
+
+  skill(skill: SkillBuilder, alias?: string): this {
+    return this.clone({
+      skills: [
+        ...this.params.skills,
+        alias ? skill.name(alias) : skill,
+      ],
+    })
+  }
+
+  rule(rule: string): this {
+    return this.clone({
+      rules: [...this.params.rules, ...rule],
+    })
+  }
+
+  ruleset(ruleset: RulesetBuilder): this {
+    return this.clone({
+      rulesets: [...this.params.rulesets, ruleset],
+    })
+  }
+
+  systemPrompt(systemPrompt: SystemPromptValue): this {
+    return this.clone({ systemPrompt })
+  }
+
+  scope(type: 'feature'): this
+  scope(type: 'task' | 'turn', amount: number): this
+  scope(type: 'feature' | 'task' | 'turn', amount?: number): this {
+    if (type === 'feature') {
+      return this.clone({
+        scope: { type: 'feature' }
+      })
     }
 
-    role(role: string): this {
-        this._role = role
-        return this
+    return this.clone({
+      scope: { type, amount: Number(amount) },
+    })
+  }
+
+  ephemeral(): this {
+    return this.scope('turn', 1)
+  }
+
+  maxContextTokens(maxContextTokens: number): this {
+    return this.clone({ maxContextTokens })
+  }
+
+  maxFailures(maxFailures: number): this {
+    return this.clone({ maxFailures })
+  }
+
+  maxRecognizedHallucinations(maxRecognizedHallucinations: number): this {
+    return this.clone({ maxRecognizedHallucinations })
+  }
+
+  timeout(timeoutMs: number): this {
+    return this.clone({ timeout: timeoutMs })
+  }
+
+  handoff(config: HandoffConfig): this {
+    const idx = this.params.handoffs.findIndex(h => h.reason === config.reason)
+
+    if (idx >= 0) {
+      return this.clone({
+        handoffs: this.params.handoffs.map((h, i) => i === idx ? config : h)
+      })
     }
 
-    persona(value: PersonaValue): this {
-        this._persona = value
-        return this
-    }
+    return this.clone({
+      handoffs: [...this.params.handoffs, config],
+    })
+  }
 
-    skill(skill: SkillBuilder): this {
-        this._skills.push(skill)
-        return this
-    }
+  [BUILD](): AgentEntity {
+    if (!this.params.name) throw new Error('Agent requires a name.')
+    if (!this.params.role) throw new Error('Agent requires a role.')
+    if (!this.params.persona) throw new Error('Agent requires a persona.')
 
-    rule(rule: string): this {
-        this._rules.push(rule)
-        return this
+    return {
+      name: this.params.name,
+      role: this.params.role,
+      persona: this.params.persona,
+      skill: this.params.skills.map(skill => skill[BUILD]()),
+      rules: this.params.rules,
+      rulesets: this.params.rulesets.map(ruleset => ruleset[BUILD]()),
+      scope: this.params.scope,
+      maxContextTokens: this.params.maxContextTokens,
+      maxFailures: this.params.maxFailures,
+      maxRecognizedHallucinations: this.params.maxRecognizedHallucinations,
+      timeout: this.params.timeout,
+      handoffs: this.params.handoffs.length > 0 ? [...this.params.handoffs] : undefined,
+      systemPrompt: this.params.systemPrompt,
     }
+  }
 
-    ruleset(ruleset: RulesetBuilder): this {
-        this._rulesets.push(ruleset)
-        return this
-    }
+  private clone(params: Partial<AgentBuilderParams>): this {
+    type self = this
+    const Constructor = this.constructor as { new(): self }
+    const clone = new Constructor()
+    clone.params = { ...this.params, ...params }
 
-    systemPrompt(value: SystemPromptValue): this {
-        this._systemPrompt = value
-        return this
-    }
-
-    scope(type: 'feature'): this
-    scope(type: 'task' | 'turn', amount: number): this
-    scope(type: 'feature' | 'task' | 'turn', amount?: number): this {
-        if (type === 'feature') {
-            this._scope = { type }
-        } else {
-            this._scope = { type, amount: amount! }
-        }
-        return this
-    }
-
-    ephemeral(): void {
-        this.scope('turn', 1)
-    }
-
-    maxContextTokens(value: number): this {
-        this._maxContextTokens = value
-        return this
-    }
-
-    maxFailures(value: number): this {
-        this._maxFailures = value
-        return this
-    }
-
-    maxRecognizedHallucinations(value: number): this {
-        this._maxRecognizedHallucinations = value
-        return this
-    }
-
-    timeout(timeoutMs: number): this {
-        this._timeout = timeoutMs
-        return this
-    }
-
-    handoff(config: HandoffConfig): this {
-        const idx = this._handoffs.findIndex(h => h.reason === config.reason)
-        if (idx >= 0) {
-            this._handoffs[idx] = config
-        } else {
-            this._handoffs.push(config)
-        }
-        return this
-    }
-
-    [BUILD](): AgentEntity {
-        if (!this._name) throw new Error('Agent requires a name.')
-        if (!this._role) throw new Error('Agent requires a role.')
-        if (!this._persona) throw new Error('Agent requires a persona.')
-
-        return {
-            name: this._name,
-            role: this._role,
-            persona: this._persona,
-            skill: this._skills.map(skill => skill[BUILD]()),
-            rules: this._rules,
-            rulesets: this._rulesets.map(ruleset => ruleset[BUILD]()),
-            scope: this._scope,
-            maxContextTokens: this._maxContextTokens,
-            maxFailures: this._maxFailures,
-            maxRecognizedHallucinations: this._maxRecognizedHallucinations,
-            timeout: this._timeout,
-            handoffs: this._handoffs.length > 0 ? [...this._handoffs] : undefined,
-            systemPrompt: this._systemPrompt,
-        }
-    }
+    return clone
+  }
 }

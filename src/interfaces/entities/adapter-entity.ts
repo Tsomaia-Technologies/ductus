@@ -8,9 +8,11 @@ import { AgentChunk } from '../agent-chunk.js'
  * Created by AdapterEntity.create() — the kernel manages the lifecycle.
  */
 export interface AgentAdapter {
-    initialize(context?: AgentContext): Promise<void>
-    process(input: string): AsyncIterable<AgentChunk>
-    terminate(): Promise<void>
+  initialize(context?: AgentContext): Promise<void>
+
+  process(input: string): AsyncIterable<AgentChunk>
+
+  terminate(): Promise<void>
 }
 
 /**
@@ -18,5 +20,5 @@ export interface AgentAdapter {
  * Holds a factory closure that captures config and creates runtime adapters on demand.
  */
 export interface AdapterEntity {
-    create(agent: AgentEntity, model: ModelEntity): AgentAdapter
+  create(agent: AgentEntity, model: ModelEntity): AgentAdapter
 }

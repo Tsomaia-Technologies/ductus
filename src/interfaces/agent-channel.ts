@@ -13,9 +13,11 @@ export interface AgentChannelProcessOptions {
  */
 export interface AgentChannel<TInput> {
   initialize(): Promise<void>
+
   process(
     input: TInput,
     options?: AgentChannelProcessOptions,
   ): AsyncIterable<AgentChunk>
+
   terminate(): Promise<void>
 }

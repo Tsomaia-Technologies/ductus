@@ -119,7 +119,7 @@ export class NodeSystemAdapter implements SystemAdapter {
     const cwd = options.cwd || this.defaultCwd
     const internalCanceller = new Canceller({ forceByDefault: true })
     const disposeProvidedCancellerListener =
-        providedCanceller?.onCancel(force => internalCanceller.cancel({ force }))
+      providedCanceller?.onCancel(force => internalCanceller.cancel({ force }))
     const disposeBaseCancellationListener =
       this.baseCanceller.onCancel(force => internalCanceller.cancel({ force }))
 

@@ -1,4 +1,4 @@
-import { BUILD, Buildable } from './__internal__.js'
+import { Buildable } from './__internal__.js'
 import { ReactionEntity } from '../entities/reaction-entity.js'
 import { BaseEvent } from '../event.js'
 import { Schema } from '../schema.js'
@@ -9,15 +9,19 @@ import { Schema } from '../schema.js'
  */
 export interface InvokeCursorBuilder<TEvent extends BaseEvent> {
   case(schema: Schema, action: ReactionBuilder<TEvent>): InvokeCursorBuilder<TEvent>
+
   emit(event: TEvent): ReactionBuilder<TEvent>
 
   // Escape: return to parent builder
   when(...events: TEvent[]): ReactionBuilder<TEvent>
-  invoke(agent: string, skill: string): InvokeCursorBuilder<TEvent>
+
+  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent>
 }
 
 export interface ReactionBuilder<TEvent extends BaseEvent> extends Buildable<ReactionEntity<TEvent>> {
   when(...events: TEvent[]): this
-  invoke(agent: string, skill: string): InvokeCursorBuilder<TEvent>
+
+  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent>
+
   emit(event: TEvent): this
 }
