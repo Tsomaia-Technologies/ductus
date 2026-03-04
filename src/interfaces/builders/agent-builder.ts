@@ -1,6 +1,6 @@
 import { SkillBuilder } from './skill-builder.js'
 import { Buildable } from './__internal__.js'
-import { AgentEntity, HandoffConfig } from '../entities/agent-entity.js'
+import { AgentEntity, HandoffConfig, PersonaValue, SystemPromptValue } from '../entities/agent-entity.js'
 import { RulesetBuilder } from './ruleset-builder.js'
 
 /**
@@ -17,11 +17,15 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
   role(role: string): this
 
   /**
-   * Static string — framework auto-appends rules/rulesets after the text.
-   * Template — rendered with agent config { agent: { name, role }, rules, rulesets }.
-   *            User controls rule placement; no auto-append.
+   * Defines the agent's identity (WHO).
+   *
+   * - Static string: framework auto-appends rules/rulesets after the text.
+   * - Template object: rendered with agent config { agent, rules, rulesets }.
+   *   User controls rule placement; no auto-append.
+   * - Async resolver: called at runtime with (use, agent) to fetch persona
+   *   from external sources (CMS, database, API).
    */
-  persona(value: string | { template: string }): this
+  persona(value: PersonaValue): this
 
   skill(skill: SkillBuilder): this
   rule(rule: string): this
@@ -34,11 +38,15 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
   readonly skills: Record<string, SkillRef>
 
   /**
-   * Template path rendered with runtime state at adapter initialization.
-   * Provides situational context (WHAT you need to know) separate from
-   * persona (WHO you are). Composed with persona into a single system message.
+   * Defines situational context (WHAT you need to know).
+   *
+   * - Static string: template path rendered with runtime state { state }.
+   * - Async resolver: called at runtime with (use, agent) to fetch template
+   *   from external sources.
+   *
+   * Composed with persona into a single system message at initialization.
    */
-  systemPrompt(template: string): this
+  systemPrompt(value: SystemPromptValue): this
 
   /**
    * Agent leaves for the duration of feature, unless reaches any of the hard limitations (see below).
@@ -86,9 +94,8 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
   /**
    * Configures context transfer when an agent gets replaced.
    *
-   * Instead of relying on AI self-reporting (summarization), the handoff renders
-   * current reducer state and relevant events from the ledger into a Moxite template,
-   * producing structured context for the replacement adapter.
+   * Renders current reducer state and relevant events from the ledger into a
+   * template, producing structured context for the replacement adapter.
    *
    * Handoff reasons map to limit triggers:
    * - `overflow` — triggered by maxContextTokens
@@ -97,24 +104,21 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
    * - `scope`   — triggered by scope() quota
    *
    * The template receives: { reason, state, headEvents, tailEvents, failureCount,
-   * hallucinationCount, agent }. Each event carries an `isFailed` flag indicating
-   * whether it was emitted during a turn the dispatcher marked as failed.
+   * hallucinationCount, agent }. Each event carries an `isFailed` flag.
    *
-   * Event windows: `headEvents` (default: 2) captures foundational events.
-   * `tailEvents` (default: 10) captures recent activity.
-   * If total events ≤ headEvents + tailEvents, headEvents gets all events
-   * and tailEvents is empty.
+   * Event windows: `headEvents` (default: 2), `tailEvents` (default: 10).
+   * If total events ≤ headEvents + tailEvents, headEvents gets all, tailEvents empty.
    *
-   * `agentSummary` (scope only): if true, calls the outgoing adapter for a
-   * self-summary before terminating. Available as `{{agentSummary}}` in template.
+   * `agentSummary` (scope only): calls outgoing adapter for self-summary.
+   * Template field accepts string path or async resolver (use, agent) => Promise<string>.
    *
-   * No handoff configured for a reason → replacement starts fresh (no context).
+   * No handoff configured for a reason → replacement starts fresh.
    *
    * @example
    * ```typescript
    * .handoff({ reason: 'overflow', template: 'overflow.mx', headEvents: 5, tailEvents: 50 })
    * .handoff({ reason: 'failure',  template: 'failure.mx' })
-   * .handoff({ reason: 'scope',    template: 'rotation.mx', agentSummary: true })
+   * .handoff({ reason: 'scope',    template: async (use) => use(CMS).loadTemplate('rotation'), agentSummary: true })
    * ```
    */
   handoff(config: HandoffConfig): this

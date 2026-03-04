@@ -1,13 +1,13 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { AgentBuilder, SkillRef } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
-import { AgentEntity, AgentScope, HandoffConfig } from '../interfaces/entities/agent-entity.js'
+import { AgentEntity, AgentScope, HandoffConfig, PersonaValue, SystemPromptValue } from '../interfaces/entities/agent-entity.js'
 import { RulesetBuilder } from '../interfaces/builders/ruleset-builder.js'
 
 export class DefaultAgentBuilder implements AgentBuilder {
     private _name?: string
     private _role?: string
-    private _persona?: string | { template: string }
+    private _persona?: PersonaValue
     private readonly _skills: SkillBuilder[] = []
     private readonly _rules: string[] = []
     private readonly _rulesets: RulesetBuilder[] = []
@@ -17,7 +17,7 @@ export class DefaultAgentBuilder implements AgentBuilder {
     private _maxRecognizedHallucinations?: number
     private _timeout?: number
     private readonly _handoffs: HandoffConfig[] = []
-    private _systemPrompt?: string
+    private _systemPrompt?: SystemPromptValue
     private _skillsProxy?: Record<string, SkillRef>
 
     get skills(): Record<string, SkillRef> {
@@ -46,7 +46,7 @@ export class DefaultAgentBuilder implements AgentBuilder {
         return this
     }
 
-    persona(value: string | { template: string }): this {
+    persona(value: PersonaValue): this {
         this._persona = value
         return this
     }
@@ -66,8 +66,8 @@ export class DefaultAgentBuilder implements AgentBuilder {
         return this
     }
 
-    systemPrompt(template: string): this {
-        this._systemPrompt = template
+    systemPrompt(value: SystemPromptValue): this {
+        this._systemPrompt = value
         return this
     }
 

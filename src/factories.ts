@@ -2,7 +2,7 @@ import { DefaultAgentBuilder } from './builders/default-agent-builder.js'
 import { DefaultSkillBuilder } from './builders/default-skill-builder.js'
 import { DefaultEventBuilder } from './builders/default-event-builder.js'
 import { DefaultProcessorBuilder } from './builders/default-processor-builder.js'
-import { EventGenerator } from './interfaces/event-generator.js'
+import { EventGenerator, Injector } from './interfaces/event-generator.js'
 import { DefaultReactionBuilder } from './builders/default-reaction-builder.js'
 import { DefaultReducerBuilder } from './builders/default-reducer-builder.js'
 import { DefaultFlowBuilder } from './builders/default-flow-builder.js'
@@ -18,7 +18,7 @@ import { DuctusKernel } from './core/ductus-kernel.js'
 import { DependencyContainer } from './interfaces/dependency-container.js'
 import { DefaultRulesetBuilder } from './builders/default-ruleset-builder.js'
 import { CancellationToken } from './interfaces/cancellation-token.js'
-import { AgentDispatcher } from './core/agent-dispatcher.js'
+import { AgentDispatcher, TemplateRenderer } from './core/agent-dispatcher.js'
 
 export function createDuctus<TEvent extends BaseEvent, TState>() {
   return {
@@ -33,6 +33,18 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
     processor: (generator: EventGenerator<TEvent, TState>) =>
       new DefaultProcessorBuilder<TEvent, TState>().processor(generator),
     adapter: (type: 'cli') => new DefaultCliAdapterBuilder(),
+
+    /**
+     * Async wrapper for dynamic flow definitions.
+     * Provides the injector for async data fetching while using the same builder DSL.
+     */
+    async: async (
+      factory: (use: Injector) => Promise<FlowEntity<TEvent, TState>>,
+      injector: DependencyContainer,
+    ): Promise<FlowEntity<TEvent, TState>> => {
+      const use = injector.use.bind(injector) as Injector
+      return factory(use)
+    },
   }
 }
 
@@ -42,16 +54,21 @@ export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
   ledger: EventLedger<CommittedEvent<TEvent>>
   injector: DependencyContainer
   canceller?: CancellationToken
+  templateRenderer?: TemplateRenderer
 }
 
-export function createKernel<TEvent extends BaseEvent, TState>(
+  export function createKernel<TEvent extends BaseEvent, TState>(
   options: CreateKernelOptions<TEvent, TState>,
 ) {
-  const { flow, multiplexer, ledger, injector, canceller } = options
+  const { flow, multiplexer, ledger, injector, canceller, templateRenderer } = options
+
+  const use = injector.use.bind(injector) as Injector
 
   const dispatcher = new AgentDispatcher({
     agents: flow.agents,
     ledger: ledger as unknown as EventLedger<BaseEvent>,
+    templateRenderer,
+    injector: use,
   })
 
   const processors = flow.processors.map(entity => {

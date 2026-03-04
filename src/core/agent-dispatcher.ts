@@ -1,4 +1,4 @@
-import { AgentEntity, HandoffReason } from '../interfaces/entities/agent-entity.js'
+import { AgentEntity, AsyncTemplateResolver, HandoffReason } from '../interfaces/entities/agent-entity.js'
 import { ModelEntity } from '../interfaces/entities/model-entity.js'
 import { AdapterEntity, AgentAdapter } from '../interfaces/entities/adapter-entity.js'
 import { AgentChunk } from '../interfaces/agent-chunk.js'
@@ -6,6 +6,7 @@ import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 import { AgentContext } from '../interfaces/agent-context.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
+import { Injector } from '../interfaces/event-generator.js'
 
 export interface AgentTuple {
     agent: AgentEntity
@@ -13,7 +14,13 @@ export interface AgentTuple {
     adapter: AdapterEntity
 }
 
-export type TemplateRenderer = (template: string, context: Record<string, any>) => string
+/**
+ * Generic template renderer. Engine-agnostic — user wraps their preferred
+ * engine (Moxite, Handlebars, Nunjucks, etc.) in this interface.
+ * Engine-specific features (pipes, helpers, filters) are configured
+ * in the user's closure, invisible to the framework.
+ */
+export type TemplateRenderer = (template: string, context: Record<string, any>) => string | Promise<string>
 
 export interface AnnotatedEvent {
     type: string
@@ -45,6 +52,7 @@ export interface AgentDispatcherOptions {
     templateRenderer?: TemplateRenderer
     ledger?: EventLedger<BaseEvent>
     stateAccessor?: () => unknown
+    injector?: Injector
 }
 
 const DEFAULT_HEAD_EVENTS = 2
@@ -63,6 +71,7 @@ export class AgentDispatcher {
     private readonly templateRenderer?: TemplateRenderer
     private readonly ledger?: EventLedger<BaseEvent>
     private readonly stateAccessor?: () => unknown
+    private readonly injector?: Injector
     private lastKnownSequence = 0
 
     constructor(options: AgentDispatcherOptions) {
@@ -72,6 +81,7 @@ export class AgentDispatcher {
         this.templateRenderer = options.templateRenderer
         this.ledger = options.ledger
         this.stateAccessor = options.stateAccessor
+        this.injector = options.injector
     }
 
     async *invoke(agentName: string, skillName: string, input: unknown): AsyncIterable<AgentChunk> {
@@ -89,7 +99,7 @@ export class AgentDispatcher {
         await this.enforceLifecycleLimits(agentName, tuple.agent, state)
 
         const validatedInput = skill.input.schema.parse(input)
-        const prompt = this.renderPrompt(skill, validatedInput)
+        const prompt = await this.renderPrompt(skill, validatedInput)
 
         state.turns++
         state.currentTurnStartSequence = this.lastKnownSequence + 1
@@ -155,18 +165,43 @@ export class AgentDispatcher {
 
     /**
      * Composes the full system message from persona + systemPrompt.
-     * For static persona: auto-appends rules and rulesets.
-     * For template persona: renders with agent config (user controls rule placement).
-     * SystemPrompt: renders with runtime state.
+     * Resolves async template resolvers if present.
      */
-    private composeSystemMessage(agentConfig: AgentEntity): string {
+    private async composeSystemMessage(agentConfig: AgentEntity): Promise<string> {
         const parts: string[] = []
 
         // Layer 1: Persona
-        if (typeof agentConfig.persona === 'string') {
-            parts.push(agentConfig.persona)
+        const persona = await this.resolvePersona(agentConfig)
+        if (persona) parts.push(persona)
 
-            // Auto-append rules for static persona
+        // Layer 2: SystemPrompt (runtime state)
+        const systemPrompt = await this.resolveSystemPrompt(agentConfig)
+        if (systemPrompt) parts.push(systemPrompt)
+
+        return parts.join('\n\n')
+    }
+
+    private async resolvePersona(agentConfig: AgentEntity): Promise<string | undefined> {
+        const { persona } = agentConfig
+
+        if (typeof persona === 'function') {
+            // Async resolver
+            if (!this.injector) return undefined
+            const resolved = await persona(this.injector, agentConfig)
+            return this.formatPersona(agentConfig, resolved)
+        }
+
+        return this.formatPersona(agentConfig, persona)
+    }
+
+    private async formatPersona(
+        agentConfig: AgentEntity,
+        value: string | { template: string },
+    ): Promise<string | undefined> {
+        if (typeof value === 'string') {
+            // Static string — auto-append rules
+            const parts = [value]
+
             if (agentConfig.rules.length > 0) {
                 const ruleLines = agentConfig.rules.map(r => `- ${r}`).join('\n')
                 parts.push(`\nRules:\n${ruleLines}`)
@@ -175,35 +210,53 @@ export class AgentDispatcher {
                 const ruleLines = ruleset.rules.map(r => `- ${r}`).join('\n')
                 parts.push(`\n${ruleset.name}:\n${ruleLines}`)
             }
-        } else if (this.templateRenderer) {
-            // Template persona — rendered with agent config
-            const rendered = this.templateRenderer(agentConfig.persona.template, {
+
+            return parts.join('')
+        }
+
+        // Template — render with agent config
+        if (!this.templateRenderer) return undefined
+        return await this.awaitRendered(
+            this.templateRenderer(value.template, {
                 agent: { name: agentConfig.name, role: agentConfig.role },
                 rules: agentConfig.rules,
                 rulesets: agentConfig.rulesets,
-            })
-            parts.push(rendered)
+            }),
+        )
+    }
+
+    private async resolveSystemPrompt(agentConfig: AgentEntity): Promise<string | undefined> {
+        const { systemPrompt } = agentConfig
+        if (!systemPrompt) return undefined
+
+        if (typeof systemPrompt === 'function') {
+            if (!this.injector) return undefined
+            const resolved = await systemPrompt(this.injector, agentConfig)
+            // resolved is string or { template }
+            const templatePath = typeof resolved === 'string' ? resolved : resolved.template
+            if (!this.templateRenderer || !this.stateAccessor) return templatePath
+            return this.awaitRendered(
+                this.templateRenderer(templatePath, { state: this.stateAccessor() }),
+            )
         }
 
-        // Layer 2: SystemPrompt (runtime state)
-        if (agentConfig.systemPrompt && this.templateRenderer && this.stateAccessor) {
-            const rendered = this.templateRenderer(agentConfig.systemPrompt, {
-                state: this.stateAccessor(),
-            })
-            parts.push(rendered)
-        }
-
-        return parts.join('\n\n')
+        // Static template path
+        if (!this.templateRenderer || !this.stateAccessor) return undefined
+        return this.awaitRendered(
+            this.templateRenderer(systemPrompt, { state: this.stateAccessor() }),
+        )
     }
 
     // ── Skill Prompt Rendering ────────────────────────────────────────────
 
-    private renderPrompt(skill: SkillEntity, validatedInput: unknown): string {
+    private async renderPrompt(skill: SkillEntity, validatedInput: unknown): Promise<string> {
         if (skill.input.payload && this.templateRenderer) {
             const context = typeof validatedInput === 'object' && validatedInput !== null
                 ? validatedInput as Record<string, any>
                 : { input: validatedInput }
-            return this.templateRenderer(skill.input.payload, context)
+            return this.awaitRendered(
+                this.templateRenderer(skill.input.payload, context),
+            )
         }
 
         return JSON.stringify(validatedInput)
@@ -217,7 +270,7 @@ export class AgentDispatcher {
             const tuple = this.agents.get(agentName)!
             const adapter = tuple.adapter.create(tuple.agent, tuple.model)
 
-            const systemMessage = this.composeSystemMessage(tuple.agent)
+            const systemMessage = await this.composeSystemMessage(tuple.agent)
 
             const context: AgentContext = {
                 messages: [{
@@ -288,67 +341,84 @@ export class AgentDispatcher {
         let handoffContent: string | undefined
 
         if (handoff && this.templateRenderer && this.ledger && this.stateAccessor) {
-            const allEvents = await this.readAllEvents()
-            const failedSequences = this.getFailedSequences(oldState)
-
-            const annotated = allEvents.map(e => ({
-                type: e.type,
-                payload: e.payload,
-                sequence: e.sequenceNumber,
-                timestamp: e.timestamp,
-                isFailed: failedSequences.has(e.sequenceNumber),
-            }))
-
-            const headCount = handoff.headEvents ?? DEFAULT_HEAD_EVENTS
-            const tailCount = handoff.tailEvents ?? DEFAULT_TAIL_EVENTS
-
-            let headEvents: AnnotatedEvent[]
-            let tailEvents: AnnotatedEvent[]
-
-            if (annotated.length <= headCount + tailCount) {
-                headEvents = annotated
-                tailEvents = []
+            // Resolve handoff template (may be async)
+            let templatePath: string
+            if (typeof handoff.template === 'function') {
+                if (!this.injector) {
+                    templatePath = ''
+                } else {
+                    const resolved = await handoff.template(this.injector, tuple.agent)
+                    templatePath = typeof resolved === 'string' ? resolved : resolved.template
+                }
             } else {
-                headEvents = annotated.slice(0, headCount)
-                tailEvents = annotated.slice(-tailCount)
+                templatePath = handoff.template
+            }
 
-                if (reason === 'failure') {
-                    const failedEvents = annotated.filter(e => e.isFailed)
-                    const tailSequences = new Set(tailEvents.map(e => e.sequence))
-                    for (const fe of failedEvents) {
-                        if (!tailSequences.has(fe.sequence)) {
-                            tailEvents.push(fe)
+            if (templatePath) {
+                const allEvents = await this.readAllEvents()
+                const failedSequences = this.getFailedSequences(oldState)
+
+                const annotated = allEvents.map(e => ({
+                    type: e.type,
+                    payload: e.payload,
+                    sequence: e.sequenceNumber,
+                    timestamp: e.timestamp,
+                    isFailed: failedSequences.has(e.sequenceNumber),
+                }))
+
+                const headCount = handoff.headEvents ?? DEFAULT_HEAD_EVENTS
+                const tailCount = handoff.tailEvents ?? DEFAULT_TAIL_EVENTS
+
+                let headEvents: AnnotatedEvent[]
+                let tailEvents: AnnotatedEvent[]
+
+                if (annotated.length <= headCount + tailCount) {
+                    headEvents = annotated
+                    tailEvents = []
+                } else {
+                    headEvents = annotated.slice(0, headCount)
+                    tailEvents = annotated.slice(-tailCount)
+
+                    if (reason === 'failure') {
+                        const failedEvents = annotated.filter(e => e.isFailed)
+                        const tailSequences = new Set(tailEvents.map(e => e.sequence))
+                        for (const fe of failedEvents) {
+                            if (!tailSequences.has(fe.sequence)) {
+                                tailEvents.push(fe)
+                            }
+                        }
+                        tailEvents.sort((a, b) => a.sequence - b.sequence)
+                    }
+                }
+
+                // Opt-in agent summary for scope handoffs
+                let agentSummary: string | undefined
+                if (handoff.agentSummary && reason === 'scope' && oldState) {
+                    let summary = ''
+                    for await (const chunk of oldState.adapter.process(AGENT_SUMMARY_PROMPT)) {
+                        if (chunk.type === 'text') {
+                            summary += chunk.content
                         }
                     }
-                    tailEvents.sort((a, b) => a.sequence - b.sequence)
+                    agentSummary = summary
                 }
-            }
 
-            // Opt-in agent summary for scope handoffs
-            let agentSummary: string | undefined
-            if (handoff.agentSummary && reason === 'scope' && oldState) {
-                let summary = ''
-                for await (const chunk of oldState.adapter.process(AGENT_SUMMARY_PROMPT)) {
-                    if (chunk.type === 'text') {
-                        summary += chunk.content
-                    }
-                }
-                agentSummary = summary
+                handoffContent = await this.awaitRendered(
+                    this.templateRenderer(templatePath, {
+                        reason,
+                        state: this.stateAccessor(),
+                        headEvents,
+                        tailEvents,
+                        failureCount: oldState?.failures ?? 0,
+                        hallucinationCount: oldState?.hallucinations ?? 0,
+                        agent: {
+                            name: tuple.agent.name,
+                            role: tuple.agent.role,
+                        },
+                        agentSummary,
+                    }),
+                )
             }
-
-            handoffContent = this.templateRenderer(handoff.template, {
-                reason,
-                state: this.stateAccessor(),
-                headEvents,
-                tailEvents,
-                failureCount: oldState?.failures ?? 0,
-                hallucinationCount: oldState?.hallucinations ?? 0,
-                agent: {
-                    name: tuple.agent.name,
-                    role: tuple.agent.role,
-                },
-                agentSummary,
-            })
         }
 
         // Terminate old adapter
@@ -358,7 +428,7 @@ export class AgentDispatcher {
 
         // Create new adapter with composed system message + handoff context
         const newAdapter = tuple.adapter.create(tuple.agent, tuple.model)
-        const systemMessage = this.composeSystemMessage(tuple.agent)
+        const systemMessage = await this.composeSystemMessage(tuple.agent)
 
         const fullMessage = handoffContent
             ? `${systemMessage}\n\n${handoffContent}`
@@ -410,6 +480,10 @@ export class AgentDispatcher {
             events.push(event)
         }
         return events
+    }
+
+    private async awaitRendered(result: string | Promise<string>): Promise<string> {
+        return result
     }
 
     private parseStructuredOutput(rawText: string, skill: SkillEntity): unknown {
