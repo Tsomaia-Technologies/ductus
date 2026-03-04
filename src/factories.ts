@@ -49,7 +49,10 @@ export function createKernel<TEvent extends BaseEvent, TState>(
 ) {
   const { flow, multiplexer, ledger, injector, canceller } = options
 
-  const dispatcher = new AgentDispatcher({ agents: flow.agents })
+  const dispatcher = new AgentDispatcher({
+    agents: flow.agents,
+    ledger: ledger as unknown as EventLedger<BaseEvent>,
+  })
 
   const processors = flow.processors.map(entity => {
     return createProcessorAdapter(entity.processor)

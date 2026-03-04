@@ -1,21 +1,23 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { AgentBuilder, SkillRef } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
-import { AgentEntity, AgentScope, ContextOverflowPolicy } from '../interfaces/entities/agent-entity.js'
+import { AgentEntity, AgentScope, HandoffConfig } from '../interfaces/entities/agent-entity.js'
 import { RulesetBuilder } from '../interfaces/builders/ruleset-builder.js'
 
 export class DefaultAgentBuilder implements AgentBuilder {
     private _name?: string
     private _role?: string
-    private _persona?: string
+    private _persona?: string | { template: string }
     private readonly _skills: SkillBuilder[] = []
     private readonly _rules: string[] = []
     private readonly _rulesets: RulesetBuilder[] = []
     private _scope?: AgentScope
-    private _maxContextTokens?: { value: number; overflowPolicy: ContextOverflowPolicy }
+    private _maxContextTokens?: number
     private _maxFailures?: number
     private _maxRecognizedHallucinations?: number
     private _timeout?: number
+    private readonly _handoffs: HandoffConfig[] = []
+    private _systemPrompt?: string
     private _skillsProxy?: Record<string, SkillRef>
 
     get skills(): Record<string, SkillRef> {
@@ -44,8 +46,8 @@ export class DefaultAgentBuilder implements AgentBuilder {
         return this
     }
 
-    persona(persona: string): this {
-        this._persona = persona
+    persona(value: string | { template: string }): this {
+        this._persona = value
         return this
     }
 
@@ -64,6 +66,11 @@ export class DefaultAgentBuilder implements AgentBuilder {
         return this
     }
 
+    systemPrompt(template: string): this {
+        this._systemPrompt = template
+        return this
+    }
+
     scope(type: 'feature'): this
     scope(type: 'task' | 'turn', amount: number): this
     scope(type: 'feature' | 'task' | 'turn', amount?: number): this {
@@ -79,8 +86,8 @@ export class DefaultAgentBuilder implements AgentBuilder {
         this.scope('turn', 1)
     }
 
-    maxContextTokens(value: number, overflowPolicy: ContextOverflowPolicy = 'fresh'): this {
-        this._maxContextTokens = { value, overflowPolicy }
+    maxContextTokens(value: number): this {
+        this._maxContextTokens = value
         return this
     }
 
@@ -96,6 +103,16 @@ export class DefaultAgentBuilder implements AgentBuilder {
 
     timeout(timeoutMs: number): this {
         this._timeout = timeoutMs
+        return this
+    }
+
+    handoff(config: HandoffConfig): this {
+        const idx = this._handoffs.findIndex(h => h.reason === config.reason)
+        if (idx >= 0) {
+            this._handoffs[idx] = config
+        } else {
+            this._handoffs.push(config)
+        }
         return this
     }
 
@@ -116,6 +133,8 @@ export class DefaultAgentBuilder implements AgentBuilder {
             maxFailures: this._maxFailures,
             maxRecognizedHallucinations: this._maxRecognizedHallucinations,
             timeout: this._timeout,
+            handoffs: this._handoffs.length > 0 ? [...this._handoffs] : undefined,
+            systemPrompt: this._systemPrompt,
         }
     }
 }

@@ -5,18 +5,28 @@ export type AgentScope =
   | { type: 'feature' }
   | { type: 'task' | 'turn'; amount: number }
 
-export type ContextOverflowPolicy = 'summarize' | 'truncate' | 'fresh'
+export type HandoffReason = 'overflow' | 'failure' | 'scope'
+
+export interface HandoffConfig {
+  reason: HandoffReason
+  template: string
+  headEvents?: number
+  tailEvents?: number
+  agentSummary?: boolean
+}
 
 export interface AgentEntity {
   name: string
   role: string
-  persona: string
+  persona: string | { template: string }
   skill: SkillEntity[]
   rules: string[]
   rulesets: RulesetEntity[]
   scope?: AgentScope
-  maxContextTokens?: { value: number; overflowPolicy: ContextOverflowPolicy }
+  maxContextTokens?: number
   maxFailures?: number
   maxRecognizedHallucinations?: number
   timeout?: number
+  handoffs?: HandoffConfig[]
+  systemPrompt?: string
 }
