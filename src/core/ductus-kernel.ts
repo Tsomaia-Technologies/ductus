@@ -3,20 +3,20 @@ import { Multiplexer } from '../interfaces/multiplexer.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { LinkedList } from './linked-list.js'
-import { DependencyContainer } from '../interfaces/dependency-container.js'
 import { CancellationToken } from '../interfaces/cancellation-token.js'
 import { Canceller } from '../system/canceller.js'
 import { EventSubscriber } from '../interfaces/event-subscriber.js'
+import { Injector } from '../interfaces/event-generator.js'
+import { StoreAdapter } from '../interfaces/store-adapter.js'
 
 export type DuctusReducer<TEvent extends BaseEvent, TState> = (state: TState, event: TEvent) => [TState, TEvent[]]
 
 export interface KernelOptions<TEvent extends BaseEvent, TState> {
-  initialState: TState
-  reducer: DuctusReducer<TEvent, TState>
-  injector: DependencyContainer
+  injector: Injector,
   multiplexer: Multiplexer<TEvent>
   processors: EventProcessor<TEvent, TState>[]
   ledger: EventLedger<CommittedEvent<TEvent>>
+  store: StoreAdapter<TState, TEvent>
   canceller?: CancellationToken
 }
 
@@ -24,33 +24,31 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
   private readonly multiplexer: Multiplexer<TEvent>
   private readonly processors: EventProcessor<TEvent, TState>[] = []
   private readonly ledger: EventLedger<CommittedEvent<TEvent>>
-  private readonly injector: DependencyContainer
+  private readonly store: StoreAdapter<TState, TEvent>
+  private readonly use: Injector
+  private readonly getState: () => TState
   private readonly canceller: Canceller
   private readonly subscribers: EventSubscriber<CommittedEvent<TEvent>>[] = []
   private mountResolver: Promise<void[]> = Promise.resolve<void[]>([])
-  private reducer: DuctusReducer<TEvent, TState>
-  private state: TState
-  private getState = () => this.state
   private readonly cascadingEvents = new LinkedList<TEvent>()
   private readonly cascadeWakeUpResolvers = new LinkedList<() => void>()
   private unsubscribeCommit?: () => void
 
   constructor(options: KernelOptions<TEvent, TState>) {
     const {
-      initialState,
-      reducer,
       multiplexer,
       processors,
       ledger,
+      store,
       injector,
       canceller,
     } = options
-    this.state = initialState
-    this.reducer = reducer
     this.multiplexer = multiplexer
     this.processors = processors
     this.ledger = ledger
-    this.injector = injector
+    this.store = store
+    this.getState = this.store.getState.bind(this.store)
+    this.use = injector
     this.canceller = new Canceller({ base: canceller })
   }
 
@@ -92,15 +90,13 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
 
   private async hydrateStore() {
     for await (const event of this.ledger.readEvents()) {
-      const [state] = this.reducer(this.state, event)
-      this.state = state
+      this.store.dispatch(event)
     }
   }
 
   private mountStore() {
     this.unsubscribeCommit = this.multiplexer.onCommit(commitedEvent => {
-      const [state, eventsOut] = this.reducer(this.state, commitedEvent)
-      this.state = state
+      const eventsOut = this.store.dispatch(commitedEvent)
 
       if (this.canceller.isCancelled()) return
 
@@ -121,7 +117,7 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
     const eventsOut = processor.process(
       eventsIn,
       this.getState,
-      this.injector.use.bind(this.injector),
+      this.use,
     )
 
     for await (const event of eventsOut) {

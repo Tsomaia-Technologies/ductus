@@ -19,6 +19,9 @@ import { DependencyContainer } from './interfaces/dependency-container.js'
 import { DefaultRulesetBuilder } from './builders/default-ruleset-builder.js'
 import { CancellationToken } from './interfaces/cancellation-token.js'
 import { AgentDispatcher, TemplateRenderer } from './core/agent-dispatcher.js'
+import { SystemAdapter } from './interfaces/system-adapter.js'
+import { FileAdapter } from '../research/interfaces/adapters.js'
+import { DuctusStore } from './core/ductus-store.js'
 
 export function createDuctus<TEvent extends BaseEvent, TState>() {
   return {
@@ -40,10 +43,9 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
      */
     async: async (
       factory: (use: Injector) => Promise<FlowEntity<TEvent, TState>>,
-      injector: DependencyContainer,
+      injector: Injector,
     ): Promise<FlowEntity<TEvent, TState>> => {
-      const use = injector.use.bind(injector) as Injector
-      return factory(use)
+      return factory(injector)
     },
   }
 }
@@ -52,23 +54,42 @@ export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
   flow: FlowEntity<TEvent, TState>
   multiplexer: Multiplexer<TEvent>
   ledger: EventLedger<CommittedEvent<TEvent>>
-  injector: DependencyContainer
+  container: DependencyContainer
   canceller?: CancellationToken
-  templateRenderer?: TemplateRenderer
+  templateRenderer: TemplateRenderer
+  systemAdapter: SystemAdapter
+  fileAdapter: FileAdapter
 }
 
-  export function createKernel<TEvent extends BaseEvent, TState>(
+export function createKernel<TEvent extends BaseEvent, TState>(
   options: CreateKernelOptions<TEvent, TState>,
 ) {
-  const { flow, multiplexer, ledger, injector, canceller, templateRenderer } = options
+  const {
+    flow,
+    multiplexer,
+    ledger,
+    container,
+    canceller,
+    templateRenderer,
+    systemAdapter,
+    fileAdapter,
+  } = options
 
-  const use = injector.use.bind(injector) as Injector
+  const use = container.use.bind(container) as Injector
+
+  const store = new DuctusStore(
+    flow.initialState,
+    flow.reducer.reducer,
+  )
 
   const dispatcher = new AgentDispatcher({
     agents: flow.agents,
-    ledger: ledger as unknown as EventLedger<BaseEvent>,
+    ledger,
+    store,
     templateRenderer,
     injector: use,
+    systemAdapter,
+    fileAdapter,
   })
 
   const processors = flow.processors.map(entity => {
@@ -80,12 +101,11 @@ export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
   })
 
   const kernel = new DuctusKernel({
-    initialState: flow.initialState,
-    reducer: flow.reducer.reducer,
     multiplexer,
     processors: [...processors, ...reactionProcessors],
     ledger,
-    injector,
+    store,
+    injector: use,
     canceller,
   })
 
@@ -102,21 +122,25 @@ export function createProcessorAdapter<TEvent extends BaseEvent, TState>(
 
 export function createReactionAdapter<TEvent extends BaseEvent, TState>(
   reaction: ReactionEntity<TEvent>,
-  dispatcher: AgentDispatcher,
+  dispatcher: AgentDispatcher<TEvent, TState>,
 ): EventProcessor<TEvent, TState> {
-  return createProcessorAdapter(async function* (events, getState) {
+  return createProcessorAdapter(async function* (events) {
     for await (const event of events) {
       if (!reaction.triggers.includes(event.type)) continue
 
-      yield* executePipeline<TEvent>(reaction.pipeline, event.payload, dispatcher)
+      yield* executePipeline(
+        reaction.pipeline,
+        event.payload,
+        dispatcher,
+      )
     }
   })
 }
 
-async function* executePipeline<TEvent extends BaseEvent>(
+async function* executePipeline<TEvent extends BaseEvent, TState>(
   steps: PipelineStep<TEvent>[],
   input: unknown,
-  dispatcher: AgentDispatcher,
+  dispatcher: AgentDispatcher<TEvent, TState>,
 ): AsyncIterable<TEvent> {
   let lastInvokeResult: unknown = input
 
@@ -137,7 +161,7 @@ async function* executePipeline<TEvent extends BaseEvent>(
       case 'case':
         try {
           const matched = step.schema.parse(lastInvokeResult)
-          yield* executePipeline<TEvent>(step.then, matched, dispatcher)
+          yield* executePipeline(step.then, matched, dispatcher)
         } catch {
           // Schema didn't match — skip this case branch
         }

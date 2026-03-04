@@ -40,8 +40,9 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
   /**
    * Defines situational context (WHAT you need to know).
    *
-   * - Static string: template path rendered with runtime state { state }.
-   * - Async resolver: called at runtime with (use, agent) to fetch template
+   * - Static string: Literal, unrendered text appended to the system message.
+   * - Template object: `template` path rendered with runtime state { state }.
+   * - Async resolver: called at runtime with (use, agent) to fetch literal or template
    *   from external sources.
    *
    * Composed with persona into a single system message at initialization.

@@ -1,6 +1,7 @@
 import { SkillEntity } from './skill-entity.js'
 import { RulesetEntity } from './ruleset-entity.js'
 import { Injector } from '../event-generator.js'
+import { PromptTemplate } from '../prompt-template.js'
 
 export type AgentScope =
   | { type: 'feature' }
@@ -16,7 +17,7 @@ export type AsyncTemplateResolver =
   (use: Injector, agent: AgentEntity) => Promise<string | { template: string }>
 
 export type PersonaValue = string | { template: string } | AsyncTemplateResolver
-export type SystemPromptValue = string | AsyncTemplateResolver
+export type SystemPromptValue = string | { template: string } | AsyncTemplateResolver
 
 export interface HandoffConfig {
   reason: HandoffReason
@@ -29,7 +30,7 @@ export interface HandoffConfig {
 export interface AgentEntity {
   name: string
   role: string
-  persona: PersonaValue
+  persona: PromptTemplate<AgentEntity>
   skill: SkillEntity[]
   rules: string[]
   rulesets: RulesetEntity[]
@@ -39,5 +40,5 @@ export interface AgentEntity {
   maxRecognizedHallucinations?: number
   timeout?: number
   handoffs?: HandoffConfig[]
-  systemPrompt?: SystemPromptValue
+  systemPrompt?: PromptTemplate<AgentEntity>
 }

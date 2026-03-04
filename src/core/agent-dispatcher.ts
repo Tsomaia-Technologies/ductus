@@ -7,6 +7,11 @@ import { AgentContext } from '../interfaces/agent-context.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { Injector } from '../interfaces/event-generator.js'
+import { PromptTemplate } from '../interfaces/prompt-template.js'
+import { FileAdapter } from '../../research/interfaces/adapters.js'
+import { SystemAdapter } from '../interfaces/system-adapter.js'
+import { identity } from '../utils/common-utils.js'
+import { StoreAdapter } from '../interfaces/store-adapter.js'
 
 export interface AgentTuple {
     agent: AgentEntity
@@ -47,12 +52,14 @@ interface AgentLifecycleState {
     currentTurnStartSequence: number
 }
 
-export interface AgentDispatcherOptions {
+export interface AgentDispatcherOptions<TEvent extends BaseEvent, TState> {
     agents: AgentTuple[]
-    templateRenderer?: TemplateRenderer
-    ledger?: EventLedger<BaseEvent>
-    stateAccessor?: () => unknown
-    injector?: Injector
+    ledger: EventLedger<CommittedEvent<BaseEvent>>
+    store: StoreAdapter<TState, TEvent>
+    templateRenderer: TemplateRenderer
+    systemAdapter: SystemAdapter
+    fileAdapter: FileAdapter
+    injector: Injector
 }
 
 const DEFAULT_HEAD_EVENTS = 2
@@ -65,23 +72,27 @@ const AGENT_SUMMARY_PROMPT = 'Provide a concise summary of our conversation so f
  * composes system prompts (persona + systemPrompt + handoff), and
  * renders event+state handoff context for replacement adapters.
  */
-export class AgentDispatcher {
+export class AgentDispatcher<TEvent extends BaseEvent, TState> {
     private readonly agents: Map<string, AgentTuple> = new Map()
     private readonly lifecycle: Map<string, AgentLifecycleState> = new Map()
-    private readonly templateRenderer?: TemplateRenderer
-    private readonly ledger?: EventLedger<BaseEvent>
-    private readonly stateAccessor?: () => unknown
-    private readonly injector?: Injector
+    private readonly templateRenderer: TemplateRenderer
+    private readonly ledger: EventLedger<BaseEvent>
+    private readonly store: StoreAdapter<TState, TEvent>
+    private readonly injector: Injector
+    private readonly systemAdapter: SystemAdapter
+    private readonly fileAdapter: FileAdapter
     private lastKnownSequence = 0
 
-    constructor(options: AgentDispatcherOptions) {
+    constructor(options: AgentDispatcherOptions<TEvent, TState>) {
         for (const tuple of options.agents) {
             this.agents.set(tuple.agent.name, tuple)
         }
         this.templateRenderer = options.templateRenderer
         this.ledger = options.ledger
-        this.stateAccessor = options.stateAccessor
+        this.store = options.store
         this.injector = options.injector
+        this.systemAdapter = options.systemAdapter
+        this.fileAdapter = options.fileAdapter
     }
 
     async *invoke(agentName: string, skillName: string, input: unknown): AsyncIterable<AgentChunk> {
@@ -181,70 +192,88 @@ export class AgentDispatcher {
         return parts.join('\n\n')
     }
 
-    private async resolvePersona(agentConfig: AgentEntity): Promise<string | undefined> {
-        const { persona } = agentConfig
+    private async formatPrompt<T>(params: {
+        prompt: PromptTemplate<T>,
+        entity: T,
+        templateContext: Record<string, any>
+        mapInline?: (inline: string) => string
+    }): Promise<string | undefined> {
+        let {
+            prompt,
+            entity,
+            templateContext,
+            mapInline = identity,
+        } = params
 
-        if (typeof persona === 'function') {
-            // Async resolver
-            if (!this.injector) return undefined
-            const resolved = await persona(this.injector, agentConfig)
-            return this.formatPersona(agentConfig, resolved)
-        }
-
-        return this.formatPersona(agentConfig, persona)
-    }
-
-    private async formatPersona(
-        agentConfig: AgentEntity,
-        value: string | { template: string },
-    ): Promise<string | undefined> {
-        if (typeof value === 'string') {
-            // Static string — auto-append rules
-            const parts = [value]
-
-            if (agentConfig.rules.length > 0) {
-                const ruleLines = agentConfig.rules.map(r => `- ${r}`).join('\n')
-                parts.push(`\nRules:\n${ruleLines}`)
-            }
-            for (const ruleset of agentConfig.rulesets) {
-                const ruleLines = ruleset.rules.map(r => `- ${r}`).join('\n')
-                parts.push(`\n${ruleset.name}:\n${ruleLines}`)
-            }
-
-            return parts.join('')
-        }
-
-        // Template — render with agent config
-        if (!this.templateRenderer) return undefined
-        return await this.awaitRendered(
-            this.templateRenderer(value.template, {
-                agent: { name: agentConfig.name, role: agentConfig.role },
-                rules: agentConfig.rules,
-                rulesets: agentConfig.rulesets,
-            }),
-        )
-    }
-
-    private async resolveSystemPrompt(agentConfig: AgentEntity): Promise<string | undefined> {
-        const { systemPrompt } = agentConfig
-        if (!systemPrompt) return undefined
-
-        if (typeof systemPrompt === 'function') {
-            if (!this.injector) return undefined
-            const resolved = await systemPrompt(this.injector, agentConfig)
-            // resolved is string or { template }
-            const templatePath = typeof resolved === 'string' ? resolved : resolved.template
-            if (!this.templateRenderer || !this.stateAccessor) return templatePath
-            return this.awaitRendered(
-                this.templateRenderer(templatePath, { state: this.stateAccessor() }),
+        if (typeof prompt === 'function') {
+            prompt = await prompt(
+              this.injector,
+              entity,
             )
         }
 
-        // Static template path
-        if (!this.templateRenderer || !this.stateAccessor) return undefined
-        return this.awaitRendered(
-            this.templateRenderer(systemPrompt, { state: this.stateAccessor() }),
+        if (typeof prompt === 'object' && 'raw' in prompt) {
+            return prompt.raw
+        }
+
+        let isInline = true
+
+        if (typeof prompt === 'object' && 'template' in prompt) {
+            prompt = await this.fileAdapter.read(
+              this.systemAdapter.resolveAbsolutePath(prompt.template)
+            )
+            isInline = false
+        }
+
+        return await this.awaitRendered(
+          this.templateRenderer(
+            isInline ? mapInline(String(prompt)) : String(prompt),
+            templateContext,
+          )
         )
+    }
+
+    private async resolvePersona(agent: AgentEntity): Promise<string | undefined> {
+        const { persona } = agent
+
+        return await this.formatPrompt({
+            prompt: persona,
+            entity: agent,
+            templateContext: {
+                agent,
+                rules: agent.rules,
+                rulesets: agent.rulesets,
+            },
+            mapInline: value => {
+                const parts = [value]
+
+                if (agent.rules.length > 0) {
+                    const ruleLines = agent.rules.map(r => `- ${r}`).join('\n')
+                    parts.push(`\nRules:\n${ruleLines}`)
+                }
+
+                for (const ruleset of agent.rulesets) {
+                    const ruleLines = ruleset.rules.map(r => `- ${r}`).join('\n')
+                    parts.push(`\n${ruleset.name}:\n${ruleLines}`)
+                }
+
+                return parts.join('')
+            }
+        })
+    }
+
+    private async resolveSystemPrompt(agent: AgentEntity): Promise<string | undefined> {
+        const { systemPrompt } = agent
+
+        if (!systemPrompt) return undefined
+
+        return await this.formatPrompt({
+            prompt: systemPrompt,
+            entity: agent,
+            templateContext: {
+                state: this.store.getState(),
+            },
+        })
     }
 
     // ── Skill Prompt Rendering ────────────────────────────────────────────
@@ -254,8 +283,13 @@ export class AgentDispatcher {
             const context = typeof validatedInput === 'object' && validatedInput !== null
                 ? validatedInput as Record<string, any>
                 : { input: validatedInput }
+
+            const templateContent = await this.fileAdapter.read(
+              this.systemAdapter.resolveAbsolutePath(skill.input.payload)
+            )
+
             return this.awaitRendered(
-                this.templateRenderer(skill.input.payload, context),
+                this.templateRenderer(templateContent, context),
             )
         }
 
@@ -340,7 +374,7 @@ export class AgentDispatcher {
         const handoff = tuple.agent.handoffs?.find(h => h.reason === reason)
         let handoffContent: string | undefined
 
-        if (handoff && this.templateRenderer && this.ledger && this.stateAccessor) {
+        if (handoff) {
             // Resolve handoff template (may be async)
             let templatePath: string
             if (typeof handoff.template === 'function') {
@@ -403,10 +437,14 @@ export class AgentDispatcher {
                     agentSummary = summary
                 }
 
+                const templateContent = await this.fileAdapter.read(
+                  this.systemAdapter.resolveAbsolutePath(templatePath)
+                )
+
                 handoffContent = await this.awaitRendered(
-                    this.templateRenderer(templatePath, {
+                    this.templateRenderer(templateContent, {
                         reason,
-                        state: this.stateAccessor(),
+                        state: this.store.getState(),
                         headEvents,
                         tailEvents,
                         failureCount: oldState?.failures ?? 0,
