@@ -5,20 +5,40 @@ import { EventLedger } from '../interfaces/event-ledger.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
+import { EventSubscriber } from '../interfaces/event-subscriber.js'
+import { CancellationToken } from '../interfaces/cancellation-token.js'
 
-describe('DuctusKernel (Baseline)', () => {
+describe('DuctusKernel (Exhaustive Baseline)', () => {
     let mockMultiplexer: jest.Mocked<Multiplexer<any>>
     let mockLedger: jest.Mocked<EventLedger<CommittedEvent<any>>>
     let mockStore: jest.Mocked<StoreAdapter<any, any>>
     let mockInjector: jest.Mocked<Injector>
-    let mockProcessor: jest.Mocked<EventProcessor<any, any>>
+    let mockProcessor1: jest.Mocked<EventProcessor<any, any>>
+    let mockProcessor2: jest.Mocked<EventProcessor<any, any>>
+    let mockSubscriber: jest.Mocked<EventSubscriber<CommittedEvent<any>>>
+    let mockCancelToken: jest.Mocked<CancellationToken>
     let kernel: DuctusKernel<any, any>
+    let commitListener: (event: CommittedEvent<any>) => void
 
     beforeEach(() => {
+        mockSubscriber = {
+            streamEvents: jest.fn(),
+            push: jest.fn(),
+            unsubscribe: jest.fn(),
+            onUnsubscribe: jest.fn(),
+            waitForSpace: jest.fn(),
+            isFull: jest.fn(),
+            onDrain: jest.fn(),
+            streamStats: jest.fn(),
+        } as any
+
         mockMultiplexer = {
-            onCommit: jest.fn(),
-            subscribe: jest.fn().mockReturnValue({ streamEvents: jest.fn().mockReturnValue((async function* () { })()) }),
-            broadcast: jest.fn(),
+            onCommit: jest.fn().mockImplementation((cb) => {
+                commitListener = cb
+                return jest.fn() // uninstaller
+            }),
+            subscribe: jest.fn().mockReturnValue(mockSubscriber),
+            broadcast: jest.fn().mockResolvedValue(undefined),
         } as any
 
         mockLedger = {
@@ -27,13 +47,21 @@ describe('DuctusKernel (Baseline)', () => {
 
         mockStore = {
             dispatch: jest.fn().mockReturnValue([]),
-            getState: jest.fn(),
+            getState: jest.fn().mockReturnValue({ val: 1 }),
         } as any
 
         mockInjector = {} as any
 
-        mockProcessor = {
-            process: jest.fn().mockReturnValue((async function* () { })()),
+        mockProcessor1 = { process: jest.fn() } as any
+        mockProcessor2 = { process: jest.fn() } as any
+
+        mockCancelToken = {
+            isCancelled: false as any,
+            onCancel: jest.fn(),
+            cancel: jest.fn((r) => { (mockCancelToken as any).isCancelled = true }),
+            throwIfCancelled: jest.fn(),
+            wrap: jest.fn(),
+            defer: jest.fn()
         } as any
 
         kernel = new DuctusKernel({
@@ -41,55 +69,131 @@ describe('DuctusKernel (Baseline)', () => {
             ledger: mockLedger,
             store: mockStore,
             injector: mockInjector,
-            processors: [mockProcessor],
+            processors: [mockProcessor1, mockProcessor2],
+            canceller: mockCancelToken,
         })
     })
 
-    describe('Hydration and Boot (To Be Refactored)', () => {
-
-        it('currently replays all events from the ledger causing O(N) constraints (Needs Snapshotting)', async () => {
-            const events = [
-                { sequenceNumber: 1, type: 'EventA' },
-                { sequenceNumber: 2, type: 'EventB' }
-            ]
+    describe('Boot Sequence: Hydration & Mounting', () => {
+        it('completely drains the ledger iteratively during hydration (O(N) flaw to be fixed)', async () => {
+            const history = [
+                { sequenceNumber: 1, type: 'Evt1', volatility: 'durable', payload: 'a', isCommited: true, eventId: '1', prevHash: '', hash: '', timestamp: 1 },
+                { sequenceNumber: 2, type: 'Evt2', volatility: 'durable', payload: 'b', isCommited: true, eventId: '2', prevHash: '', hash: '', timestamp: 2 },
+                { sequenceNumber: 3, type: 'Evt3', volatility: 'durable', payload: 'c', isCommited: true, eventId: '3', prevHash: '', hash: '', timestamp: 3 }
+            ] as CommittedEvent<any>[]
 
             mockLedger.readEvents.mockImplementation(async function* () {
-                for (const event of events) {
-                    yield event
-                }
+                for (const h of history) yield h
             })
+
+            // Processors return empty streams
+            mockProcessor1.process.mockImplementation(async function* () { })
+            mockProcessor2.process.mockImplementation(async function* () { })
+            mockSubscriber.streamEvents.mockImplementation(async function* () { })
 
             await kernel.boot()
 
-            // Verifies that hydrateStore currently blindly consumes the whole ledger iterable
-            expect(mockLedger.readEvents).toHaveBeenCalled()
-            expect(mockStore.dispatch).toHaveBeenCalledTimes(2)
-            expect(mockStore.dispatch).toHaveBeenCalledWith(events[0])
-            expect(mockStore.dispatch).toHaveBeenCalledWith(events[1])
+            // Verify exhaustive hydration
+            expect(mockLedger.readEvents).toHaveBeenCalledTimes(1)
+            expect(mockStore.dispatch).toHaveBeenCalledTimes(3)
+            expect(mockStore.dispatch).toHaveBeenNthCalledWith(1, history[0])
+            expect(mockStore.dispatch).toHaveBeenNthCalledWith(2, history[1])
+            expect(mockStore.dispatch).toHaveBeenNthCalledWith(3, history[2])
+
+            // Verify processors were mounted
+            expect(mockMultiplexer.subscribe).toHaveBeenCalledTimes(2)
+            expect(mockProcessor1.process).toHaveBeenCalled()
+            expect(mockProcessor2.process).toHaveBeenCalled()
+            expect(mockMultiplexer.onCommit).toHaveBeenCalled()
+
+            await kernel.shutdown({ force: true })
         })
 
-        it('currently propagates events naively leading to cascading loops (Needs Causation Tracking)', async () => {
-            // Setup the onCommit listener to simulate a cascade
-            let commitCallback: any
-            mockMultiplexer.onCommit.mockImplementation((cb) => {
-                commitCallback = cb
-                return () => { }
+        it('allows state inspection directly in processors by passing getState binding', async () => {
+            mockProcessor1.process.mockImplementation(async function* (stream, getState) {
+                expect(getState()).toEqual({ val: 1 })
             })
+            mockProcessor2.process.mockImplementation(async function* () { })
+            mockSubscriber.streamEvents.mockImplementation(async function* () { })
+
+            await kernel.boot()
+            expect(mockProcessor1.process).toHaveBeenCalled()
+
+            await kernel.shutdown({ force: true })
+        })
+    })
+
+    describe('Runtime Loop: Processing & Cascading', () => {
+        it('relays processor output into multiplexer broadcasts', async () => {
+            mockProcessor1.process.mockImplementation(async function* () {
+                yield { type: 'ProcessorOutput1' }
+                yield { type: 'ProcessorOutput2' }
+            })
+            mockProcessor2.process.mockImplementation(async function* () { })
+            mockSubscriber.streamEvents.mockImplementation(async function* () { })
+
+            await kernel.boot()
+            // In a real application, the background monitor loop would be awaited. 
+            // the boot creates the mounts asynchronously.
+            // Let the microtask queue clear so the process() loops execute their yields.
+            await new Promise(r => setTimeout(r, 10))
+
+            expect(mockMultiplexer.broadcast).toHaveBeenCalledTimes(2)
+            expect(mockMultiplexer.broadcast).toHaveBeenCalledWith({ type: 'ProcessorOutput1' })
+            expect(mockMultiplexer.broadcast).toHaveBeenCalledWith({ type: 'ProcessorOutput2' })
+
+            await kernel.shutdown({ force: true })
+        })
+
+        it('dispatches multiplexer commits to the store and orchestrates pure, un-correlated cascading logic', async () => {
+            mockProcessor1.process.mockImplementation(async function* () { })
+            mockProcessor2.process.mockImplementation(async function* () { })
+            mockSubscriber.streamEvents.mockImplementation(async function* () { })
 
             await kernel.boot()
 
-            // Ensure the commit callback is registered
-            expect(commitCallback).toBeDefined()
+            // Store responds to the commit with new events
+            mockStore.dispatch.mockReturnValueOnce([
+                { type: 'CascadeEventA' },
+                { type: 'CascadeEventB' }
+            ])
 
-            // To be refactored: Currently, if dispatch returns events, they go into cascadingEvents 
-            // and are blindly broadcasted back to the multiplexer without correlation/causation IDs
-            mockStore.dispatch.mockReturnValueOnce([{ type: 'CascadedEvent' }])
+            // Trigger the onCommit listener manually
+            const incomingCommit = { type: 'RootCausationEvent', eventId: 'ROOT', sequenceNumber: 10 } as any
+            commitListener(incomingCommit)
 
-            commitCallback({ type: 'TriggerEvent' })
+            await new Promise(r => setImmediate(r))
+            await new Promise(r => setTimeout(r, 10))
 
-            // In a real execution, the mountCascadingEvents loop would pick this up
-            // This test just asserts the structural setup where dispatch output goes to cascade
-            expect(mockStore.dispatch).toHaveBeenCalledWith({ type: 'TriggerEvent' })
+            // The cascading loop pulls from the LinkedList and broadcasts
+            expect(mockStore.dispatch).toHaveBeenCalledWith(incomingCommit)
+            expect(mockMultiplexer.broadcast).toHaveBeenCalledWith({ type: 'CascadeEventA' })
+            expect(mockMultiplexer.broadcast).toHaveBeenCalledWith({ type: 'CascadeEventB' })
+
+            await kernel.shutdown({ force: true })
+        })
+    })
+
+    describe('Shutdown & Cancellation', () => {
+        it('aborts processing loops and unsubscribes bridges forcefully when requested', async () => {
+            mockProcessor1.process.mockImplementation(async function* () { })
+            mockProcessor2.process.mockImplementation(async function* () { })
+            mockSubscriber.streamEvents.mockImplementation(async function* () { })
+
+            await kernel.boot()
+            expect(mockCancelToken.isCancelled).toBe(false)
+
+            await kernel.shutdown({ force: true })
+
+            // Base canceller should be triggered
+            expect(mockCancelToken.cancel).toHaveBeenCalled()
+
+            // Subscriptions should be severed instantly
+            expect(mockSubscriber.unsubscribe).toHaveBeenCalledTimes(2)
+            expect(mockSubscriber.unsubscribe).toHaveBeenCalledWith({ drain: false })
+
+            // Since kernel creates its own internal Canceller wrapper, we know the loops evaluate it,
+            // resulting in resolution of the mountResolver. If it didn't, the test would hang.
         })
     })
 })

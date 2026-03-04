@@ -1,36 +1,37 @@
 import { DuctusMultiplexer } from '../core/ductus-multiplexer.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
+import { BufferedSubscriber } from '../core/buffered-subscriber.js'
 import * as cryptoUtils from '../utils/crypto-utils.js'
 
 jest.mock('../utils/crypto-utils.js', () => ({
-    getInitialEventHash: jest.fn().mockReturnValue('initial-hash-123'),
-    getEventHash: jest.fn().mockReturnValue('new-hash-456'),
+    getInitialEventHash: jest.fn().mockReturnValue('GENESIS_HASH_XYZ'),
+    getEventHash: jest.fn().mockImplementation((e) => `HASH_OF_${e.type}_SEQ_${e.sequenceNumber}`),
 }))
 
-describe('DuctusMultiplexer (Baseline)', () => {
+describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
     let mockLedger: jest.Mocked<EventLedger<any>>
     let multiplexer: DuctusMultiplexer<any>
 
     beforeEach(() => {
-        // Mock global crypto
+        // Deterministic global mocks
+        let uuidCounter = 0
         Object.defineProperty(globalThis, 'crypto', {
-            value: {
-                randomUUID: jest.fn().mockReturnValue('uuid-123'),
-            },
+            value: { randomUUID: jest.fn(() => `uuid-mock-${++uuidCounter}`) },
             writable: true
         });
 
-        // Mock Date.now
-        jest.spyOn(Date, 'now').mockReturnValue(1000)
+        let timeCounter = 1000000
+        jest.spyOn(Date, 'now').mockImplementation(() => timeCounter++)
 
         mockLedger = {
-            readEvents: jest.fn(),
+            readEvents: jest.fn().mockImplementation(async function* () { }),
             appendEvent: jest.fn().mockResolvedValue(undefined),
         } as any
 
         multiplexer = new DuctusMultiplexer({
             ledger: mockLedger,
+            // Opting out of passing initialHash and sequenceNumber to verify the unsafe defaults
         })
     })
 
@@ -38,41 +39,107 @@ describe('DuctusMultiplexer (Baseline)', () => {
         jest.restoreAllMocks()
     })
 
-    describe('Sequence and Hash Integrity (To Be Refactored)', () => {
+    describe('Sequence Advancing & Event Validation', () => {
+        it('assigns incrementing sequences, timestamps, IDs, and sequential hash chains', async () => {
+            const e1 = { type: 'Evt1' }
+            const e2 = { type: 'Evt2' }
 
-        it('currently initializes blindly to 0 and initial hash ignoring the ledger (Needs Ledger-Driven Init)', async () => {
-            const testEvent = { type: 'TestEvent', payload: 'data' }
+            await multiplexer.broadcast(e1)
+            await multiplexer.broadcast(e2)
 
-            await multiplexer.broadcast(testEvent)
+            expect(mockLedger.appendEvent).toHaveBeenCalledTimes(2)
 
-            // Note: The multiplexer NEVER queried `mockLedger.readEvents` or a latest event.
-            // It just started sequence at 1, pointing back to the initial hash.
-            // If this node restarted with a populated ledger, it would overwrite sequence 1.
-            expect(mockLedger.appendEvent).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    eventId: 'uuid-123',
-                    isCommited: true,
-                    payload: 'data',
-                    prevHash: 'initial-hash-123', // Blindly starts here
-                    sequenceNumber: 1,            // Blindly starts at 1
-                    timestamp: 1000,
-                    type: 'TestEvent'
-                })
-            )
+            const firstCommit = mockLedger.appendEvent.mock.calls[0][0]
+            const secondCommit = mockLedger.appendEvent.mock.calls[1][0]
+
+            // Assert exact structure of Event 1
+            expect(firstCommit).toMatchObject({
+                type: 'Evt1',
+                sequenceNumber: 1,
+                prevHash: 'GENESIS_HASH_XYZ', // Initial default 
+                hash: 'HASH_OF_Evt1_SEQ_1',
+                eventId: 'uuid-mock-1',
+                timestamp: 1000000,
+                isCommited: true
+            })
+
+            // Assert Object freeze 
+            expect(Object.isFrozen(firstCommit)).toBe(true)
+
+            // Assert exact structure of Event 2 building sequentially
+            expect(secondCommit).toMatchObject({
+                type: 'Evt2',
+                sequenceNumber: 2,
+                prevHash: 'HASH_OF_Evt1_SEQ_1', // Chained correctly
+                hash: 'HASH_OF_Evt2_SEQ_2',
+                eventId: 'uuid-mock-2',
+                timestamp: 1000001,
+            })
         })
 
-        it('currently commits events without causation tracking (Needs Causation/Correlation Metadata)', async () => {
-            const testEvent = { type: 'CauselessEvent' }
+        it('blindly overwrites existing ledgers if instanced without metadata (To Be Refactored)', async () => {
+            // Assume the user injects a ledger that already has 100 events.
+            // Under normal design, the Multiplexer MUST resume at sequence 101.
 
-            await multiplexer.broadcast(testEvent)
+            const e = { type: 'CrashRecoveryEvent' }
+            await multiplexer.broadcast(e)
 
-            // The committed event lacks causationId and correlationId structures
-            expect(mockLedger.appendEvent).toHaveBeenCalledWith(
-                expect.not.objectContaining({
-                    causationId: expect.anything(),
-                    correlationId: expect.anything(),
-                })
-            )
+            const commit = mockLedger.appendEvent.mock.calls[0][0]
+
+            // The flaw: It ignores the ledger contents and restarts the sequence and hashing
+            expect(commit.sequenceNumber).toBe(1)
+            expect(commit.prevHash).toBe('GENESIS_HASH_XYZ')
+        })
+    })
+
+    describe('Subscriptions and Locks', () => {
+        it('pushes frozen committed events to all active subscribers sequentially', async () => {
+            const sub1 = multiplexer.subscribe()
+            const sub2 = multiplexer.subscribe()
+
+            // Spy on the internal buffered subscriber push mechanism
+            jest.spyOn(sub1, 'push').mockResolvedValue(undefined)
+            jest.spyOn(sub2, 'push').mockResolvedValue(undefined)
+
+            await multiplexer.broadcast({ type: 'BroadcastTest' })
+
+            expect(sub1.push).toHaveBeenCalledTimes(1)
+            expect(sub2.push).toHaveBeenCalledTimes(1)
+
+            const pushedEvent1 = (sub1.push as jest.Mock).mock.calls[0][0]
+            const pushedEvent2 = (sub2.push as jest.Mock).mock.calls[0][0]
+
+            expect(pushedEvent1.eventId).toBe(pushedEvent2.eventId) // Same object relayed
+            expect(pushedEvent1.sequenceNumber).toBe(1)
+        })
+
+        it('cleans up subscribers upon deregistration', async () => {
+            const sub1 = multiplexer.subscribe()
+            jest.spyOn(sub1, 'push').mockResolvedValue(undefined)
+
+            // Explicitly call the array cleanup block tied to the onUnsubscribe callback
+            sub1.unsubscribe({ drain: false })
+
+            await multiplexer.broadcast({ type: 'UnseenEvent' })
+
+            // Assuming unsubscribe resolves the underlying generators, 
+            // the bridge array splice should eliminate it.
+            expect(sub1.push).not.toHaveBeenCalled()
+        })
+
+        it('executes commit listeners synchronously during broadcast', async () => {
+            const listener = jest.fn()
+            const off = multiplexer.onCommit(listener)
+
+            await multiplexer.broadcast({ type: 'SyncEvent' })
+
+            expect(listener).toHaveBeenCalledTimes(1)
+            expect(listener.mock.calls[0][0].type).toBe('SyncEvent')
+
+            off() // Deregister
+
+            await multiplexer.broadcast({ type: 'SyncEvent2' })
+            expect(listener).toHaveBeenCalledTimes(1) // Not called again
         })
     })
 })
