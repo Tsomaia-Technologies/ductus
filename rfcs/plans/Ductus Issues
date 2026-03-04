@@ -3,7 +3,7 @@
 ## Critical
 
 ### 1. Reducer Event Matching is Broken
-**File:** [default-reducer-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/default-reducer-builder.ts#L36-L38)
+**File:** [immutable-reducer-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/immutable-reducer-builder.ts#L36-L38)
 
 Uses reference equality + `as any` fallback on `.name`. Should match on `event.type` string only.
 
@@ -25,11 +25,11 @@ Uses reference equality + `as any` fallback on `.name`. Should match on `event.t
 ---
 
 ### 3. Agent Builder Missing Entity Fields ✅ Designed
-**Files:** [agent-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/builders/agent-builder.ts), [default-agent-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/default-agent-builder.ts), [agent-entity.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/entities/agent-entity.ts)
+**Files:** [agent-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/builders/agent-builder.ts), [immutable-agent-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/immutable-agent-builder.ts), [agent-entity.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/entities/agent-entity.ts)
 
 **Agreed design:**
 - Add `scope`, `maxContextTokens`, `maxFailures`, `maxRecognizedHallucinations`, `timeout` fields to `AgentEntity`
-- Store them in `DefaultAgentBuilder`, serialize in `[BUILD]()`
+- Store them in `ImmutableAgentBuilder`, serialize in `[BUILD]()`
 - **Lifecycle enforcement via AgentDispatcher** (modernized concept):
   - Created by `createKernel` from flow's `{ agent, model, adapter }[]` tuples
   - Owns adapter registry (agent name → live adapter instance)
@@ -73,7 +73,7 @@ Uses reference equality + `as any` fallback on `.name`. Should match on `event.t
 ## Medium
 
 ### 6. Reaction System Redesign
-**File:** [default-reaction-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/default-reaction-builder.ts)
+**File:** [immutable-reaction-builder.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/builders/immutable-reaction-builder.ts)
 
 Current `ReactionEntity` is a flat `{ events, reactions }`. Needs full redesign:
 

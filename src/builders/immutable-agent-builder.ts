@@ -27,10 +27,10 @@ interface AgentBuilderParams {
   skillsProxy?: Record<string, SkillRef>
 }
 
-export class DefaultAgentBuilder implements AgentBuilder {
+export class ImmutableAgentBuilder implements AgentBuilder {
   private params: AgentBuilderParams
 
-  constructor(base?: DefaultAgentBuilder) {
+  constructor(base?: ImmutableAgentBuilder) {
     this.params = {
       name: undefined,
       role: undefined,
