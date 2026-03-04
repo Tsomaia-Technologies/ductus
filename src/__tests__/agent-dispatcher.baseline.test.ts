@@ -29,12 +29,14 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
         mockAdapter = {
             initialize: jest.fn().mockResolvedValue(undefined),
             process: jest.fn().mockImplementation(async function* () { yield { type: 'text', content: '{}', timestamp: 1 } }),
+            parse: jest.fn().mockReturnValue({}),
             terminate: jest.fn().mockResolvedValue(undefined),
         } as any
 
         mockSecondAdapter = {
             initialize: jest.fn().mockResolvedValue(undefined),
             process: jest.fn().mockImplementation(async function* () { yield { type: 'text', content: '{}', timestamp: 1 } }),
+            parse: jest.fn().mockReturnValue({}),
             terminate: jest.fn().mockResolvedValue(undefined),
         } as any
 
@@ -213,33 +215,26 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
         })
     })
 
-    describe('invokeAndParse (Pipeline ParsingInterceptor Extraction)', () => {
-        it('extracts structured output when text contains markdown brackets', async () => {
+    describe('invokeAndParse (Delegation to Adapter)', () => {
+        it('collects all chunks and delegates extraction to the adapter', async () => {
             mockAdapter.process.mockImplementation(async function* () {
-                yield { type: 'text', content: 'Here is the data:\n```json\n{"key": "value", "arr": [1,2]}\n```', timestamp: 1 }
+                yield { type: 'text', content: 'chunk1', timestamp: 1 }
+                yield { type: 'text', content: 'chunk2', timestamp: 2 }
             })
+            mockAdapter.parse.mockReturnValue({ final: 'data' })
 
             const res = await dispatcher.invokeAndParse('test-agent', 'test-skill', {})
-            expect(res).toEqual({ key: 'value', arr: [1, 2] })
+
+            expect(res).toEqual({ final: 'data' })
+            expect(mockAdapter.parse).toHaveBeenCalledWith([
+                expect.objectContaining({ content: 'chunk1' }),
+                expect.objectContaining({ content: 'chunk2' })
+            ])
         })
 
-        it('throws when the extracted block is invalid JSON due to aggressive regex matching', async () => {
-            mockAdapter.process.mockImplementation(async function* () {
-                // Testing the fragility: A regex /[\[{][\s\S]*[\]}]/ matches from the first '{' or '[' to the last '}' or ']'.
-                yield { type: 'text', content: 'I thought about using an array like [1, 2, 3] but I decided to return: {"key":"value"}', timestamp: 1 }
-            })
-
-            // The exact regex behavior will extract: "[1, 2, 3] but I decided to return: {"key":"value"}"
-            // This is invalid JSON.
-            await expect(dispatcher.invokeAndParse('test-agent', 'test-skill', {})).rejects.toThrow()
-        })
-
-        it('throws if no brackets are found at all', async () => {
-            mockAdapter.process.mockImplementation(async function* () {
-                yield { type: 'text', content: 'Just a raw string output with no structure.', timestamp: 1 }
-            })
-
-            await expect(dispatcher.invokeAndParse('test-agent', 'test-skill', {})).rejects.toThrow("Failed to extract JSON from agent response")
+        it('throws if the adapter fails to parse', async () => {
+            mockAdapter.parse.mockImplementation(() => { throw new Error("Parse Error") })
+            await expect(dispatcher.invokeAndParse('test-agent', 'test-skill', {})).rejects.toThrow("Parse Error")
         })
     })
 

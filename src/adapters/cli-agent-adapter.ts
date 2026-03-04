@@ -3,6 +3,7 @@ import { AgentContext } from '../interfaces/agent-context.js'
 import { AgentChunk } from '../interfaces/agent-chunk.js'
 import { NodeSystemAdapter } from '../system/node-system-adapter.js'
 import { SystemProcessAdapter } from '../interfaces/system-process-adapter.js'
+import { InvocationContext } from '../core/pipeline/agent-interceptor.js'
 
 export interface CliAdapterConfig {
   command: string
@@ -48,12 +49,16 @@ export class CliAgentAdapter implements AgentAdapter {
     })
   }
 
-  async* process(input: string): AsyncIterable<AgentChunk> {
+  async* process(context: InvocationContext): AsyncIterable<AgentChunk> {
     if (!this.processAdapter) {
       throw new Error('Adapter not initialized. Call initialize() first.')
     }
 
-    await this.processAdapter.write(input, { end: true })
+    if (!context.prompt) {
+      throw new Error('No prompt in context for adapter execution.')
+    }
+
+    await this.processAdapter.write(context.prompt, { end: true })
 
     for await (const event of this.processAdapter.readStream()) {
       switch (event.type) {
@@ -80,6 +85,24 @@ export class CliAgentAdapter implements AgentAdapter {
           }
           return
       }
+    }
+  }
+
+  parse(chunks: AgentChunk[]): any {
+    const text = chunks
+      .filter(c => c.type === 'text')
+      .map(c => (c as any).content)
+      .join('')
+
+    const match = text.match(/[\[{][\s\S]*[\]}]/)
+    if (!match) {
+      throw new Error(`Failed to extract JSON from agent response. Raw text length: ${text.length}`)
+    }
+
+    try {
+      return JSON.parse(match[0])
+    } catch (e) {
+      throw new Error(`Failed to parse extracted JSON block: ${(e as Error).message}`)
     }
   }
 

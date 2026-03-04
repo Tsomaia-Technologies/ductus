@@ -15,7 +15,6 @@ import { StoreAdapter } from '../interfaces/store-adapter.js'
 
 import { AgentTuple, AgentLifecycleState, TurnRecord } from '../interfaces/agent-lifecycle.js'
 import { AgentInterceptor, InvocationContext } from './pipeline/agent-interceptor.js'
-import { ParsingInterceptor } from './pipeline/interceptors/parsing-interceptor.js'
 import { TemplateInterceptor } from './pipeline/interceptors/template-interceptor.js'
 
 /**
@@ -80,8 +79,7 @@ export class AgentDispatcher<TEvent extends BaseEvent, TState> {
     this.systemAdapter = options.systemAdapter
     this.fileAdapter = options.fileAdapter
     this.interceptors = options.interceptors ?? [
-      new TemplateInterceptor(this.fileAdapter, this.systemAdapter, this.templateRenderer),
-      new ParsingInterceptor()
+      new TemplateInterceptor(this.fileAdapter, this.systemAdapter, this.templateRenderer)
     ]
   }
 
@@ -161,15 +159,16 @@ export class AgentDispatcher<TEvent extends BaseEvent, TState> {
       data: new Map()
     }
 
+    const chunks: AgentChunk[] = []
     for await (const chunk of this.invokeContext(context)) {
-      // Just drain the generator. Pipeline writes to context.
+      chunks.push(chunk)
     }
 
-    const parsed = context.data.get('parsedOutput')
-    if (parsed === undefined) {
-      throw new Error(`Failed to extract JSON from agent response for skill '${skillName}'.`)
+    if (!context.state?.adapter) {
+      throw new Error("Agent lifecycle state or adapter missing after invocation")
     }
-    return parsed
+
+    return context.state.adapter.parse(chunks)
   }
 
   async terminateAll(): Promise<void> {

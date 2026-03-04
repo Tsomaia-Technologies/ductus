@@ -13,6 +13,8 @@ export interface AgentAdapter {
 
   process(context: InvocationContext): AsyncIterable<AgentChunk>
 
+  parse(chunks: AgentChunk[]): any
+
   terminate(): Promise<void>
 }
 

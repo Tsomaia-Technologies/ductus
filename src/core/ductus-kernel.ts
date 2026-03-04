@@ -8,6 +8,7 @@ import { Canceller } from '../system/canceller.js'
 import { EventSubscriber } from '../interfaces/event-subscriber.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
+import { DeeplyReadonly } from '../interfaces/helpers.js'
 
 export type DuctusReducer<TEvent extends BaseEvent, TState> = (state: TState, event: TEvent) => [TState, TEvent[]]
 
@@ -18,7 +19,7 @@ export interface KernelOptions<TEvent extends BaseEvent, TState> {
   ledger: EventLedger<CommittedEvent<TEvent>>
   store: StoreAdapter<TState, TEvent>
   canceller?: CancellationToken
-  snapshotPredicate?: (eventsProcessed: number) => boolean
+  shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent<TEvent>) => boolean
 }
 
 export class DuctusKernel<TEvent extends BaseEvent, TState> {
@@ -34,8 +35,8 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
   private readonly cascadingEvents = new LinkedList<{ event: TEvent; context: { causationId: string; correlationId: string } }>()
   private readonly cascadeWakeUpResolvers = new LinkedList<() => void>()
   private unsubscribeCommit?: () => void
-  private readonly snapshotPredicate?: (eventsProcessed: number) => boolean
-  private eventsProcessedSinceSnapshot = 0
+  private readonly shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent<TEvent>) => boolean
+  private readonly causationGraph = new Map<string, { type: string, causationId?: string }>()
 
   constructor(options: KernelOptions<TEvent, TState>) {
     const {
@@ -45,7 +46,7 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
       store,
       injector,
       canceller,
-      snapshotPredicate,
+      shouldTakeSnapshot,
     } = options
     this.multiplexer = multiplexer
     this.processors = processors
@@ -54,7 +55,7 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
     this.getState = this.store.getState.bind(this.store)
     this.use = injector
     this.canceller = new Canceller({ base: canceller })
-    this.snapshotPredicate = snapshotPredicate
+    this.shouldTakeSnapshot = shouldTakeSnapshot
   }
 
   async boot() {
@@ -104,17 +105,20 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
 
     for await (const event of this.ledger.readEvents({ afterSequence })) {
       this.store.dispatch(event)
-      this.eventsProcessedSinceSnapshot++
     }
   }
 
   private mountStore() {
     this.unsubscribeCommit = this.multiplexer.onCommit(commitedEvent => {
+      // Record Graph Node for Cycle Detection
+      this.causationGraph.set(commitedEvent.eventId, {
+        type: commitedEvent.type,
+        causationId: commitedEvent.causationId
+      })
+
       const eventsOut = this.store.dispatch(commitedEvent)
 
-      this.eventsProcessedSinceSnapshot++
-      if (this.store.saveSnapshot && this.snapshotPredicate?.(this.eventsProcessedSinceSnapshot)) {
-        this.eventsProcessedSinceSnapshot = 0
+      if (this.store.saveSnapshot && this.shouldTakeSnapshot?.(this.store.getState() as DeeplyReadonly<TState>, commitedEvent)) {
         this.store.saveSnapshot(commitedEvent.sequenceNumber).catch(console.error)
       }
 
@@ -123,6 +127,22 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
       const correlationId = commitedEvent.correlationId || commitedEvent.eventId
 
       for (const event of eventsOut) {
+        // Cycle detection check
+        let pointer: string | undefined = commitedEvent.eventId
+        const depthLimit = 100 // Hard limit just in case
+        let jumps = 0
+        while (pointer && jumps < depthLimit) {
+          const node = this.causationGraph.get(pointer)
+          if (!node) break
+          if (node.type === event.type) {
+            console.error(`Ductus Framework Error: Logical Event Cycle Detected! Event Type '${event.type}' caused by itself via causation chain. Halting propagation.`)
+            this.canceller.cancel({ force: true })
+            return
+          }
+          pointer = node.causationId
+          jumps++
+        }
+
         this.cascadingEvents.insertLast({
           event,
           context: {
@@ -157,6 +177,14 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
   private async mountCascadingEvents() {
     while (!this.canceller.isCancelled()) {
       const wrapper = this.cascadingEvents.removeFirst()
+
+      // Flush causation transit map if cascade wraps up
+      if (!wrapper && this.cascadingEvents.size === 0) {
+        // Keep at most last 100 to prevent leak, or simply clear heavily
+        if (this.causationGraph.size > 1000) {
+          this.causationGraph.clear()
+        }
+      }
 
       if (wrapper) {
         await this.multiplexer.broadcast(wrapper.event, wrapper.context)

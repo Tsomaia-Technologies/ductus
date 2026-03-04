@@ -180,6 +180,48 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
 
             await kernel.shutdown({ force: true })
         })
+
+        it('detects logical cycles and halts propagation via the canceller', async () => {
+            mockProcessor1.process.mockImplementation(async function* () { })
+            mockProcessor2.process.mockImplementation(async function* () { })
+            mockSubscriber.streamEvents.mockImplementation(async function* () { })
+
+            await kernel.boot()
+
+            // Event A causes Event A (Infinite Loop)
+            mockStore.dispatch.mockReturnValue([{ type: 'InfiniteLoopEvent' }])
+
+            const commit = { type: 'InfiniteLoopEvent', eventId: 'EVT_1', sequenceNumber: 10 } as any
+            commitListener(commit)
+
+            await new Promise(r => setImmediate(r))
+
+            expect(mockCancelToken.cancel).toHaveBeenCalledWith({ force: true })
+            expect((mockCancelToken as any).isCancelled).toBe(true)
+
+            await kernel.shutdown({ force: true })
+        })
+
+        it('triggers state snapshotting when the predicate returns true', async () => {
+            const customKernel = new DuctusKernel({
+                multiplexer: mockMultiplexer,
+                ledger: mockLedger,
+                store: mockStore,
+                injector: mockInjector,
+                processors: [],
+                canceller: mockCancelToken,
+                shouldTakeSnapshot: (state: any, event: any) => event.type === 'SnapshotMe'
+            })
+
+            await customKernel.boot()
+
+            const commit = { type: 'SnapshotMe', eventId: 'S1', sequenceNumber: 50, timestamp: 100 } as any
+            commitListener(commit)
+
+            expect(mockStore.saveSnapshot).toHaveBeenCalledWith(50)
+
+            await customKernel.shutdown({ force: true })
+        })
     })
 
     describe('Shutdown & Cancellation', () => {
