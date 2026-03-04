@@ -8,17 +8,20 @@ import { Schema } from '../schema.js'
  * and escape methods to return to the main reaction builder.
  */
 export interface InvokeCursorBuilder<TEvent extends BaseEvent> {
+  name(name: string): ReactionBuilder<TEvent>
+
   case(schema: Schema, action: ReactionBuilder<TEvent>): InvokeCursorBuilder<TEvent>
+
+  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent>
 
   emit(event: TEvent): ReactionBuilder<TEvent>
 
-  // Escape: return to parent builder
   when(...events: TEvent[]): ReactionBuilder<TEvent>
-
-  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent>
 }
 
 export interface ReactionBuilder<TEvent extends BaseEvent> extends Buildable<ReactionEntity<TEvent>> {
+  name(name: string): this
+
   when(...events: TEvent[]): this
 
   invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent>

@@ -50,7 +50,7 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
     event: (name: string) => new ImmutableEventBuilder().type(name),
     flow: () => new ImmutableFlowBuilder<TEvent, TState>(),
     model: (modelId: string) => new ImmutableModelBuilder().model(modelId),
-    reaction: () => new ImmutableReactionBuilder<TEvent>(),
+    reaction: (name: string) => new ImmutableReactionBuilder<TEvent>().name(name),
     reducer: () => new ImmutableReducerBuilder<TEvent, TState>(),
     ruleset: (name: string) => new ImmutableRulesetBuilder().name(name),
     skill: (name: string) => new ImmutableSkillBuilder().name(name),

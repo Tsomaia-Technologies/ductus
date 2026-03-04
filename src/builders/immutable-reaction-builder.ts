@@ -5,6 +5,7 @@ import { BaseEvent } from '../interfaces/event.js'
 import { Schema } from '../interfaces/schema.js'
 
 interface ReactionBuilderParams<TEvent extends BaseEvent> {
+  name?: string
   readonly triggers: TEvent[]
   readonly pipeline: PipelineStep<TEvent>[]
 }
@@ -14,9 +15,14 @@ export class ImmutableReactionBuilder<TEvent extends BaseEvent> implements React
 
   constructor(params?: ReactionBuilderParams<TEvent>) {
     this.params = params ?? {
+      name: undefined,
       triggers: [],
       pipeline: [],
     }
+  }
+
+  name(name: string) {
+    return this.clone({ name })
   }
 
   when(...events: TEvent[]): this {
@@ -58,6 +64,10 @@ class ImmutableInvokeCursorBuilder<TEvent extends BaseEvent> implements InvokeCu
     private readonly invokeStep: InvokeStep,
     private readonly cases: PipelineStep<TEvent>[] = []
   ) { }
+
+  name(name: string): ReactionBuilder<TEvent> {
+    return this.escape().name(name)
+  }
 
   case(schema: Schema, action: ReactionBuilder<TEvent>): InvokeCursorBuilder<TEvent> {
     const nested = action[BUILD]()
