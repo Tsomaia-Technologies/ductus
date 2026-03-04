@@ -20,7 +20,11 @@ export class LinkedList<T> {
       next: this.first,
     }
 
-    if (this.first) this.first.previous = newNode
+    if (this.first) {
+      this.first.previous = newNode
+    } else {
+      this.last = newNode
+    }
     this.first = newNode
     ++this.length
   }
@@ -32,7 +36,11 @@ export class LinkedList<T> {
       next: null,
     }
 
-    if (this.last) this.last.next = newNode
+    if (this.last) {
+      this.last.next = newNode
+    } else {
+      this.first = newNode
+    }
     this.last = newNode
     ++this.length
   }
@@ -44,7 +52,11 @@ export class LinkedList<T> {
 
     const value = this.first.value
     this.first = this.first.next
-    if (this.first) this.first.previous = null
+    if (this.first) {
+      this.first.previous = null
+    } else {
+      this.last = null
+    }
     --this.length
 
     return value
@@ -57,7 +69,11 @@ export class LinkedList<T> {
 
     const value = this.last.value
     this.last = this.last.previous
-    if (this.last) this.last.next = null
+    if (this.last) {
+      this.last.next = null
+    } else {
+      this.first = null
+    }
     --this.length
 
     return value
