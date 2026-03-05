@@ -23,6 +23,31 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
   }
 
   [BUILD](): ContainerEntity {
+    return {
+      use: (() => {
+        const registry = this.registry
+        const services = new Map<Type, InstanceType<Type>>()
 
+        return function injector<T extends Type>(type: T): InstanceType<T> {
+          const service = services.get(type)
+          if (service) return service
+
+          const entry = registry.get(type)
+
+          if (!entry) {
+            throw new TypeError(`No instance found for type: ${type.name}.`)
+          }
+
+          if (entry.type === 'factory') {
+            const service = entry.factory(injector)
+            services.set(type, service)
+            return service
+          }
+
+          services.set(type, service)
+          return service
+        }
+      })()
+    }
   }
 }
