@@ -9,17 +9,25 @@ export interface ContainerServiceEntry {
   instance: InstanceType<Type>
 }
 
-export interface ContainerServiceFactoryEntry {
-  type: 'factory'
+export interface ContainerSingletonEntry {
+  type: 'singleton'
+  factory: ServiceFactory
+}
+
+export interface ContainerTransientEntry {
+  type: 'transient'
   factory: ServiceFactory
 }
 
 export type ContainerEntry =
   | ContainerServiceEntry
-  | ContainerServiceFactoryEntry
+  | ContainerSingletonEntry
+  | ContainerTransientEntry
 
 export interface ContainerBuilder extends Buildable<ContainerEntity> {
   service<T extends Type>(type: T, instance: InstanceType<Type>): this
 
-  factory<T extends Type>(type: T, factory: ServiceFactory): this
+  singleton<T extends Type>(type: T, factory: ServiceFactory): this
+
+  transient<T extends Type>(type: T, factory: ServiceFactory): this
 }
