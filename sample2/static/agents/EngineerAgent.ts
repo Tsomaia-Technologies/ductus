@@ -1,4 +1,4 @@
-import Ductus from '../core.js'
+import Ductus from 'ductus'
 import ImplementSkill from '../skills/ImplementSkill.js'
 
 export default Ductus.agent('engineer')

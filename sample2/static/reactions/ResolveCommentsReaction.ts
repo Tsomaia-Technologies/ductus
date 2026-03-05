@@ -1,5 +1,5 @@
-import Ductus from '../core.js'
-import ImplementationReportEvent from '../events/ImplementationReportEvent.js'
+import Ductus from 'ductus'
+import { ImplementationReportEvent } from '../events/index.js'
 import EngineerAgent from '../agents/EngineerAgent.js'
 
 export default Ductus.reaction('ResolveCommentsReaction')

@@ -1,4 +1,4 @@
-import Ductus from '../core.js'
+import Ductus from 'ductus'
 import ApprovalSchema from './ApprovalSchema.js'
 import RejectionSchema from './RejectionSchema.js'
 

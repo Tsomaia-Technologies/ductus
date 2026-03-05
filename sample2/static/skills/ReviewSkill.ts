@@ -1,4 +1,4 @@
-import Ductus from '../core.js'
+import Ductus from 'ductus'
 import ImplementationReportSchema from '../schemas/ImplementationReportSchema.js'
 import ReviewSchema from '../schemas/ReviewResultSchema.js'
 

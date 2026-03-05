@@ -1,4 +1,4 @@
-import Ductus from '../core.js'
+import Ductus from 'ductus'
 
 const Check = Ductus.object({
   command: Ductus.string(),

@@ -1,5 +1,5 @@
 import { Buildable } from './__internal__.js'
-import { ReactionEntity } from '../entities/reaction-entity.js'
+import { PipelineAction, ReactionEntity } from '../entities/reaction-entity.js'
 import { EventDefinition } from '../event.js'
 import { Schema } from '../schema.js'
 
@@ -10,7 +10,7 @@ import { Schema } from '../schema.js'
 export interface InvokeCursorBuilder {
   name(name: string): ReactionBuilder
 
-  case(schema: Schema, action: ReactionBuilder): InvokeCursorBuilder
+  case(schema: Schema, action: PipelineAction): InvokeCursorBuilder
 
   invoke(params: { agent: string, skill: string }): InvokeCursorBuilder
 

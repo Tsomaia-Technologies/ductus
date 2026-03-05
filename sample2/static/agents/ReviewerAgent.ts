@@ -1,4 +1,4 @@
-import Ductus from '../core.js'
+import Ductus from 'ductus'
 import ReviewSkill from '../skills/ReviewSkill.js'
 
 export default Ductus.agent('reviewer')

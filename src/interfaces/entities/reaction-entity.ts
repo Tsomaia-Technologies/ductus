@@ -1,11 +1,6 @@
 import { EventDefinition } from '../event.js'
 import { Schema } from '../schema.js'
 
-export type PipelineStep =
-  | InvokeStep
-  | CaseStep
-  | EmitStep
-
 export interface InvokeStep {
   type: 'invoke'
   agent: string
@@ -22,6 +17,14 @@ export interface EmitStep {
   type: 'emit'
   event: EventDefinition
 }
+
+export type PipelineAction =
+  | InvokeStep
+  | EmitStep
+
+export type PipelineStep =
+  | PipelineAction
+  | CaseStep
 
 export interface ReactionEntity {
   triggers: string[]

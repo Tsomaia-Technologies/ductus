@@ -34,7 +34,7 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
    */
   persona(value: PersonaValue): this
 
-  skill(skill: SkillBuilder): this
+  skill(skill: SkillBuilder, alias?: string): this
 
   rule(rule: string): this
 
