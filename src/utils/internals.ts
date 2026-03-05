@@ -74,7 +74,7 @@ async function* executePipeline<TState>(
   for (const step of steps) {
     switch (step.type) {
       case 'emit':
-        yield step.event
+        yield step.event(lastInvokeResult)
         break
 
       case 'invoke':
