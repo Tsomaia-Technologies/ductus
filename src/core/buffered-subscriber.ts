@@ -19,8 +19,7 @@ export class BufferedSubscriber implements EventSubscriber {
 
   async push(event: CommittedEvent): Promise<void> {
     if (this.isTerminated) {
-      // Gracefully ignore events pushed to a terminated subscriber
-      return Promise.resolve()
+      return
     }
 
     if (this.eventQueue.size >= this.bufferLimit) {
