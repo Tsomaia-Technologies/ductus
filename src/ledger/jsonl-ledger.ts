@@ -12,15 +12,13 @@ export interface JsonLedgerOptions {
 
 export class JsonlLedger implements EventLedger {
   private readonly fileAdapter: FileAdapter
-  private readonly fileHandleAdapter: FileHandleAdapter
   private readonly ledgerFileAbsolutePath: string
-  private openPromise: Promise<void> | null = null
+  private handlePromise: Promise<FileHandleAdapter> | null = null
 
   constructor(options: JsonLedgerOptions) {
     const { fileAdapter, ledgerFileAbsolutePath } = options
     this.fileAdapter = fileAdapter
     this.ledgerFileAbsolutePath = ledgerFileAbsolutePath
-    this.fileHandleAdapter = this.fileAdapter.createFileHandle()
   }
 
   async* readEvents(): AsyncIterable<CommittedEvent> {
@@ -52,10 +50,10 @@ export class JsonlLedger implements EventLedger {
   }
 
   async appendEvent(event: CommittedEvent): Promise<void> {
-    if (!this.openPromise) {
-      this.openPromise = this.fileHandleAdapter.open(this.ledgerFileAbsolutePath, 'a')
+    if (!this.handlePromise) {
+      this.handlePromise = this.fileAdapter.open(this.ledgerFileAbsolutePath, 'a')
     }
-    await this.openPromise
-    await this.fileHandleAdapter.appendJsonl(event as any)
+    const handle = await this.handlePromise
+    await handle.appendJsonl(event as any)
   }
 }

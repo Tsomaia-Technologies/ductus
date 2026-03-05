@@ -141,7 +141,9 @@ export class NodeFileAdapter implements FileAdapter {
     }
   }
 
-  createFileHandle(): FileHandleAdapter {
-    return new NodeFileHandleAdapter()
+  async open(absolutePath: string, mode: 'a' | 'w'): Promise<FileHandleAdapter> {
+    const handle = new NodeFileHandleAdapter()
+    await handle.open(absolutePath, mode)
+    return handle
   }
 }

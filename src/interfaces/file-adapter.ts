@@ -133,7 +133,10 @@ export interface FileAdapter {
   delete(absolutePath: string): Promise<boolean>
 
   /**
-   * Creates a detached file handle adapter instance.
+   * Creates and opens a stateful file handle adapter.
+   *
+   * @param {string} absolutePath
+   * @param {'a' | 'w'} mode
    */
-  createFileHandle(): FileHandleAdapter
+  open(absolutePath: string, mode: 'a' | 'w'): Promise<FileHandleAdapter>
 }
