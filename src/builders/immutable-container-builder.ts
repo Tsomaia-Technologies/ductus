@@ -12,15 +12,19 @@ type RegistryNode = {
 export class ImmutableContainerBuilder implements ContainerBuilder {
   constructor(
     private readonly head: RegistryNode | null = null,
-    private readonly parentContainer?: ContainerEntity,
+    private readonly parentBuilder?: ContainerBuilder,
   ) { }
+
+  parent(builder: ContainerBuilder): this {
+    return new ImmutableContainerBuilder(this.head, builder) as this
+  }
 
   service<T extends Type>(type: T, instance: InstanceType<Type>): this {
     return new ImmutableContainerBuilder({
       type,
       entry: { type: 'service', instance },
       parent: this.head,
-    }, this.parentContainer) as this
+    }, this.parentBuilder) as this
   }
 
   singleton<T extends Type>(type: T, factory: ServiceFactory): this {
@@ -28,7 +32,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
       type,
       entry: { type: 'singleton', factory },
       parent: this.head,
-    }, this.parentContainer) as this
+    }, this.parentBuilder) as this
   }
 
   transient<T extends Type>(type: T, factory: ServiceFactory): this {
@@ -36,17 +40,21 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
       type,
       entry: { type: 'transient', factory },
       parent: this.head,
-    }, this.parentContainer) as this
+    }, this.parentBuilder) as this
   }
 
   [BUILD](): ContainerEntity {
+    const parentContainer = this.parentBuilder
+      ? this.parentBuilder[BUILD]()
+      : undefined
+
     return {
       use: (() => {
         const services = new Map<Type, InstanceType<Type>>()
         const singletons = new Map<Type, ServiceFactory>()
         const transients = new Map<Type, ServiceFactory>()
         const currentlyResolving = new Set<Type>()
-        const parent = this.parentContainer
+        const parent = parentContainer
 
         let current = this.head
 

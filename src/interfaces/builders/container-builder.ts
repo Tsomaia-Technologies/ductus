@@ -25,6 +25,8 @@ export type ContainerEntry =
   | ContainerTransientEntry
 
 export interface ContainerBuilder extends Buildable<ContainerEntity> {
+  parent(container: ContainerBuilder): this
+
   service<T extends Type>(type: T, instance: InstanceType<Type>): this
 
   singleton<T extends Type>(type: T, factory: ServiceFactory): this
