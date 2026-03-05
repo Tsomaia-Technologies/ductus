@@ -82,3 +82,5 @@ export * from './utils/schema-utils.js'
 export * from './utils/string-utils.js'
 
 export * from './factories.js'
+
+export { default } from './factories.js'
