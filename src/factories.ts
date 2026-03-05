@@ -1,6 +1,5 @@
 import { ImmutableAgentBuilder } from './builders/immutable-agent-builder.js'
 import { ImmutableSkillBuilder } from './builders/immutable-skill-builder.js'
-import { ImmutableEventBuilder } from './builders/immutable-event-builder.js'
 import { ImmutableProcessorBuilder } from './builders/immutable-processor-builder.js'
 import { EventGenerator, Injector } from './interfaces/event-generator.js'
 import { ImmutableReactionBuilder } from './builders/immutable-reaction-builder.js'
@@ -13,7 +12,7 @@ import { Multiplexer } from './interfaces/multiplexer.js'
 import { EventLedger } from './interfaces/event-ledger.js'
 import { EventProcessor } from './interfaces/event-processor.js'
 import { EmitStep, InvokeStep, PipelineStep, ReactionEntity } from './interfaces/entities/reaction-entity.js'
-import { BaseEvent, CommittedEvent } from './interfaces/event.js'
+import { BaseEvent, CommittedEvent, Volatility } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { DependencyContainer } from './interfaces/dependency-container.js'
 import { ImmutableRulesetBuilder } from './builders/immutable-ruleset-builder.js'
@@ -24,7 +23,27 @@ import { FileAdapter } from '../research/interfaces/adapters.js'
 import { DuctusStore } from './core/ductus-store.js'
 import * as zod from 'zod/v3'
 
-export function createDuctus<TEvent extends BaseEvent, TState>() {
+export interface CreateDuctusOptions {
+  environment?: 'production' | 'development'
+}
+
+function createDurableEvent<TType extends string, TPayloadShape extends zod.ZodRawShape>(
+  type: TType,
+  payloadShape: TPayloadShape,
+) {
+  return createEventFactory({ type, payloadShape, volatility: 'durable' })
+}
+
+function createVolatileEvent<TType extends string, TPayloadShape extends zod.ZodRawShape>(
+  type: TType,
+  payloadShape: TPayloadShape,
+) {
+  return createEventFactory({ type, payloadShape, volatility: 'volatile' })
+}
+
+export function createDuctus<TEvent extends BaseEvent, TState>(options: CreateDuctusOptions) {
+  const { environment = 'development', } = options
+
   return {
     literal: zod.literal,
     boolean: zod.boolean,
@@ -35,7 +54,7 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
     date: zod.date,
     union: zod.union,
     discriminatedUnion: zod.discriminatedUnion,
-    object: zod.object,
+    object: zod.strictObject,
     array: zod.array,
     enum: zod.enum,
 
@@ -47,7 +66,8 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
     }),
 
     agent: (name: string) => new ImmutableAgentBuilder().name(name),
-    event: (name: string) => new ImmutableEventBuilder().type(name),
+    event: createDurableEvent,
+    signal: createVolatileEvent,
     flow: () => new ImmutableFlowBuilder<TEvent, TState>(),
     model: (modelId: string) => new ImmutableModelBuilder().model(modelId),
     reaction: (name: string) => new ImmutableReactionBuilder<TEvent>().name(name),
@@ -69,6 +89,35 @@ export function createDuctus<TEvent extends BaseEvent, TState>() {
       return factory(injector)
     },
   }
+}
+
+export function createEventFactory<TType extends string, TPayloadShape extends zod.ZodRawShape>(params: {
+  type: TType
+  payloadShape: TPayloadShape
+  volatility: Volatility,
+}) {
+  const { type, payloadShape, volatility } = params
+  const payloadSchema = zod.strictObject(payloadShape)
+  type TPayload = zod.input<typeof payloadSchema>
+
+  const createEvent = (payload: TPayload): BaseEvent<TType, TPayload> => {
+    const validatedPayload = payloadSchema.parse(payload)
+
+    return {
+      type,
+      payload: validatedPayload,
+      volatility,
+      isCommited: false,
+    }
+  }
+
+  Object.assign(createEvent, {
+    type,
+    volatility,
+    payloadSchema,
+  })
+
+  return createEvent
 }
 
 export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
