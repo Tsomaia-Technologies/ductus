@@ -5,7 +5,7 @@ export interface Multiplexer {
   /**
    * Creates subscriber to the commited events and returns it
    */
-  subscribe(): EventSubscriber<CommittedEvent>
+  subscribe(): EventSubscriber
 
   /**
    * Registers synchronous listener that is invoked when event is commited and is about to be broadcasted,
