@@ -33,6 +33,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
       use: (() => {
         const services = new Map<Type, InstanceType<Type>>()
         const factories = new Map<Type, ServiceFactory>()
+        const currentlyResolving = new Set<Type>()
 
         let current = this.head
 
@@ -54,11 +55,21 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
           const factory = factories.get(type)
           if (!factory) throw new Error(`Type ${type.name} not registered.`)
 
-          const service = factory(injector)
-          services.set(type, service)
-          factories.delete(type)
+          if (currentlyResolving.has(type)) {
+            throw new Error(`Circular dependency detected while resolving ${type.name}`)
+          }
 
-          return service as InstanceType<T>
+          currentlyResolving.add(type)
+
+          try {
+            const service = factory(injector)
+            services.set(type, service)
+            factories.delete(type)
+
+            return service as InstanceType<T>
+          } finally {
+            currentlyResolving.delete(type)
+          }
         }
       })(),
     }
