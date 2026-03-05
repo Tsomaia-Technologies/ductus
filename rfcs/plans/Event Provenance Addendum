@@ -1,0 +1,31 @@
+# Event Provenance Plan - Architectural Addendum
+
+Following the review of the "Event Provenance & Causality Strictness" RFC, the following structural mandates have been established to guarantee zero-trust observability while maintaining an optimal Developer Experience (DX).
+
+## 1. The ActorIdentity Envelope
+The `authorId` string parameter is insufficient for a self-describing ledger. The `CommittedEvent` must structurally require a discriminated union:
+
+```typescript
+export type ActorIdentity = 
+  | { type: 'system' }
+  | { type: 'agent', name: string, instanceId: string }
+  | { type: 'user', id: string }
+  | { type: 'anonymous' };
+```
+This ensures downstream processors and security rules can route and authorize events based on typological context, entirely free from string-parsing heuristics.
+
+## 2. Implicit Context Propagation (The DX Mandate)
+To prevent developers from manually passing `{ actor: ... }` through every application layer, Ductus will adopt an implicit context boundary using Node.js `AsyncLocalStorage`.
+
+**Mechanism:**
+1. Maintain `DuctusContextProvider` interface in `DuctusMultiplexer`.
+2. Multiplexer's `commitEvent` prioritizes any explicit context (provided by `AgentDispatcher` or `DuctusKernel` internals).
+3. If no explicit context exists, the Multiplexer queries the `DuctusContextProvider`.
+4. Developers implement the provider in their application perimeter (e.g., an Express middleware using `AsyncLocalStorage.run(...)`) to automatically bind the authenticated `user.id` to the chronological execution thread.
+
+This achieves mathematically strict, unforgeable provenance with zero boilerplate at the call site.
+
+## 3. The Strict Boundary Enforcement
+If the Multiplexer attempts to commit a root event and neither the explicit caller nor the implicit `DuctusContextProvider` resolves an `ActorIdentity`, the framework MUST synchronously throw an error and abort the broadcast.
+
+Silent fallbacks to `system` or `anonymous` are strictly prohibited, as they destroy the audit integrity of the ledger.

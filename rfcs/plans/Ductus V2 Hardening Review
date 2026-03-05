@@ -1,0 +1,49 @@
+# Ductus v2 Architectural Hardening Review
+
+This document outlines four critical architectural bottlenecks identified in the Ductus v2 core foundation, along with proposed structural remediations to ensure high-throughput, deterministic execution at scale.
+
+## 1. The Multiplexer Deadlock (BufferedSubscriber Race Condition)
+
+**The Vulnerability:**
+The `DuctusMultiplexer` enforces strict causal ordering by holding a global `broadcastLock` until all `BufferedSubscribers` acknowledge receipt of an event via `Promise.all`. However, the current `BufferedSubscriber.push()` implementation refuses to resolve its promise until the downstream processor calls `.next()` on its generator.
+
+If a single processor (e.g., an LLM adapter) takes 30 seconds to yield an event, it will not resolve the `push` promise. consequently, the global multiplexer lock freezes for 30 seconds, entirely halting all fast, synchronous reducers in the system.
+
+**The Remediation:**
+The `BufferedSubscriber` must act as a true decoupled buffer.
+- `push()` must resolve synchronously and immediately if the internal queue is not full.
+- Implement an explicit `bufferLimit` (e.g., default `10,000` events) to prevent infinite memory growth if a processor deadlocks.
+- Expose the limit configuration via the builder DSL (e.g., `.withBufferLimit(5000)`). If the enqueue limit is breached, the subscriber throws an exception, tearing down the isolated, failing processor without halting the global bus.
+
+## 2. Ledger IO Serialization (FileAdapter Overhead)
+
+**The Vulnerability:**
+Currently, `JsonlLedger` uses `fileAdapter.appendLineJsonl()` for every single emitted event. In high-frequency synchronous flows, this triggers atomic `fs.appendFile` operations, incurring the overhead of file open/close cycles and OS kernel context switches linearly (1:1 with events).
+
+**The Remediation:**
+Introduce a stateful `FileHandleAdapter` abstraction running via micro-batching.
+- The Ledger requests a persistent POSIX file lock descriptor (`fs.promises.open('a')`) on startup.
+- Rapid-fire events emitted while a previous disk write is pending are collected in a memory queue.
+- When the disk signals ready, the queue is flushed in a single, bulk JSONL write. This guarantees identical strict logical durability but amortizes IO overhead exponentially.
+
+## 3. Causation Graph Memory Leak
+
+**The Vulnerability:**
+In `ductus-kernel.ts`, the `causationGraph` map is used to detect infinite logical loops. However, the map is only cleared when the `cascadingEvents` queue is entirely empty. Under continuous load, the queue may never reach size `0`, causing the graph to grow indefinitely, leaking memory and degrading cycle-check performance.
+
+**The Remediation:**
+Implement a deterministic, O(1) sliding sequence window eviction strategy.
+- Store the event `sequence` number in the causation map.
+- Because JavaScript `Map` objects naturally preserve insertion order, iterate from the head and periodically `delete()` any event node whose sequence number falls outside a safe threshold (e.g., `currentSequence - 5000`).
+- This guarantees bound memory usage regardless of queue load.
+
+## 4. The AgentDispatcher Monolith
+
+**The Vulnerability:**
+`AgentDispatcher` currently handles too many orthogonal responsibilities. It violates the Single Responsibility Principle by simultaneously routing invocations, compiling prompt templates, evaluating handoff limit scopes (tokens, turns), reading ledger histories, and swapping state adapters.
+
+**The Remediation:**
+Refactor the dispatcher into a pure router using a Chain of Responsibility pattern.
+- Move logic into specialized implementations of `AgentInterceptor` (e.g., `TokenSizerInterceptor`, `ScopeInterceptor`, `TemplateHydrationInterceptor`, and `HandoffInterceptor`).
+- If an interceptor detects a limit breach, it throws a typed `HandoffException`.
+- A final catch-block gracefully handles the exception, tearing down the adapter and triggering the replacement flow seamlessly.
