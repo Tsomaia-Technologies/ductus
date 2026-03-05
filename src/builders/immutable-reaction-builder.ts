@@ -1,6 +1,6 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { InvokeCursorBuilder, ReactionBuilder } from '../interfaces/builders/reaction-builder.js'
-import { InvokeStep, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
+import { InvokeStep, PipelineAction, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
 import { EventDefinition } from '../interfaces/event.js'
 import { Schema } from '../interfaces/schema.js'
 
@@ -70,12 +70,11 @@ class ImmutableInvokeCursorBuilder implements InvokeCursorBuilder {
     return this.escape().name(name)
   }
 
-  case(schema: Schema, action: ReactionBuilder): InvokeCursorBuilder {
-    const nested = action[BUILD]()
+  case(schema: Schema, action: PipelineAction): InvokeCursorBuilder {
     return new ImmutableInvokeCursorBuilder(
       this.parentParams,
       this.invokeStep,
-      [...this.cases, { type: 'case', schema, then: nested.pipeline }],
+      [...this.cases, { type: 'case', schema, then: action }],
     )
   }
 
@@ -89,6 +88,10 @@ class ImmutableInvokeCursorBuilder implements InvokeCursorBuilder {
 
   invoke(params: { agent: string, skill: string }): InvokeCursorBuilder {
     return this.escape().invoke(params)
+  }
+
+  [BUILD](): ReactionEntity {
+    return this.escape()[BUILD]()
   }
 
   private escape(): ImmutableReactionBuilder {

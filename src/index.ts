@@ -56,6 +56,7 @@ export * from './interfaces/event-ledger.js'
 export * from './interfaces/event-processor.js'
 export * from './interfaces/event-subscriber.js'
 export * from './interfaces/file-adapter.js'
+export * from './interfaces/file-handle-adapter.js'
 export * from './interfaces/helpers.js'
 export * from './interfaces/input-event-stream.js'
 export * from './interfaces/json.js'
@@ -71,6 +72,7 @@ export * from './ledger/jsonl-ledger.js'
 
 export * from './system/canceller.js'
 export * from './system/node-file-adapter.js'
+export * from './system/node-file-handle-adapter.js'
 export * from './system/node-process-adapter.js'
 export * from './system/node-system-adapter.js'
 
@@ -83,4 +85,5 @@ export * from './utils/string-utils.js'
 
 export * from './factories.js'
 
-export { default } from './factories.js'
+import Ductus from './factories.js'
+export default Ductus

@@ -37,7 +37,7 @@ export class DuctusKernel<TState> {
   private readonly cascadeWakeUpResolvers = new LinkedList<() => void>()
   private unsubscribeCommit?: () => void
   private readonly shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
-  private readonly causationGraph = new Map<string, { type: string, causationId?: string }>()
+  private readonly causationGraph = new Map<string, { type: string, causationId?: string, sequence: number }>()
 
   constructor(options: KernelOptions<TState>) {
     const {
@@ -115,7 +115,20 @@ export class DuctusKernel<TState> {
       this.causationGraph.set(commitedEvent.eventId, {
         type: commitedEvent.type,
         causationId: commitedEvent.causationId,
+        sequence: commitedEvent.sequenceNumber,
       })
+
+      // Run sliding window eviction to prevent memory leak
+      if (commitedEvent.sequenceNumber % 100 === 0) {
+        const threshold = commitedEvent.sequenceNumber - 5000
+        for (const [key, node] of this.causationGraph.entries()) {
+          if (node.sequence < threshold) {
+            this.causationGraph.delete(key)
+          } else {
+            break // Map preserves insertion order, break early
+          }
+        }
+      }
 
       const eventsOut = this.store.dispatch(commitedEvent)
 
@@ -178,14 +191,6 @@ export class DuctusKernel<TState> {
   private async mountCascadingEvents() {
     while (!this.canceller.isCancelled()) {
       const wrapper = this.cascadingEvents.removeFirst()
-
-      // Flush causation transit map if cascade wraps up
-      if (!wrapper && this.cascadingEvents.size === 0) {
-        // Keep at most last 100 to prevent leak, or simply clear heavily
-        if (this.causationGraph.size > 1000) {
-          this.causationGraph.clear()
-        }
-      }
 
       if (wrapper) {
         await this.multiplexer.broadcast(wrapper.event, wrapper.context)

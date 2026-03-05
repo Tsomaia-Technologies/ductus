@@ -10,7 +10,7 @@ export interface InvokeStep {
 export interface CaseStep {
   type: 'case'
   schema: Schema
-  then: PipelineStep[]
+  then: PipelineAction
 }
 
 export interface EmitStep {
