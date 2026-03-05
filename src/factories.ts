@@ -168,7 +168,7 @@ export function kernel<TState>(
   container.register(AgentDispatcher, dispatcher)
   container.register(DuctusKernel, kernel)
 
-  return { kernel, dispatcher }
+  return kernel
 }
 
 const literal = zod.literal
