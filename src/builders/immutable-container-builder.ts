@@ -29,31 +29,24 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
   }
 
   [BUILD](): ContainerEntity {
-    const registry = new Map<Type, ContainerEntry>()
+    const services = new Map<Type, InstanceType<Type>>()
+    const factories = new Map<Type, ServiceFactory>()
+
     let current = this.head
 
     while (current !== null) {
-      if (!registry.has(current.type)) {
-        registry.set(current.type, current.entry)
+      if (!services.has(current.type) && !factories.has(current.type)) {
+        if (current.entry.type === 'factory') {
+          factories.set(current.type, current.entry.factory)
+        } else {
+          services.set(current.type, current.entry.instance)
+        }
       }
       current = current.parent
     }
 
-    const services = new Map<Type, InstanceType<Type>>()
-    const factories = new Map<Type, ServiceFactory>()
-
-    for (const [type, entry] of registry) {
-      if (entry.type === 'factory') {
-        factories.set(type, entry.factory)
-      } else {
-        services.set(type, entry.instance)
-      }
-    }
-
     return {
       use: (() => {
-        const services = new Map<Type, InstanceType<Type>>()
-
         const useFn = <T extends Type>(type: T): InstanceType<T> => {
           const cached = services.get(type)
           if (cached) return cached as InstanceType<T>
@@ -62,10 +55,10 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
           if (!factory) throw new Error(`Type ${type.name} not registered.`)
 
           const service = factory(useFn)
-          services.set(type, factory)
+          services.set(type, service)
           factories.delete(type)
 
-          return service
+          return service as InstanceType<T>
         }
 
         return useFn
