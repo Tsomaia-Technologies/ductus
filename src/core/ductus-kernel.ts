@@ -172,34 +172,46 @@ export class DuctusKernel<TState> {
   }
 
   private async mountProcessor(processor: EventProcessor<TState>) {
-    const subscriber = this.multiplexer.subscribe()
-    this.subscribers.push(subscriber)
+    try {
+      const subscriber = this.multiplexer.subscribe()
+      this.subscribers.push(subscriber)
 
-    const eventsIn = subscriber.streamEvents()
-    const eventsOut = processor.process(
-      eventsIn,
-      this.getState,
-      this.use,
-    )
+      const eventsIn = subscriber.streamEvents()
+      const eventsOut = processor.process(
+        eventsIn,
+        this.getState,
+        this.use,
+      )
 
-    for await (const event of eventsOut) {
-      if (this.canceller.isCancelled()) break
-      if (!event) continue
-      await this.multiplexer.broadcast(event)
+      for await (const event of eventsOut) {
+        if (this.canceller.isCancelled()) break
+        if (!event) continue
+        await this.multiplexer.broadcast(event)
+      }
+    } catch (e: any) {
+      console.error(`Ductus Framework Error: Processor threw an unhandled exception. Initiating Kernel shutdown.`, e)
+      this.shutdown({ force: true }).catch()
+      throw e
     }
   }
 
   private async mountCascadingEvents() {
-    while (!this.canceller.isCancelled()) {
-      const wrapper = this.cascadingEvents.removeFirst()
+    try {
+      while (!this.canceller.isCancelled()) {
+        const wrapper = this.cascadingEvents.removeFirst()
 
-      if (wrapper) {
-        await this.multiplexer.broadcast(wrapper.event, wrapper.context)
-      } else {
-        await new Promise<void>(resolve => {
-          this.cascadeWakeUpResolvers.insertLast(resolve)
-        })
+        if (wrapper) {
+          await this.multiplexer.broadcast(wrapper.event, wrapper.context)
+        } else {
+          await new Promise<void>(resolve => {
+            this.cascadeWakeUpResolvers.insertLast(resolve)
+          })
+        }
       }
+    } catch (e: any) {
+      console.error(`Ductus Framework Error: Cascading loop threw an unhandled exception. Initiating Kernel shutdown.`, e)
+      this.shutdown({ force: true }).catch()
+      throw e
     }
   }
 }

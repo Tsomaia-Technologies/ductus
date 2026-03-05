@@ -51,12 +51,11 @@ export class NodeFileHandleAdapter implements FileHandleAdapter {
                 const batch = this.writeQueue
                 this.writeQueue = []
 
-                // Merge all chunks into one payload
-                const mergedData = batch.map(w => w.chunk).join('')
-
                 try {
                     if (this.handle) {
-                        await this.handle.appendFile(mergedData)
+                        for (const pending of batch) {
+                            await this.handle.appendFile(pending.chunk)
+                        }
                     } else {
                         throw new Error('Handle closed during write')
                     }

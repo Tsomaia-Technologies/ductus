@@ -58,6 +58,10 @@ export class DuctusMultiplexer implements Multiplexer {
       if (this.ledger) {
         await this.ledger.appendEvent(commitedEvent as unknown as CommittedEvent)
       }
+
+      this.lastSequenceNumber = commitedEvent.sequenceNumber
+      this.lastHash = commitedEvent.hash
+
       this.commitListeners.forEach(listener => {
         listener(commitedEvent as unknown as CommittedEvent)
       })
@@ -85,7 +89,7 @@ export class DuctusMultiplexer implements Multiplexer {
     causationId?: string,
     correlationId?: string
   }): DeeplyReadonly<CommittedEvent> {
-    ++this.lastSequenceNumber
+    const nextSequenceNumber = this.lastSequenceNumber + 1
     const eventId = crypto.randomUUID()
     const timestamp = Date.now()
     const unhashedEvent: Omit<CommittedEvent, 'hash'> = {
@@ -93,7 +97,7 @@ export class DuctusMultiplexer implements Multiplexer {
       eventId,
       ...(context?.causationId ? { causationId: context.causationId } : {}),
       ...(context?.correlationId ? { correlationId: context.correlationId } : {}),
-      sequenceNumber: this.lastSequenceNumber,
+      sequenceNumber: nextSequenceNumber,
       prevHash: this.lastHash,
       isCommited: true,
       timestamp,
@@ -104,7 +108,6 @@ export class DuctusMultiplexer implements Multiplexer {
       ...unhashedEvent,
       hash,
     } as CommittedEvent
-    this.lastHash = hash
 
     return freezeEvent(commitedEvent)
   }

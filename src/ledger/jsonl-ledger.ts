@@ -51,7 +51,10 @@ export class JsonlLedger implements EventLedger {
 
   async appendEvent(event: CommittedEvent): Promise<void> {
     if (!this.handlePromise) {
-      this.handlePromise = this.fileAdapter.open(this.ledgerFileAbsolutePath, 'a')
+      this.handlePromise = this.fileAdapter.open(this.ledgerFileAbsolutePath, 'a').catch(err => {
+        this.handlePromise = null
+        throw err
+      })
     }
     const handle = await this.handlePromise
     await handle.appendJsonl(event as any)
