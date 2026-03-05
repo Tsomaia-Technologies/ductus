@@ -9,7 +9,7 @@ import { ImmutableModelBuilder } from './builders/immutable-model-builder.js'
 import { ImmutableCliAdapterBuilder } from './builders/immutable-cli-adapter-builder.js'
 import { FlowEntity } from './interfaces/entities/flow-entity.js'
 import { EmitStep, InvokeStep } from './interfaces/entities/reaction-entity.js'
-import { EventDefinition, PayloadShape } from './interfaces/event.js'
+import { EventDefinition, EventPayloadShape, PayloadShape } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { ImmutableRulesetBuilder } from './builders/immutable-ruleset-builder.js'
 import { AgentDispatcher, TemplateRenderer } from './core/agent-dispatcher.js'
@@ -33,46 +33,29 @@ import { SystemAdapter } from './interfaces/system-adapter.js'
 import { FileAdapter } from './interfaces/file-adapter.js'
 import { AsyncEntity } from './interfaces/entities/async-entity.js'
 
-const literal = zod.literal
-const boolean = zod.boolean
-const string = zod.string
-const number = zod.number
-const _null = zod.null
-const nullable = zod.nullable
-const date = zod.date
-const union = zod.union
-const discriminatedUnion = zod.discriminatedUnion
-const object = zod.strictObject
-const array = zod.array
-const _enum = zod.enum
+export interface CreateKernelOptions<TState> {
+  flow: FlowEntity<TState>
+  multiplexer: Multiplexer
+  ledger: EventLedger
+  container: DependencyContainer
+  templateRenderer: TemplateRenderer
+  systemAdapter: SystemAdapter
+  fileAdapter: FileAdapter
+  canceller?: CancellationToken
+}
 
-function event<TType extends string, TPayloadShape extends zod.ZodRawShape>(
+function event<TType extends string, TPayloadShape extends EventPayloadShape>(
   type: TType,
   payloadShape: PayloadShape<TPayloadShape>,
 ) {
   return createEventFactory({ type, payloadShape, volatility: 'durable' })
 }
 
-function signal<TType extends string, TPayloadShape extends zod.ZodRawShape>(
+function signal<TType extends string, TPayloadShape extends EventPayloadShape>(
   type: TType,
   payloadShape: PayloadShape<TPayloadShape>,
 ) {
   return createEventFactory({ type, payloadShape, volatility: 'volatile' })
-}
-
-function emit(event: EventDefinition): EmitStep {
-  return {
-    type: 'emit',
-    event,
-  }
-}
-
-function invoke(agent: string, skill: string): InvokeStep {
-  return {
-    type: 'invoke',
-    agent,
-    skill,
-  }
 }
 
 function agent(name: string): AgentBuilder {
@@ -119,64 +102,19 @@ function async<TState>(
   }
 }
 
-export function createDuctus<TState>() {
+function emit(event: EventDefinition): EmitStep {
   return {
-    literal: zod.literal,
-    boolean: zod.boolean,
-    string: zod.string,
-    number: zod.number,
-    null: zod.null,
-    nullable: zod.nullable,
-    date: zod.date,
-    union: zod.union,
-    discriminatedUnion: zod.discriminatedUnion,
-    object: zod.strictObject,
-    array: zod.array,
-    enum: zod.enum,
-
-    emit: (event: EventDefinition): EmitStep => ({ type: 'emit', event }),
-    invoke: (agent: string, skill: string): InvokeStep => ({
-      type: 'invoke',
-      agent,
-      skill,
-    }),
-
-    agent: (name: string) => new ImmutableAgentBuilder().name(name),
+    type: 'emit',
     event,
-    signal,
-    flow: () => new ImmutableFlowBuilder<TState>(),
-    model: (modelId: string) => new ImmutableModelBuilder().model(modelId),
-    reaction: (name: string) => new ImmutableReactionBuilder().name(name),
-    reducer: () => new ImmutableReducerBuilder<TState>(),
-    ruleset: (name: string) => new ImmutableRulesetBuilder().name(name),
-    skill: (name: string) => new ImmutableSkillBuilder().name(name),
-    processor: (generator: EventGenerator<TState>) =>
-      new ImmutableProcessorBuilder<TState>().processor(generator),
-    adapter: (type: 'cli') => new ImmutableCliAdapterBuilder(),
-
-    /**
-     * Async wrapper for dynamic flow definitions.
-     * Provides the injector for async data fetching while using the same builder DSL.
-     */
-    async: async (
-      factory: (use: Injector) => Promise<FlowEntity<TState>>,
-      injector: Injector,
-    ): Promise<FlowEntity<TState>> => {
-      return factory(injector)
-    },
   }
 }
 
-
-export interface CreateKernelOptions<TState> {
-  flow: FlowEntity<TState>
-  multiplexer: Multiplexer
-  ledger: EventLedger
-  container: DependencyContainer
-  templateRenderer: TemplateRenderer
-  systemAdapter: SystemAdapter
-  fileAdapter: FileAdapter
-  canceller?: CancellationToken
+function invoke(agent: string, skill: string): InvokeStep {
+  return {
+    type: 'invoke',
+    agent,
+    skill,
+  }
 }
 
 export function kernel<TState>(
@@ -230,25 +168,22 @@ export function kernel<TState>(
   return { kernel, dispatcher }
 }
 
-export default {
-  literal,
-  boolean,
-  string,
-  number,
-  null: _null,
-  nullable,
-  date,
-  union,
-  discriminatedUnion,
-  object,
-  array,
-  enum: _enum,
+const literal = zod.literal
+const boolean = zod.boolean
+const string = zod.string
+const number = zod.number
+const _null = zod.null
+const nullable = zod.nullable
+const date = zod.date
+const union = zod.union
+const discriminatedUnion = zod.discriminatedUnion
+const object = zod.strictObject
+const array = zod.array
+const _enum = zod.enum
 
+export default {
   event,
   signal,
-
-  emit,
-  invoke,
 
   agent,
   flow,
@@ -261,5 +196,21 @@ export default {
   adapter,
   async,
 
+  emit,
+  invoke,
+
   kernel,
+
+  literal,
+  boolean,
+  string,
+  number,
+  null: _null,
+  nullable,
+  date,
+  union,
+  discriminatedUnion,
+  object,
+  array,
+  enum: _enum,
 }

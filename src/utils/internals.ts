@@ -1,12 +1,12 @@
-import * as zod from 'zod/v3/index.js'
-import { BaseEvent, EventDefinition, PayloadShape, Volatility } from '../interfaces/event.js'
+import * as zod from 'zod/v3'
+import { BaseEvent, EventDefinition, EventPayloadShape, PayloadShape, Volatility } from '../interfaces/event.js'
 import { isSchemaType } from './schema-utils.js'
 import { PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
 import { AgentDispatcher } from '../core/agent-dispatcher.js'
 import { EventGenerator } from '../interfaces/event-generator.js'
 import { EventProcessor } from '../interfaces/event-processor.js'
 
-export function createEventFactory<TType extends string, TPayloadShape extends zod.ZodRawShape>(params: {
+export function createEventFactory<TType extends string, TPayloadShape extends EventPayloadShape>(params: {
   type: TType
   payloadShape: PayloadShape<TPayloadShape>
   volatility: Volatility,
