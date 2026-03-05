@@ -29,39 +29,37 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
   }
 
   [BUILD](): ContainerEntity {
-    const services = new Map<Type, InstanceType<Type>>()
-    const factories = new Map<Type, ServiceFactory>()
-
-    let current = this.head
-
-    while (current !== null) {
-      if (!services.has(current.type) && !factories.has(current.type)) {
-        if (current.entry.type === 'factory') {
-          factories.set(current.type, current.entry.factory)
-        } else {
-          services.set(current.type, current.entry.instance)
-        }
-      }
-      current = current.parent
-    }
-
     return {
       use: (() => {
-        const useFn = <T extends Type>(type: T): InstanceType<T> => {
+        const services = new Map<Type, InstanceType<Type>>()
+        const factories = new Map<Type, ServiceFactory>()
+
+        let current = this.head
+
+        while (current !== null) {
+          if (!services.has(current.type) && !factories.has(current.type)) {
+            if (current.entry.type === 'factory') {
+              factories.set(current.type, current.entry.factory)
+            } else {
+              services.set(current.type, current.entry.instance)
+            }
+          }
+          current = current.parent
+        }
+
+        return function injector<T extends Type>(type: T): InstanceType<T> {
           const cached = services.get(type)
           if (cached) return cached as InstanceType<T>
 
           const factory = factories.get(type)
           if (!factory) throw new Error(`Type ${type.name} not registered.`)
 
-          const service = factory(useFn)
+          const service = factory(injector)
           services.set(type, service)
           factories.delete(type)
 
           return service as InstanceType<T>
         }
-
-        return useFn
       })(),
     }
   }
