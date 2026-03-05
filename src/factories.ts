@@ -32,9 +32,12 @@ import { CancellationToken } from './interfaces/cancellation-token.js'
 import { SystemAdapter } from './interfaces/system-adapter.js'
 import { FileAdapter } from './interfaces/file-adapter.js'
 import { AsyncEntity } from './interfaces/entities/async-entity.js'
+import { BUILD } from './interfaces/builders/__internal__.js'
+import { ContainerBuilder } from './interfaces/builders/container-builder.js'
+import { ImmutableContainerBuilder } from './builders/immutable-container-builder.js'
 
 export interface CreateKernelOptions<TState> {
-  flow: FlowEntity<TState>
+  flow: FlowBuilder<TState>
   multiplexer: Multiplexer
   ledger: EventLedger
   container: DependencyContainer
@@ -117,11 +120,14 @@ function invoke(agent: string, skill: string): InvokeStep {
   }
 }
 
+function container(): ContainerBuilder {
+  return new ImmutableContainerBuilder()
+}
+
 export function kernel<TState>(
   options: CreateKernelOptions<TState>,
 ) {
   const {
-    flow,
     multiplexer,
     ledger,
     container,
@@ -131,6 +137,7 @@ export function kernel<TState>(
     fileAdapter,
   } = options
 
+  const flow = options.flow[BUILD]()
   const use = container.use.bind(container) as Injector
 
   const store = new DuctusStore(
@@ -201,6 +208,8 @@ export default {
 
   emit,
   invoke,
+
+  container,
 
   kernel,
 

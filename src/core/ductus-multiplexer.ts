@@ -9,7 +9,7 @@ import { EventLedger } from '../interfaces/event-ledger.js'
 export interface DuctusMultiplexerOptions {
   initialHash?: string
   initialSequenceNumber?: number
-  ledger?: EventLedger
+  ledger: EventLedger
 }
 
 export class DuctusMultiplexer implements Multiplexer {
@@ -18,12 +18,12 @@ export class DuctusMultiplexer implements Multiplexer {
   private readonly bridges: BufferedSubscriber[] = []
   private broadcastLock: Promise<unknown>
   private commitListeners: Array<(event: CommittedEvent) => BaseEvent[] | void> = []
-  private readonly ledger?: EventLedger
+  private readonly ledger: EventLedger
 
-  constructor(options?: DuctusMultiplexerOptions) {
-    if (options?.initialHash) this.lastHash = options.initialHash
-    if (options?.initialSequenceNumber) this.lastSequenceNumber = options.initialSequenceNumber
-    this.ledger = options?.ledger
+  constructor(options: DuctusMultiplexerOptions) {
+    this.ledger = options.ledger
+    if (options.initialHash) this.lastHash = options.initialHash
+    if (options.initialSequenceNumber) this.lastSequenceNumber = options.initialSequenceNumber
 
     // Pre-emptively hold the lock to sync with the ledger before first broadcast
     this.broadcastLock = this.syncLedger()

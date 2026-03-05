@@ -13,9 +13,12 @@ import LogProcessor from './processors/LogProcessor.js'
 export default Ductus.flow()
   .initialState(initialState)
   .reducer(RootReducer)
+
   .agent(EngineerAgent, ClaudeOpus4_6, CliAdapter)
   .agent(ReviewerAgent, ClaudeOpus4_6, CliAdapter)
+
   .reaction(ImplementationReaction)
   .reaction(ResolveCommentsReaction)
   .reaction(ReviewReaction)
+
   .processor(LogProcessor)
