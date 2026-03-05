@@ -30,7 +30,10 @@ export class DuctusKernel<TState> {
   private readonly canceller: Canceller
   private readonly subscribers: EventSubscriber<CommittedEvent>[] = []
   private mountResolver: Promise<void[]> = Promise.resolve<void[]>([])
-  private readonly cascadingEvents = new LinkedList<{ event: BaseEvent; context: { causationId: string; correlationId: string } }>()
+  private readonly cascadingEvents = new LinkedList<{
+    event: BaseEvent;
+    context: { causationId: string; correlationId: string }
+  }>()
   private readonly cascadeWakeUpResolvers = new LinkedList<() => void>()
   private unsubscribeCommit?: () => void
   private readonly shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
@@ -111,7 +114,7 @@ export class DuctusKernel<TState> {
       // Record Graph Node for Cycle Detection
       this.causationGraph.set(commitedEvent.eventId, {
         type: commitedEvent.type,
-        causationId: commitedEvent.causationId
+        causationId: commitedEvent.causationId,
       })
 
       const eventsOut = this.store.dispatch(commitedEvent)
@@ -146,7 +149,7 @@ export class DuctusKernel<TState> {
           context: {
             causationId: commitedEvent.eventId,
             correlationId,
-          }
+          },
         })
       }
 

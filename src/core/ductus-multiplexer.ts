@@ -29,15 +29,6 @@ export class DuctusMultiplexer implements Multiplexer {
     this.broadcastLock = this.syncLedger()
   }
 
-  private async syncLedger() {
-    if (!this.ledger) return
-    const lastEvent = await this.ledger.readLastEvent()
-    if (lastEvent) {
-      this.lastSequenceNumber = lastEvent.sequenceNumber
-      this.lastHash = lastEvent.hash
-    }
-  }
-
   subscribe(): BufferedSubscriber {
     const bridge = new BufferedSubscriber()
     this.bridges.push(bridge)
@@ -72,6 +63,15 @@ export class DuctusMultiplexer implements Multiplexer {
       })
       await this.invokeBridges(commitedEvent as unknown as CommittedEvent)
     })
+  }
+
+  private async syncLedger() {
+    if (!this.ledger) return
+    const lastEvent = await this.ledger.readLastEvent()
+    if (lastEvent) {
+      this.lastSequenceNumber = lastEvent.sequenceNumber
+      this.lastHash = lastEvent.hash
+    }
   }
 
   private lock<T>(callback: () => T | Promise<T>): Promise<T> {

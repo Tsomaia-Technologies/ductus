@@ -22,7 +22,7 @@ export class ImmutableRulesetBuilder implements RulesetBuilder {
 
   rule(directive: string): this {
     return this.clone({
-      rules: [...this.params.rules, directive]
+      rules: [...this.params.rules, directive],
     })
   }
 

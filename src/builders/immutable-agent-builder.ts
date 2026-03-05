@@ -108,7 +108,7 @@ export class ImmutableAgentBuilder implements AgentBuilder {
   scope(type: 'feature' | 'task' | 'turn', amount?: number): this {
     if (type === 'feature') {
       return this.clone({
-        scope: { type: 'feature' }
+        scope: { type: 'feature' },
       })
     }
 
@@ -142,7 +142,7 @@ export class ImmutableAgentBuilder implements AgentBuilder {
 
     if (idx >= 0) {
       return this.clone({
-        handoffs: this.params.handoffs.map((h, i) => i === idx ? config : h)
+        handoffs: this.params.handoffs.map((h, i) => i === idx ? config : h),
       })
     }
 

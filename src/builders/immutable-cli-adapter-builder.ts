@@ -40,11 +40,11 @@ export class ImmutableCliAdapterBuilder implements CliAdapterBuilder {
   ): this {
     if (typeof keyOrVars === 'string') {
       return this.clone({
-        env: { ...this.params.env, [keyOrVars]: value }
+        env: { ...this.params.env, [keyOrVars]: value },
       })
     }
     return this.clone({
-      env: { ...this.params.env, ...keyOrVars }
+      env: { ...this.params.env, ...keyOrVars },
     })
   }
 

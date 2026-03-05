@@ -28,13 +28,13 @@ export class ImmutableReducerBuilder<TState> implements ReducerBuilder<TState> {
     reduce: (state: TState, event: BaseEvent) => [Partial<TState>, BaseEvent[]],
   ): this {
     return this.clone({
-      handlers: [...this.params.handlers, { event, reduce }]
+      handlers: [...this.params.handlers, { event, reduce }],
     })
   }
 
   combine(reducer: ReducerBuilder<TState>): this {
     return this.clone({
-      combined: [...this.params.combined, reducer]
+      combined: [...this.params.combined, reducer],
     })
   }
 

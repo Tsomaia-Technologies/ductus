@@ -43,19 +43,19 @@ export class ImmutableFlowBuilder<TState> implements FlowBuilder<TState> {
 
   agent(agent: AgentBuilder, model: ModelBuilder, adapter: AdapterBuilder): this {
     return this.clone({
-      agents: [...this.params.agents, { agent, model, adapter }]
+      agents: [...this.params.agents, { agent, model, adapter }],
     })
   }
 
   reaction(reaction: ReactionBuilder): this {
     return this.clone({
-      reactions: [...this.params.reactions, reaction]
+      reactions: [...this.params.reactions, reaction],
     })
   }
 
   processor(processor: ProcessorBuilder<TState>): this {
     return this.clone({
-      processors: [...this.params.processors, processor]
+      processors: [...this.params.processors, processor],
     })
   }
 

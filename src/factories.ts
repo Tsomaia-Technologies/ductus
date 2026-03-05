@@ -8,43 +8,118 @@ import { ImmutableFlowBuilder } from './builders/immutable-flow-builder.js'
 import { ImmutableModelBuilder } from './builders/immutable-model-builder.js'
 import { ImmutableCliAdapterBuilder } from './builders/immutable-cli-adapter-builder.js'
 import { FlowEntity } from './interfaces/entities/flow-entity.js'
-import { Multiplexer } from './interfaces/multiplexer.js'
-import { EventLedger } from './interfaces/event-ledger.js'
-import { EventProcessor } from './interfaces/event-processor.js'
-import { EmitStep, InvokeStep, PipelineStep, ReactionEntity } from './interfaces/entities/reaction-entity.js'
-import { BaseEvent, CommittedEvent, EventDefinition, PayloadShape, Volatility } from './interfaces/event.js'
+import { EmitStep, InvokeStep } from './interfaces/entities/reaction-entity.js'
+import { EventDefinition, PayloadShape } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
-import { DependencyContainer } from './interfaces/dependency-container.js'
 import { ImmutableRulesetBuilder } from './builders/immutable-ruleset-builder.js'
-import { CancellationToken } from './interfaces/cancellation-token.js'
 import { AgentDispatcher, TemplateRenderer } from './core/agent-dispatcher.js'
-import { SystemAdapter } from './interfaces/system-adapter.js'
-import { FileAdapter } from '../research/interfaces/adapters.js'
 import { DuctusStore } from './core/ductus-store.js'
 import * as zod from 'zod/v3'
-import { isSchemaType } from './utils/schema-utils.js'
+import { createEventFactory, createProcessorAdapter, createReactionAdapter } from './utils/internals.js'
+import { AgentBuilder } from './interfaces/builders/agent-builder.js'
+import { FlowBuilder } from './interfaces/builders/flow-builder.js'
+import { ModelBuilder } from './interfaces/builders/model-builder.js'
+import { ReactionBuilder } from './interfaces/builders/reaction-builder.js'
+import { ReducerBuilder } from './interfaces/builders/reducer-builder.js'
+import { RulesetBuilder } from './interfaces/builders/ruleset-builder.js'
+import { SkillBuilder } from './interfaces/builders/skill-builder.js'
+import { ProcessorBuilder } from './interfaces/builders/processor-builder.js'
+import { AdapterBuilder } from './interfaces/builders/adapter-builder.js'
+import { Multiplexer } from './interfaces/multiplexer.js'
+import { EventLedger } from './interfaces/event-ledger.js'
+import { DependencyContainer } from './interfaces/dependency-container.js'
+import { CancellationToken } from './interfaces/cancellation-token.js'
+import { SystemAdapter } from './interfaces/system-adapter.js'
+import { FileAdapter } from './interfaces/file-adapter.js'
+import { AsyncEntity } from './interfaces/entities/async-entity.js'
 
-export interface CreateDuctusOptions {
-  environment?: 'production' | 'development'
-}
+const literal = zod.literal
+const boolean = zod.boolean
+const string = zod.string
+const number = zod.number
+const _null = zod.null
+const nullable = zod.nullable
+const date = zod.date
+const union = zod.union
+const discriminatedUnion = zod.discriminatedUnion
+const object = zod.strictObject
+const array = zod.array
+const _enum = zod.enum
 
-function createDurableEvent<TType extends string, TPayloadShape extends zod.ZodRawShape>(
+function event<TType extends string, TPayloadShape extends zod.ZodRawShape>(
   type: TType,
   payloadShape: PayloadShape<TPayloadShape>,
 ) {
   return createEventFactory({ type, payloadShape, volatility: 'durable' })
 }
 
-function createVolatileEvent<TType extends string, TPayloadShape extends zod.ZodRawShape>(
+function signal<TType extends string, TPayloadShape extends zod.ZodRawShape>(
   type: TType,
   payloadShape: PayloadShape<TPayloadShape>,
 ) {
   return createEventFactory({ type, payloadShape, volatility: 'volatile' })
 }
 
-export function createDuctus<TState>(options: CreateDuctusOptions) {
-  const { environment = 'development', } = options
+function emit(event: EventDefinition): EmitStep {
+  return {
+    type: 'emit',
+    event,
+  }
+}
 
+function invoke(agent: string, skill: string): InvokeStep {
+  return {
+    type: 'invoke',
+    agent,
+    skill,
+  }
+}
+
+function agent(name: string): AgentBuilder {
+  return new ImmutableAgentBuilder().name(name)
+}
+
+function flow<TState>(): FlowBuilder<TState> {
+  return new ImmutableFlowBuilder<TState>()
+}
+
+function model(modelId: string): ModelBuilder {
+  return new ImmutableModelBuilder().model(modelId)
+}
+
+function reaction(name: string): ReactionBuilder {
+  return new ImmutableReactionBuilder().name(name)
+}
+
+function reducer<TState>(): ReducerBuilder<TState> {
+  return new ImmutableReducerBuilder<TState>()
+}
+
+function ruleset(name: string): RulesetBuilder {
+  return new ImmutableRulesetBuilder().name(name)
+}
+
+function skill(name: string): SkillBuilder {
+  return new ImmutableSkillBuilder().name(name)
+}
+
+function processor<TState>(generator: EventGenerator<TState>): ProcessorBuilder<TState> {
+  return new ImmutableProcessorBuilder<TState>().processor(generator)
+}
+
+function adapter(type: 'cli'): AdapterBuilder {
+  return new ImmutableCliAdapterBuilder()
+}
+
+function async<TState>(
+  factory: (use: Injector) => Promise<FlowEntity<TState>>,
+): AsyncEntity<TState> {
+  return {
+    factory,
+  }
+}
+
+export function createDuctus<TState>() {
   return {
     literal: zod.literal,
     boolean: zod.boolean,
@@ -67,8 +142,8 @@ export function createDuctus<TState>(options: CreateDuctusOptions) {
     }),
 
     agent: (name: string) => new ImmutableAgentBuilder().name(name),
-    event: createDurableEvent,
-    signal: createVolatileEvent,
+    event,
+    signal,
     flow: () => new ImmutableFlowBuilder<TState>(),
     model: (modelId: string) => new ImmutableModelBuilder().model(modelId),
     reaction: (name: string) => new ImmutableReactionBuilder().name(name),
@@ -92,51 +167,19 @@ export function createDuctus<TState>(options: CreateDuctusOptions) {
   }
 }
 
-export function createEventFactory<TType extends string, TPayloadShape extends zod.ZodRawShape>(params: {
-  type: TType
-  payloadShape: PayloadShape<TPayloadShape>
-  volatility: Volatility,
-}): EventDefinition<TType, TPayloadShape> {
-  const { type, payloadShape, volatility } = params
-  const payloadSchema = isSchemaType(payloadShape)
-    ? payloadShape
-    : zod.strictObject(payloadShape)
-  type TPayload = zod.input<typeof payloadSchema>
-  type TEvent = BaseEvent<TType, zod.input<zod.ZodObject<TPayloadShape, 'strict'>>>
-
-  const createEvent = (payload: TPayload): BaseEvent<TType, TPayload> => {
-    const validatedPayload = payloadSchema.parse(payload)
-
-    return {
-      type,
-      payload: validatedPayload,
-      volatility,
-      isCommited: false,
-    }
-  }
-
-  Object.assign(createEvent, {
-    type,
-    volatility,
-    payloadSchema,
-    is: (event: BaseEvent): event is TEvent => event.type === type,
-  })
-
-  return createEvent as unknown as EventDefinition<TType, TPayloadShape>
-}
 
 export interface CreateKernelOptions<TState> {
   flow: FlowEntity<TState>
   multiplexer: Multiplexer
   ledger: EventLedger
   container: DependencyContainer
-  canceller?: CancellationToken
   templateRenderer: TemplateRenderer
   systemAdapter: SystemAdapter
   fileAdapter: FileAdapter
+  canceller?: CancellationToken
 }
 
-export function createKernel<TState>(
+export function kernel<TState>(
   options: CreateKernelOptions<TState>,
 ) {
   const {
@@ -187,60 +230,36 @@ export function createKernel<TState>(
   return { kernel, dispatcher }
 }
 
-export function createProcessorAdapter<TState>(
-  generator: EventGenerator<TState>,
-): EventProcessor<TState> {
-  return {
-    process: generator,
-  }
-}
+export default {
+  literal,
+  boolean,
+  string,
+  number,
+  null: _null,
+  nullable,
+  date,
+  union,
+  discriminatedUnion,
+  object,
+  array,
+  enum: _enum,
 
-export function createReactionAdapter<TState>(
-  reaction: ReactionEntity,
-  dispatcher: AgentDispatcher<TState>,
-): EventProcessor<TState> {
-  return createProcessorAdapter(async function* (events) {
-    for await (const event of events) {
-      if (!reaction.triggers.includes(event.type)) continue
+  event,
+  signal,
 
-      yield* executePipeline(
-        reaction.pipeline,
-        event.payload,
-        dispatcher,
-      )
-    }
-  })
-}
+  emit,
+  invoke,
 
-async function* executePipeline<TState>(
-  steps: PipelineStep[],
-  input: unknown,
-  dispatcher: AgentDispatcher<TState>,
-): AsyncIterable<BaseEvent> {
-  let lastInvokeResult: unknown = input
+  agent,
+  flow,
+  model,
+  reaction,
+  reducer,
+  ruleset,
+  skill,
+  processor,
+  adapter,
+  async,
 
-  for (const step of steps) {
-    switch (step.type) {
-      case 'emit':
-        yield step.event
-        break
-
-      case 'invoke':
-        lastInvokeResult = await dispatcher.invokeAndParse(
-          step.agent,
-          step.skill,
-          lastInvokeResult,
-        )
-        break
-
-      case 'case':
-        try {
-          const matched = step.schema.parse(lastInvokeResult)
-          yield* executePipeline(step.then, matched, dispatcher)
-        } catch {
-          // Schema didn't match — skip this case branch
-        }
-        break
-    }
-  }
+  kernel,
 }

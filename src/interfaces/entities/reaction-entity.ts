@@ -1,4 +1,4 @@
-import { BaseEvent, EventDefinition } from '../event.js'
+import { EventDefinition } from '../event.js'
 import { Schema } from '../schema.js'
 
 export type PipelineStep =

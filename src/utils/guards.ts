@@ -1,4 +1,4 @@
-import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
+import { CommittedEvent } from '../interfaces/event.js'
 import { getEventHash } from './crypto-utils.js'
 
 export function isObject(input: unknown): input is object {
