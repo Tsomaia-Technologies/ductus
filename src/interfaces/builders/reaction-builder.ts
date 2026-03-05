@@ -1,30 +1,30 @@
 import { Buildable } from './__internal__.js'
 import { ReactionEntity } from '../entities/reaction-entity.js'
-import { BaseEvent } from '../event.js'
+import { EventDefinition } from '../event.js'
 import { Schema } from '../schema.js'
 
 /**
  * Cursor builder returned by .invoke() — provides .case() for branching
  * and escape methods to return to the main reaction builder.
  */
-export interface InvokeCursorBuilder<TEvent extends BaseEvent> {
-  name(name: string): ReactionBuilder<TEvent>
+export interface InvokeCursorBuilder {
+  name(name: string): ReactionBuilder
 
-  case(schema: Schema, action: ReactionBuilder<TEvent>): InvokeCursorBuilder<TEvent>
+  case(schema: Schema, action: ReactionBuilder): InvokeCursorBuilder
 
-  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent>
+  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder
 
-  emit(event: TEvent): ReactionBuilder<TEvent>
+  emit(event: EventDefinition): ReactionBuilder
 
-  when(...events: TEvent[]): ReactionBuilder<TEvent>
+  when(...events: EventDefinition[]): ReactionBuilder
 }
 
-export interface ReactionBuilder<TEvent extends BaseEvent> extends Buildable<ReactionEntity<TEvent>> {
+export interface ReactionBuilder extends Buildable<ReactionEntity> {
   name(name: string): this
 
-  when(...events: TEvent[]): this
+  when(...events: EventDefinition[]): this
 
-  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent>
+  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder
 
-  emit(event: TEvent): this
+  emit(event: EventDefinition): this
 }

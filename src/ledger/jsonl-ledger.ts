@@ -1,39 +1,32 @@
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
 import { getInitialEventHash } from '../utils/crypto-utils.js'
-import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
+import { CommittedEvent } from '../interfaces/event.js'
+import { isCommitedEvent } from '../utils/guards.js'
 
-export type EventGuard<TEvent extends BaseEvent> = <T extends TEvent>(
-  input: unknown,
-  verifiedPrevHash: string,
-) => input is T
-
-export interface JsonLedgerOptions<TEvent extends BaseEvent> {
+export interface JsonLedgerOptions {
   fileAdapter: FileAdapter
   ledgerFileAbsolutePath: string
-  eventGuard: EventGuard<TEvent>
 }
 
-export class JsonlLedger<TEvent extends BaseEvent> implements EventLedger<TEvent> {
+export class JsonlLedger implements EventLedger {
   private readonly fileAdapter: FileAdapter
   private readonly ledgerFileAbsolutePath: string
-  private readonly eventGuard: EventGuard<TEvent>
 
-  constructor(options: JsonLedgerOptions<TEvent>) {
-    const { fileAdapter, ledgerFileAbsolutePath, eventGuard } = options
+  constructor(options: JsonLedgerOptions) {
+    const { fileAdapter, ledgerFileAbsolutePath } = options
     this.fileAdapter = fileAdapter
     this.ledgerFileAbsolutePath = ledgerFileAbsolutePath
-    this.eventGuard = eventGuard
   }
 
-  async* readEvents(): AsyncIterable<CommittedEvent<TEvent>> {
+  async* readEvents(): AsyncIterable<CommittedEvent> {
     const events = this.fileAdapter.readLinesJsonl(this.ledgerFileAbsolutePath)
     let verifiedPrevHash = getInitialEventHash()
 
     for await (const event of events) {
       const typedEvent = event as unknown
 
-      if (!this.eventGuard<CommittedEvent<TEvent>>(typedEvent, verifiedPrevHash)) {
+      if (!isCommitedEvent(typedEvent)) {
         throw new Error('Fatal error: detected invalid entry in the ledger, terminating.')
       }
 
@@ -46,7 +39,7 @@ export class JsonlLedger<TEvent extends BaseEvent> implements EventLedger<TEvent
     }
   }
 
-  async appendEvent(event: CommittedEvent<TEvent>): Promise<void> {
+  async appendEvent(event: CommittedEvent): Promise<void> {
     await this.fileAdapter.appendLineJsonl(this.ledgerFileAbsolutePath, event as any)
   }
 }

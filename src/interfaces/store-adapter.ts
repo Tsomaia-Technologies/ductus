@@ -1,16 +1,16 @@
 import { BaseEvent } from './event.js'
 
-export type Reducer<TState, TEvent extends BaseEvent> = (
+export type Reducer<TState> = (
   state: TState,
-  event: TEvent,
-) => [TState, TEvent[]]
+  event: BaseEvent,
+) => [TState, BaseEvent[]]
 
-export interface StoreAdapter<TState, TEvent extends BaseEvent> {
+export interface StoreAdapter<TState> {
   getState(): TState
 
-  getReducer(): Reducer<TState, TEvent>
+  getReducer(): Reducer<TState>
 
-  dispatch(event: TEvent): TEvent[]
+  dispatch(event: BaseEvent): BaseEvent[]
 
   loadSnapshot?(): Promise<number | null>
 

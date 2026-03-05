@@ -4,12 +4,11 @@ import { AdapterEntity } from './adapter-entity.js'
 import { ReactionEntity } from './reaction-entity.js'
 import { ReducerEntity } from './reducer-entity.js'
 import { ProcessorEntity } from './processor-entity.js'
-import { BaseEvent } from '../event.js'
 
-export interface FlowEntity<TEvent extends BaseEvent, TState> {
+export interface FlowEntity<TState> {
   initialState: TState
-  reducer: ReducerEntity<TEvent, TState>
+  reducer: ReducerEntity<TState>
   agents: Array<{ agent: AgentEntity; model: ModelEntity; adapter: AdapterEntity }>
-  reactions: Array<ReactionEntity<TEvent>>
-  processors: Array<ProcessorEntity<TEvent, TState>>
+  reactions: Array<ReactionEntity>
+  processors: Array<ProcessorEntity<TState>>
 }

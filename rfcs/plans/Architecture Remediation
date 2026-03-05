@@ -20,7 +20,7 @@ This document formalizes the structural remediation plan for the Ductus core fra
 ## 3. Predicate-Driven State Snapshotting
 **The Problem:** Replaying the entire `EventLedger` from sequence 0 during `hydrateStore` scales O(N), paralyzing start-up times for long-lived workflows or dense execution histories.
 **The Solution:**
-- Expand `KernelOptions` to accept an explicit user-provided predicate: `shouldTakeSnapshot: (state: DeeplyReadonly<TState>, event: CommittedEvent<TEvent>) => boolean`.
+- Expand `KernelOptions` to accept an explicit user-provided predicate: `shouldTakeSnapshot: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean`.
 - When the predicate triggers `true`, the framework automatically grabs a serialized snapshot of the current state, alongside the sequence number and cryptographic hash of the committed event.
 - During initialization (`hydrateStore`), the kernel will fetch the latest valid snapshot and process only the event delta via a new `readEventsSince(sequenceNumber)` ledger method.
 

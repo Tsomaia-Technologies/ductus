@@ -45,7 +45,7 @@ Uses reference equality + `as any` fallback on `.name`. Should match on `event.t
 **Files:** [event-ledger.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/interfaces/event-ledger.ts), [ductus-multiplexer.ts](file:///Users/torniketsomaia/projects/@tsomaia.tech/ductus/src/core/ductus-multiplexer.ts)
 
 **Agreed design:**
-- Add `appendEvent(event: CommittedEvent<TEvent>): Promise<void>` to `EventLedger` interface
+- Add `appendEvent(event: CommittedEvent): Promise<void>` to `EventLedger` interface
 - Inject ledger into `DuctusMultiplexer` as **optional** dependency (constructor param)
 - Persist in `broadcast()`, after `commitEvent()`, before `invokeBridges()` — write-ahead pattern
 - If no ledger provided → purely in-memory (useful for testing / ephemeral flows)
@@ -85,14 +85,14 @@ Current `ReactionEntity` is a flat `{ events, reactions }`. Needs full redesign:
 - `agent.skills.x` produces a **reference tuple** `{ agent, skill }` at builder time
 
 ```ts
-type PipelineStep<TEvent> =
+type PipelineStep =
   | { type: 'invoke', agent: string, skill: string }
-  | { type: 'case', schema: Schema, then: PipelineStep<TEvent>[] }
-  | { type: 'emit', event: TEvent }
+  | { type: 'case', schema: Schema, then: PipelineStep[] }
+  | { type: 'emit', event: EventDefinition }
 
-interface ReactionEntity<TEvent> {
+interface ReactionEntity {
   triggers: string[]
-  pipeline: PipelineStep<TEvent>[]
+  pipeline: PipelineStep[]
 }
 ```
 

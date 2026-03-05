@@ -1,13 +1,12 @@
 import { Reducer, StoreAdapter } from '../interfaces/store-adapter.js'
 import { BaseEvent } from '../interfaces/event.js'
 
-export class DuctusStore<TState, TEvent extends BaseEvent>
-  implements StoreAdapter<TState, TEvent> {
+export class DuctusStore<TState> implements StoreAdapter<TState> {
   private state: TState
 
   constructor(
-    private readonly initialState: TState,
-    private readonly reducer: Reducer<TState, TEvent>,
+    initialState: TState,
+    private readonly reducer: Reducer<TState>,
   ) {
     this.state = initialState
   }
@@ -16,11 +15,11 @@ export class DuctusStore<TState, TEvent extends BaseEvent>
     return this.state
   }
 
-  getReducer(): Reducer<TState, TEvent> {
+  getReducer(): Reducer<TState> {
     return this.reducer
   }
 
-  dispatch(event: TEvent): TEvent[] {
+  dispatch(event: BaseEvent): BaseEvent[] {
     const [state, events] = this.reducer(this.state, event)
     this.state = state
 

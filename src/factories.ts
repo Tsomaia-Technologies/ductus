@@ -12,7 +12,7 @@ import { Multiplexer } from './interfaces/multiplexer.js'
 import { EventLedger } from './interfaces/event-ledger.js'
 import { EventProcessor } from './interfaces/event-processor.js'
 import { EmitStep, InvokeStep, PipelineStep, ReactionEntity } from './interfaces/entities/reaction-entity.js'
-import { BaseEvent, CommittedEvent, Volatility } from './interfaces/event.js'
+import { BaseEvent, CommittedEvent, EventDefinition, PayloadShape, Volatility } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { DependencyContainer } from './interfaces/dependency-container.js'
 import { ImmutableRulesetBuilder } from './builders/immutable-ruleset-builder.js'
@@ -22,6 +22,7 @@ import { SystemAdapter } from './interfaces/system-adapter.js'
 import { FileAdapter } from '../research/interfaces/adapters.js'
 import { DuctusStore } from './core/ductus-store.js'
 import * as zod from 'zod/v3'
+import { isSchemaType } from './utils/schema-utils.js'
 
 export interface CreateDuctusOptions {
   environment?: 'production' | 'development'
@@ -29,19 +30,19 @@ export interface CreateDuctusOptions {
 
 function createDurableEvent<TType extends string, TPayloadShape extends zod.ZodRawShape>(
   type: TType,
-  payloadShape: TPayloadShape,
+  payloadShape: PayloadShape<TPayloadShape>,
 ) {
   return createEventFactory({ type, payloadShape, volatility: 'durable' })
 }
 
 function createVolatileEvent<TType extends string, TPayloadShape extends zod.ZodRawShape>(
   type: TType,
-  payloadShape: TPayloadShape,
+  payloadShape: PayloadShape<TPayloadShape>,
 ) {
   return createEventFactory({ type, payloadShape, volatility: 'volatile' })
 }
 
-export function createDuctus<TEvent extends BaseEvent, TState>(options: CreateDuctusOptions) {
+export function createDuctus<TState>(options: CreateDuctusOptions) {
   const { environment = 'development', } = options
 
   return {
@@ -58,7 +59,7 @@ export function createDuctus<TEvent extends BaseEvent, TState>(options: CreateDu
     array: zod.array,
     enum: zod.enum,
 
-    emit: (event: TEvent): EmitStep<TEvent> => ({ type: 'emit', event }),
+    emit: (event: EventDefinition): EmitStep => ({ type: 'emit', event }),
     invoke: (agent: string, skill: string): InvokeStep => ({
       type: 'invoke',
       agent,
@@ -68,14 +69,14 @@ export function createDuctus<TEvent extends BaseEvent, TState>(options: CreateDu
     agent: (name: string) => new ImmutableAgentBuilder().name(name),
     event: createDurableEvent,
     signal: createVolatileEvent,
-    flow: () => new ImmutableFlowBuilder<TEvent, TState>(),
+    flow: () => new ImmutableFlowBuilder<TState>(),
     model: (modelId: string) => new ImmutableModelBuilder().model(modelId),
-    reaction: (name: string) => new ImmutableReactionBuilder<TEvent>().name(name),
-    reducer: () => new ImmutableReducerBuilder<TEvent, TState>(),
+    reaction: (name: string) => new ImmutableReactionBuilder().name(name),
+    reducer: () => new ImmutableReducerBuilder<TState>(),
     ruleset: (name: string) => new ImmutableRulesetBuilder().name(name),
     skill: (name: string) => new ImmutableSkillBuilder().name(name),
-    processor: (generator: EventGenerator<TEvent, TState>) =>
-      new ImmutableProcessorBuilder<TEvent, TState>().processor(generator),
+    processor: (generator: EventGenerator<TState>) =>
+      new ImmutableProcessorBuilder<TState>().processor(generator),
     adapter: (type: 'cli') => new ImmutableCliAdapterBuilder(),
 
     /**
@@ -83,9 +84,9 @@ export function createDuctus<TEvent extends BaseEvent, TState>(options: CreateDu
      * Provides the injector for async data fetching while using the same builder DSL.
      */
     async: async (
-      factory: (use: Injector) => Promise<FlowEntity<TEvent, TState>>,
+      factory: (use: Injector) => Promise<FlowEntity<TState>>,
       injector: Injector,
-    ): Promise<FlowEntity<TEvent, TState>> => {
+    ): Promise<FlowEntity<TState>> => {
       return factory(injector)
     },
   }
@@ -93,12 +94,15 @@ export function createDuctus<TEvent extends BaseEvent, TState>(options: CreateDu
 
 export function createEventFactory<TType extends string, TPayloadShape extends zod.ZodRawShape>(params: {
   type: TType
-  payloadShape: TPayloadShape
+  payloadShape: PayloadShape<TPayloadShape>
   volatility: Volatility,
-}) {
+}): EventDefinition<TType, TPayloadShape> {
   const { type, payloadShape, volatility } = params
-  const payloadSchema = zod.strictObject(payloadShape)
+  const payloadSchema = isSchemaType(payloadShape)
+    ? payloadShape
+    : zod.strictObject(payloadShape)
   type TPayload = zod.input<typeof payloadSchema>
+  type TEvent = BaseEvent<TType, zod.input<zod.ZodObject<TPayloadShape, 'strict'>>>
 
   const createEvent = (payload: TPayload): BaseEvent<TType, TPayload> => {
     const validatedPayload = payloadSchema.parse(payload)
@@ -115,15 +119,16 @@ export function createEventFactory<TType extends string, TPayloadShape extends z
     type,
     volatility,
     payloadSchema,
+    is: (event: BaseEvent): event is TEvent => event.type === type,
   })
 
-  return createEvent
+  return createEvent as unknown as EventDefinition<TType, TPayloadShape>
 }
 
-export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
-  flow: FlowEntity<TEvent, TState>
-  multiplexer: Multiplexer<TEvent>
-  ledger: EventLedger<CommittedEvent<TEvent>>
+export interface CreateKernelOptions<TState> {
+  flow: FlowEntity<TState>
+  multiplexer: Multiplexer
+  ledger: EventLedger
   container: DependencyContainer
   canceller?: CancellationToken
   templateRenderer: TemplateRenderer
@@ -131,8 +136,8 @@ export interface CreateKernelOptions<TEvent extends BaseEvent, TState> {
   fileAdapter: FileAdapter
 }
 
-export function createKernel<TEvent extends BaseEvent, TState>(
-  options: CreateKernelOptions<TEvent, TState>,
+export function createKernel<TState>(
+  options: CreateKernelOptions<TState>,
 ) {
   const {
     flow,
@@ -182,18 +187,18 @@ export function createKernel<TEvent extends BaseEvent, TState>(
   return { kernel, dispatcher }
 }
 
-export function createProcessorAdapter<TEvent extends BaseEvent, TState>(
-  generator: EventGenerator<TEvent, TState>,
-): EventProcessor<TEvent, TState> {
+export function createProcessorAdapter<TState>(
+  generator: EventGenerator<TState>,
+): EventProcessor<TState> {
   return {
     process: generator,
   }
 }
 
-export function createReactionAdapter<TEvent extends BaseEvent, TState>(
-  reaction: ReactionEntity<TEvent>,
-  dispatcher: AgentDispatcher<TEvent, TState>,
-): EventProcessor<TEvent, TState> {
+export function createReactionAdapter<TState>(
+  reaction: ReactionEntity,
+  dispatcher: AgentDispatcher<TState>,
+): EventProcessor<TState> {
   return createProcessorAdapter(async function* (events) {
     for await (const event of events) {
       if (!reaction.triggers.includes(event.type)) continue
@@ -207,11 +212,11 @@ export function createReactionAdapter<TEvent extends BaseEvent, TState>(
   })
 }
 
-async function* executePipeline<TEvent extends BaseEvent, TState>(
-  steps: PipelineStep<TEvent>[],
+async function* executePipeline<TState>(
+  steps: PipelineStep[],
   input: unknown,
-  dispatcher: AgentDispatcher<TEvent, TState>,
-): AsyncIterable<TEvent> {
+  dispatcher: AgentDispatcher<TState>,
+): AsyncIterable<BaseEvent> {
   let lastInvokeResult: unknown = input
 
   for (const step of steps) {

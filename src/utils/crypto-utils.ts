@@ -1,5 +1,5 @@
 import * as crypto from 'crypto'
-import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
+import { CommittedEvent } from '../interfaces/event.js'
 
 export function sha256(input: string) {
   return crypto.createHash('sha256').update(input).digest('hex')
@@ -9,7 +9,7 @@ export function getInitialEventHash() {
   return '0'.repeat(64)
 }
 
-export function getEventHash<TEvent extends BaseEvent>(event: Omit<CommittedEvent<TEvent>, 'hash'>) {
+export function getEventHash(event: Omit<CommittedEvent, 'hash'>) {
   const hashPayload = JSON.stringify({
     type: event.type,
     payload: event.payload,

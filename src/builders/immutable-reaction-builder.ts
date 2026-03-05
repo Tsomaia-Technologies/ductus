@@ -1,19 +1,19 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { InvokeCursorBuilder, ReactionBuilder } from '../interfaces/builders/reaction-builder.js'
 import { InvokeStep, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
-import { BaseEvent } from '../interfaces/event.js'
+import { EventDefinition } from '../interfaces/event.js'
 import { Schema } from '../interfaces/schema.js'
 
-interface ReactionBuilderParams<TEvent extends BaseEvent> {
+interface ReactionBuilderParams {
   name?: string
-  readonly triggers: TEvent[]
-  readonly pipeline: PipelineStep<TEvent>[]
+  readonly triggers: Array<EventDefinition>
+  readonly pipeline: PipelineStep[]
 }
 
-export class ImmutableReactionBuilder<TEvent extends BaseEvent> implements ReactionBuilder<TEvent> {
-  private params: ReactionBuilderParams<TEvent>
+export class ImmutableReactionBuilder implements ReactionBuilder {
+  private params: ReactionBuilderParams
 
-  constructor(params?: ReactionBuilderParams<TEvent>) {
+  constructor(params?: ReactionBuilderParams) {
     this.params = params ?? {
       name: undefined,
       triggers: [],
@@ -25,23 +25,23 @@ export class ImmutableReactionBuilder<TEvent extends BaseEvent> implements React
     return this.clone({ name })
   }
 
-  when(...events: TEvent[]): this {
+  when(...events: EventDefinition[]): this {
     return this.clone({
-      triggers: [...this.params.triggers, ...events]
+      triggers: [...this.params.triggers, ...events],
     })
   }
 
-  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent> {
+  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder {
     return new ImmutableInvokeCursorBuilder(this.params, { ...params, type: 'invoke' })
   }
 
-  emit(event: TEvent): this {
+  emit(event: EventDefinition): this {
     return this.clone({
-      pipeline: [...this.params.pipeline, { type: 'emit', event }]
+      pipeline: [...this.params.pipeline, { type: 'emit', event }],
     })
   }
 
-  [BUILD](): ReactionEntity<TEvent> {
+  [BUILD](): ReactionEntity {
     if (this.params.triggers.length === 0) {
       throw new Error('Reaction requires at least one event in .when()')
     }
@@ -52,48 +52,49 @@ export class ImmutableReactionBuilder<TEvent extends BaseEvent> implements React
     }
   }
 
-  private clone(params: Partial<ReactionBuilderParams<TEvent>>): this {
-    const Constructor = this.constructor as new (params: ReactionBuilderParams<TEvent>) => this
+  private clone(params: Partial<ReactionBuilderParams>): this {
+    const Constructor = this.constructor as new (params: ReactionBuilderParams) => this
     return new Constructor({ ...this.params, ...params })
   }
 }
 
-class ImmutableInvokeCursorBuilder<TEvent extends BaseEvent> implements InvokeCursorBuilder<TEvent> {
+class ImmutableInvokeCursorBuilder implements InvokeCursorBuilder {
   constructor(
-    private readonly parentParams: ReactionBuilderParams<TEvent>,
+    private readonly parentParams: ReactionBuilderParams,
     private readonly invokeStep: InvokeStep,
-    private readonly cases: PipelineStep<TEvent>[] = []
-  ) { }
+    private readonly cases: PipelineStep[] = [],
+  ) {
+  }
 
-  name(name: string): ReactionBuilder<TEvent> {
+  name(name: string): ReactionBuilder {
     return this.escape().name(name)
   }
 
-  case(schema: Schema, action: ReactionBuilder<TEvent>): InvokeCursorBuilder<TEvent> {
+  case(schema: Schema, action: ReactionBuilder): InvokeCursorBuilder {
     const nested = action[BUILD]()
     return new ImmutableInvokeCursorBuilder(
       this.parentParams,
       this.invokeStep,
-      [...this.cases, { type: 'case', schema, then: nested.pipeline }]
+      [...this.cases, { type: 'case', schema, then: nested.pipeline }],
     )
   }
 
-  emit(event: TEvent): ReactionBuilder<TEvent> {
+  emit(event: EventDefinition): ReactionBuilder {
     return this.escape().emit(event)
   }
 
-  when(...events: TEvent[]): ReactionBuilder<TEvent> {
+  when(...events: EventDefinition[]): ReactionBuilder {
     return this.escape().when(...events)
   }
 
-  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder<TEvent> {
+  invoke(params: { agent: string, skill: string }): InvokeCursorBuilder {
     return this.escape().invoke(params)
   }
 
-  private escape(): ImmutableReactionBuilder<TEvent> {
+  private escape(): ImmutableReactionBuilder {
     return new ImmutableReactionBuilder({
       ...this.parentParams,
-      pipeline: [...this.parentParams.pipeline, this.invokeStep, ...this.cases]
+      pipeline: [...this.parentParams.pipeline, this.invokeStep, ...this.cases],
     })
   }
 }

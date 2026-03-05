@@ -7,7 +7,6 @@ import { AdapterBuilder } from '../interfaces/builders/adapter-builder.js'
 import { ReactionBuilder } from '../interfaces/builders/reaction-builder.js'
 import { ProcessorBuilder } from '../interfaces/builders/processor-builder.js'
 import { FlowEntity } from '../interfaces/entities/flow-entity.js'
-import { BaseEvent } from '../interfaces/event.js'
 
 interface FlowAgentEntry {
   agent: AgentBuilder
@@ -15,16 +14,16 @@ interface FlowAgentEntry {
   adapter: AdapterBuilder
 }
 
-interface FlowBuilderParams<TEvent extends BaseEvent, TState> {
+interface FlowBuilderParams<TState> {
   initialState?: TState
-  reducer?: ReducerBuilder<TEvent, TState>
+  reducer?: ReducerBuilder<TState>
   readonly agents: FlowAgentEntry[]
-  readonly reactions: ReactionBuilder<TEvent>[]
-  readonly processors: ProcessorBuilder<TEvent, TState>[]
+  readonly reactions: ReactionBuilder[]
+  readonly processors: ProcessorBuilder<TState>[]
 }
 
-export class ImmutableFlowBuilder<TEvent extends BaseEvent, TState> implements FlowBuilder<TEvent, TState> {
-  private params: FlowBuilderParams<TEvent, TState>
+export class ImmutableFlowBuilder<TState> implements FlowBuilder<TState> {
+  private params: FlowBuilderParams<TState>
 
   constructor() {
     this.params = {
@@ -38,7 +37,7 @@ export class ImmutableFlowBuilder<TEvent extends BaseEvent, TState> implements F
     return this.clone({ initialState: state })
   }
 
-  reducer(reducer: ReducerBuilder<TEvent, TState>): this {
+  reducer(reducer: ReducerBuilder<TState>): this {
     return this.clone({ reducer })
   }
 
@@ -48,19 +47,19 @@ export class ImmutableFlowBuilder<TEvent extends BaseEvent, TState> implements F
     })
   }
 
-  reaction(reaction: ReactionBuilder<TEvent>): this {
+  reaction(reaction: ReactionBuilder): this {
     return this.clone({
       reactions: [...this.params.reactions, reaction]
     })
   }
 
-  processor(processor: ProcessorBuilder<TEvent, TState>): this {
+  processor(processor: ProcessorBuilder<TState>): this {
     return this.clone({
       processors: [...this.params.processors, processor]
     })
   }
 
-  [BUILD](): FlowEntity<TEvent, TState> {
+  [BUILD](): FlowEntity<TState> {
     if (this.params.initialState === undefined) throw new Error('Flow requires initialState.')
     if (!this.params.reducer) throw new Error('Flow requires reducer.')
 
@@ -77,7 +76,7 @@ export class ImmutableFlowBuilder<TEvent extends BaseEvent, TState> implements F
     }
   }
 
-  private clone(params: Partial<FlowBuilderParams<TEvent, TState>>): this {
+  private clone(params: Partial<FlowBuilderParams<TState>>): this {
     const Constructor = this.constructor as new () => this
     const clone = new Constructor()
     clone.params = { ...this.params, ...params }

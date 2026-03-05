@@ -1,16 +1,16 @@
 import { LinkedList } from './linked-list.js'
 import { EventSubscriber } from '../interfaces/event-subscriber.js'
-import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
+import { CommittedEvent } from '../interfaces/event.js'
 
-export class BufferedSubscriber<TEvent extends BaseEvent> implements EventSubscriber<TEvent> {
-  private readonly eventQueue = new LinkedList<CommittedEvent<TEvent>>()
+export class BufferedSubscriber implements EventSubscriber {
+  private readonly eventQueue = new LinkedList<CommittedEvent>()
   private readonly pushResolverQueue = new LinkedList<() => void>()
   private readonly processorWakeUpQueue = new LinkedList<() => void>()
   private readonly terminationListeners: Array<() => void> = []
   private isTerminated = false
   private isPushPending = false
 
-  async push(event: CommittedEvent<TEvent>): Promise<void> {
+  async push(event: CommittedEvent): Promise<void> {
     if (this.isTerminated) {
       throw new Error('Cannot push to the terminated event bridge')
     }
@@ -33,7 +33,7 @@ export class BufferedSubscriber<TEvent extends BaseEvent> implements EventSubscr
     })
   }
 
-  async* streamEvents(): AsyncIterable<CommittedEvent<TEvent>> {
+  async* streamEvents(): AsyncIterable<CommittedEvent> {
     while (true) {
       const event = this.eventQueue.removeFirst()
 
@@ -51,7 +51,7 @@ export class BufferedSubscriber<TEvent extends BaseEvent> implements EventSubscr
     }
   }
 
-  unsubscribe({ drain = true }: { drain?: boolean }): TEvent[] {
+  unsubscribe({ drain = true }: { drain?: boolean }): CommittedEvent[] {
     let wakeUp: (() => void) | null = null
     let releasePush: (() => void) | null = null
 
@@ -67,7 +67,7 @@ export class BufferedSubscriber<TEvent extends BaseEvent> implements EventSubscr
 
     this.isPushPending = false
 
-    let discardedEvents: TEvent[] = []
+    let discardedEvents: CommittedEvent[] = []
 
     if (!drain) {
       discardedEvents = this.eventQueue.toArray()

@@ -4,4 +4,6 @@ export interface DependencyContainer {
   register<T extends Type>(type: T, instance: InstanceType<Type>): void
 
   use<T extends Type, U extends InstanceType<T> = InstanceType<T>>(type: T): U
+
+  // @todo: add factory support .registerFactory()
 }

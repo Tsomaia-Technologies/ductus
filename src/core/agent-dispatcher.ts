@@ -35,10 +35,10 @@ export interface AnnotatedEvent {
 
 
 
-export interface AgentDispatcherOptions<TEvent extends BaseEvent, TState> {
+export interface AgentDispatcherOptions<TState> {
   agents: AgentTuple[]
-  ledger: EventLedger<CommittedEvent<BaseEvent>>
-  store: StoreAdapter<TState, TEvent>
+  ledger: EventLedger<CommittedEvent>
+  store: StoreAdapter<TState>
   templateRenderer: TemplateRenderer
   systemAdapter: SystemAdapter
   fileAdapter: FileAdapter
@@ -56,19 +56,19 @@ const AGENT_SUMMARY_PROMPT = 'Provide a concise summary of our conversation so f
  * composes system prompts (persona + systemPrompt + handoff), and
  * renders event+state handoff context for replacement adapters.
  */
-export class AgentDispatcher<TEvent extends BaseEvent, TState> {
+export class AgentDispatcher<TState> {
   private readonly agents: Map<string, AgentTuple> = new Map()
   private readonly lifecycle: Map<string, AgentLifecycleState> = new Map()
   private readonly templateRenderer: TemplateRenderer
   private readonly ledger: EventLedger<BaseEvent>
-  private readonly store: StoreAdapter<TState, TEvent>
+  private readonly store: StoreAdapter<TState>
   private readonly injector: Injector
   private readonly systemAdapter: SystemAdapter
   private readonly fileAdapter: FileAdapter
   private readonly interceptors: AgentInterceptor[]
   private lastKnownSequence = 0
 
-  constructor(options: AgentDispatcherOptions<TEvent, TState>) {
+  constructor(options: AgentDispatcherOptions<TState>) {
     for (const tuple of options.agents) {
       this.agents.set(tuple.agent.name, tuple)
     }
@@ -113,7 +113,11 @@ export class AgentDispatcher<TEvent extends BaseEvent, TState> {
     state.currentTurnStartSequence = this.lastKnownSequence + 1
     let turnFailed = false
 
-    const executePipeline = async function* (this: AgentDispatcher<TEvent, TState>, ctx: InvocationContext, index: number): AsyncGenerator<AgentChunk, void, unknown> {
+    const executePipeline = async function* (
+      this: AgentDispatcher<TState>,
+      ctx: InvocationContext,
+      index: number,
+    ): AsyncGenerator<AgentChunk, void, unknown> {
       if (index < this.interceptors.length) {
         yield* this.interceptors[index].intercept(ctx, (nextCtx) => executePipeline.call(this, nextCtx, index + 1))
       } else {
@@ -503,10 +507,10 @@ export class AgentDispatcher<TEvent extends BaseEvent, TState> {
     return set
   }
 
-  private async readAllEvents(): Promise<CommittedEvent<BaseEvent>[]> {
+  private async readAllEvents(): Promise<CommittedEvent[]> {
     if (!this.ledger) return []
 
-    const events: CommittedEvent<BaseEvent>[] = []
+    const events: CommittedEvent[] = []
     for await (const event of this.ledger.readEvents()) {
       events.push(event)
     }

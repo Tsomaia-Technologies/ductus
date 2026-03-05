@@ -1,9 +1,9 @@
-import { BaseEvent, CommittedEvent } from './event.js'
+import { CommittedEvent } from './event.js'
 
-export interface EventLedger<TEvent extends BaseEvent> {
-  readEvents(options?: { afterSequence?: number }): AsyncIterable<CommittedEvent<TEvent>>
+export interface EventLedger {
+  readEvents(options?: { afterSequence?: number }): AsyncIterable<CommittedEvent>
 
-  readLastEvent(): Promise<CommittedEvent<TEvent> | null>
+  readLastEvent(): Promise<CommittedEvent | null>
 
-  appendEvent(event: CommittedEvent<TEvent>): Promise<void>
+  appendEvent(event: CommittedEvent): Promise<void>
 }

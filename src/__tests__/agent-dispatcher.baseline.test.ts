@@ -17,7 +17,7 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
     let mockAdapterFactory: jest.Mocked<AdapterEntity>
     let mockAdapter: jest.Mocked<AgentAdapter>
     let mockSecondAdapter: jest.Mocked<AgentAdapter>
-    let mockLedger: jest.Mocked<EventLedger<CommittedEvent<BaseEvent>>>
+    let mockLedger: jest.Mocked<EventLedger<CommittedEvent>>
     let mockStore: jest.Mocked<StoreAdapter<any, any>>
     let mockTemplateRenderer: jest.Mock
     let mockSystemAdapter: jest.Mocked<SystemAdapter>

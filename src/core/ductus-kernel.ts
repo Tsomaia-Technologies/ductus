@@ -10,35 +10,33 @@ import { Injector } from '../interfaces/event-generator.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 
-export type DuctusReducer<TEvent extends BaseEvent, TState> = (state: TState, event: TEvent) => [TState, TEvent[]]
-
-export interface KernelOptions<TEvent extends BaseEvent, TState> {
+export interface KernelOptions<TState> {
   injector: Injector,
-  multiplexer: Multiplexer<TEvent>
-  processors: EventProcessor<TEvent, TState>[]
-  ledger: EventLedger<CommittedEvent<TEvent>>
-  store: StoreAdapter<TState, TEvent>
+  multiplexer: Multiplexer
+  processors: EventProcessor<TState>[]
+  ledger: EventLedger<CommittedEvent>
+  store: StoreAdapter<TState>
   canceller?: CancellationToken
-  shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent<TEvent>) => boolean
+  shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
 }
 
-export class DuctusKernel<TEvent extends BaseEvent, TState> {
-  private readonly multiplexer: Multiplexer<TEvent>
-  private readonly processors: EventProcessor<TEvent, TState>[] = []
-  private readonly ledger: EventLedger<CommittedEvent<TEvent>>
-  private readonly store: StoreAdapter<TState, TEvent>
+export class DuctusKernel<TState> {
+  private readonly multiplexer: Multiplexer
+  private readonly processors: EventProcessor<TState>[] = []
+  private readonly ledger: EventLedger<CommittedEvent>
+  private readonly store: StoreAdapter<TState>
   private readonly use: Injector
   private readonly getState: () => TState
   private readonly canceller: Canceller
-  private readonly subscribers: EventSubscriber<CommittedEvent<TEvent>>[] = []
+  private readonly subscribers: EventSubscriber<CommittedEvent>[] = []
   private mountResolver: Promise<void[]> = Promise.resolve<void[]>([])
-  private readonly cascadingEvents = new LinkedList<{ event: TEvent; context: { causationId: string; correlationId: string } }>()
+  private readonly cascadingEvents = new LinkedList<{ event: BaseEvent; context: { causationId: string; correlationId: string } }>()
   private readonly cascadeWakeUpResolvers = new LinkedList<() => void>()
   private unsubscribeCommit?: () => void
-  private readonly shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent<TEvent>) => boolean
+  private readonly shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
   private readonly causationGraph = new Map<string, { type: string, causationId?: string }>()
 
-  constructor(options: KernelOptions<TEvent, TState>) {
+  constructor(options: KernelOptions<TState>) {
     const {
       multiplexer,
       processors,
@@ -157,7 +155,7 @@ export class DuctusKernel<TEvent extends BaseEvent, TState> {
     })
   }
 
-  private async mountProcessor(processor: EventProcessor<TEvent, TState>) {
+  private async mountProcessor(processor: EventProcessor<TState>) {
     const subscriber = this.multiplexer.subscribe()
     this.subscribers.push(subscriber)
 

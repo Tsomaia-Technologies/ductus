@@ -6,21 +6,21 @@ import { Multiplexer } from '../interfaces/multiplexer.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 
-export interface DuctusMultiplexerOptions<TEvent extends BaseEvent> {
+export interface DuctusMultiplexerOptions {
   initialHash?: string
   initialSequenceNumber?: number
-  ledger?: EventLedger<TEvent>
+  ledger?: EventLedger
 }
 
-export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<TEvent> {
+export class DuctusMultiplexer implements Multiplexer {
   private lastHash = getInitialEventHash()
   private lastSequenceNumber = 0
-  private readonly bridges: BufferedSubscriber<CommittedEvent<TEvent>>[] = []
+  private readonly bridges: BufferedSubscriber[] = []
   private broadcastLock: Promise<unknown>
-  private commitListeners: Array<(event: CommittedEvent<TEvent>) => TEvent[] | void> = []
-  private readonly ledger?: EventLedger<TEvent>
+  private commitListeners: Array<(event: CommittedEvent) => BaseEvent[] | void> = []
+  private readonly ledger?: EventLedger
 
-  constructor(options?: DuctusMultiplexerOptions<TEvent>) {
+  constructor(options?: DuctusMultiplexerOptions) {
     if (options?.initialHash) this.lastHash = options.initialHash
     if (options?.initialSequenceNumber) this.lastSequenceNumber = options.initialSequenceNumber
     this.ledger = options?.ledger
@@ -38,8 +38,8 @@ export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<
     }
   }
 
-  subscribe(): BufferedSubscriber<CommittedEvent<TEvent>> {
-    const bridge = new BufferedSubscriber<CommittedEvent<TEvent>>()
+  subscribe(): BufferedSubscriber {
+    const bridge = new BufferedSubscriber()
     this.bridges.push(bridge)
 
     bridge.onUnsubscribe(() => {
@@ -53,7 +53,7 @@ export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<
     return bridge
   }
 
-  onCommit(callback: (event: CommittedEvent<TEvent>) => void) {
+  onCommit(callback: (event: CommittedEvent) => void) {
     this.commitListeners.push(callback)
 
     return () => {
@@ -61,16 +61,16 @@ export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<
     }
   }
 
-  async broadcast(event: TEvent, context?: { causationId?: string, correlationId?: string }): Promise<void> {
+  async broadcast(event: BaseEvent, context?: { causationId?: string, correlationId?: string }): Promise<void> {
     return await this.lock(async () => {
       const commitedEvent = this.commitEvent(event, context)
       if (this.ledger) {
-        await this.ledger.appendEvent(commitedEvent as unknown as CommittedEvent<TEvent>)
+        await this.ledger.appendEvent(commitedEvent as unknown as CommittedEvent)
       }
       this.commitListeners.forEach(listener => {
-        listener(commitedEvent as unknown as CommittedEvent<TEvent>)
+        listener(commitedEvent as unknown as CommittedEvent)
       })
-      await this.invokeBridges(commitedEvent as unknown as CommittedEvent<TEvent>)
+      await this.invokeBridges(commitedEvent as unknown as CommittedEvent)
     })
   }
 
@@ -81,11 +81,14 @@ export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<
     return turn
   }
 
-  private commitEvent(event: TEvent, context?: { causationId?: string, correlationId?: string }): DeeplyReadonly<CommittedEvent<TEvent>> {
+  private commitEvent(event: BaseEvent, context?: {
+    causationId?: string,
+    correlationId?: string
+  }): DeeplyReadonly<CommittedEvent> {
     ++this.lastSequenceNumber
     const eventId = crypto.randomUUID()
     const timestamp = Date.now()
-    const unhashedEvent: Omit<CommittedEvent<TEvent>, 'hash'> = {
+    const unhashedEvent: Omit<CommittedEvent, 'hash'> = {
       ...event,
       eventId,
       ...(context?.causationId ? { causationId: context.causationId } : {}),
@@ -94,19 +97,19 @@ export class DuctusMultiplexer<TEvent extends BaseEvent> implements Multiplexer<
       prevHash: this.lastHash,
       isCommited: true,
       timestamp,
-    } as Omit<CommittedEvent<TEvent>, 'hash'>
+    } as Omit<CommittedEvent, 'hash'>
 
     const hash = getEventHash(unhashedEvent)
     const commitedEvent = {
       ...unhashedEvent,
       hash,
-    } as CommittedEvent<TEvent>
+    } as CommittedEvent
     this.lastHash = hash
 
     return freezeEvent(commitedEvent)
   }
 
-  private async invokeBridges(event: CommittedEvent<TEvent>) {
+  private async invokeBridges(event: CommittedEvent) {
     await Promise.all(this.bridges.map(bridge => bridge.push(event)))
   }
 }

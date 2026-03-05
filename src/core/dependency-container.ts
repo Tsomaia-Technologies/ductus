@@ -17,4 +17,6 @@ export class DefaultDependencyContainer implements DependencyContainer {
 
     return instance
   }
+
+  // @todo: add factory support .registerFactory()
 }

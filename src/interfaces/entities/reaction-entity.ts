@@ -1,10 +1,10 @@
-import { BaseEvent } from '../event.js'
+import { BaseEvent, EventDefinition } from '../event.js'
 import { Schema } from '../schema.js'
 
-export type PipelineStep<TEvent extends BaseEvent> =
+export type PipelineStep =
   | InvokeStep
-  | CaseStep<TEvent>
-  | EmitStep<TEvent>
+  | CaseStep
+  | EmitStep
 
 export interface InvokeStep {
   type: 'invoke'
@@ -12,18 +12,18 @@ export interface InvokeStep {
   skill: string
 }
 
-export interface CaseStep<TEvent extends BaseEvent> {
+export interface CaseStep {
   type: 'case'
   schema: Schema
-  then: PipelineStep<TEvent>[]
+  then: PipelineStep[]
 }
 
-export interface EmitStep<TEvent extends BaseEvent> {
+export interface EmitStep {
   type: 'emit'
-  event: TEvent
+  event: EventDefinition
 }
 
-export interface ReactionEntity<TEvent extends BaseEvent> {
+export interface ReactionEntity {
   triggers: string[]
-  pipeline: PipelineStep<TEvent>[]
+  pipeline: PipelineStep[]
 }
