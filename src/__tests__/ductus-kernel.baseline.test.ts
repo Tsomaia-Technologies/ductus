@@ -9,16 +9,16 @@ import { EventSubscriber } from '../interfaces/event-subscriber.js'
 import { CancellationToken } from '../interfaces/cancellation-token.js'
 
 describe('DuctusKernel (Exhaustive Baseline)', () => {
-  let mockMultiplexer: jest.Mocked<Multiplexer<any>>
-  let mockLedger: jest.Mocked<EventLedger<CommittedEvent<any>>>
-  let mockStore: jest.Mocked<StoreAdapter<any, any>>
+  let mockMultiplexer: jest.Mocked<Multiplexer>
+  let mockLedger: jest.Mocked<EventLedger>
+  let mockStore: jest.Mocked<StoreAdapter<any>>
   let mockInjector: jest.Mocked<Injector>
-  let mockProcessor1: jest.Mocked<EventProcessor<any, any>>
-  let mockProcessor2: jest.Mocked<EventProcessor<any, any>>
-  let mockSubscriber: jest.Mocked<EventSubscriber<CommittedEvent<any>>>
+  let mockProcessor1: jest.Mocked<EventProcessor<any>>
+  let mockProcessor2: jest.Mocked<EventProcessor<any>>
+  let mockSubscriber: jest.Mocked<EventSubscriber>
   let mockCancelToken: jest.Mocked<CancellationToken>
-  let kernel: DuctusKernel<any, any>
-  let commitListener: (event: CommittedEvent<any>) => void
+  let kernel: DuctusKernel<any>
+  let commitListener: (event: CommittedEvent) => void
 
   beforeEach(() => {
     mockSubscriber = {
@@ -115,7 +115,7 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
           hash: '',
           timestamp: 3,
         },
-      ] as CommittedEvent<any>[]
+      ] as CommittedEvent[]
 
       mockLedger.readEvents.mockImplementation(async function* () {
         for (const h of history) yield h
@@ -148,7 +148,7 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
     })
 
     it('allows state inspection directly in processors by passing getState binding', async () => {
-      mockProcessor1.process.mockImplementation(async function* (stream, getState) {
+      mockProcessor1.process.mockImplementation(async function* (stream: any, getState: any) {
         expect(getState()).toEqual({ val: 1 })
       })
       mockProcessor2.process.mockImplementation(async function* () {
@@ -166,8 +166,8 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
   describe('Runtime Loop: Processing & Cascading', () => {
     it('relays processor output into multiplexer broadcasts', async () => {
       mockProcessor1.process.mockImplementation(async function* () {
-        yield { type: 'ProcessorOutput1' }
-        yield { type: 'ProcessorOutput2' }
+        yield { type: 'ProcessorOutput1', payload: {}, volatility: 'durable' } as any
+        yield { type: 'ProcessorOutput2', payload: {}, volatility: 'durable' } as any
       })
       mockProcessor2.process.mockImplementation(async function* () {
       })
@@ -199,8 +199,8 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
 
       // Store responds to the commit with new events
       mockStore.dispatch.mockReturnValueOnce([
-        { type: 'CascadeEventA' },
-        { type: 'CascadeEventB' },
+        { type: 'CascadeEventA', payload: {}, volatility: 'durable' } as any,
+        { type: 'CascadeEventB', payload: {}, volatility: 'durable' } as any,
       ])
 
       // Trigger the onCommit listener manually
@@ -235,7 +235,7 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
       await kernel.boot()
 
       // Event A causes Event A (Infinite Loop)
-      mockStore.dispatch.mockReturnValue([{ type: 'InfiniteLoopEvent' }])
+      mockStore.dispatch.mockReturnValue([{ type: 'InfiniteLoopEvent', payload: {}, volatility: 'durable' } as any])
 
       const commit = { type: 'InfiniteLoopEvent', eventId: 'EVT_1', sequenceNumber: 10 } as any
       commitListener(commit)

@@ -7,7 +7,6 @@ import { isCommitedEvent } from '../utils/guards.js'
 
 export interface JsonLedgerOptions {
   fileAdapter: FileAdapter
-  fileHandleAdapter: FileHandleAdapter
   ledgerFileAbsolutePath: string
 }
 
@@ -18,10 +17,10 @@ export class JsonlLedger implements EventLedger {
   private openPromise: Promise<void> | null = null
 
   constructor(options: JsonLedgerOptions) {
-    const { fileAdapter, fileHandleAdapter, ledgerFileAbsolutePath } = options
+    const { fileAdapter, ledgerFileAbsolutePath } = options
     this.fileAdapter = fileAdapter
-    this.fileHandleAdapter = fileHandleAdapter
     this.ledgerFileAbsolutePath = ledgerFileAbsolutePath
+    this.fileHandleAdapter = this.fileAdapter.createFileHandle()
   }
 
   async* readEvents(): AsyncIterable<CommittedEvent> {

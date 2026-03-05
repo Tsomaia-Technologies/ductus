@@ -5,7 +5,7 @@ import { AdapterEntity, AgentAdapter } from '../interfaces/entities/adapter-enti
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
 import { SystemAdapter } from '../interfaces/system-adapter.js'
-import { FileAdapter } from '../../research/interfaces/adapters.js'
+import { FileAdapter } from '../interfaces/file-adapter.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { CommittedEvent } from '../interfaces/event.js'
 import { SkillEntity } from '../interfaces/entities/skill-entity.js'
@@ -16,13 +16,13 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
   let mockAdapterFactory: jest.Mocked<AdapterEntity>
   let mockAdapter: jest.Mocked<AgentAdapter>
   let mockSecondAdapter: jest.Mocked<AgentAdapter>
-  let mockLedger: jest.Mocked<EventLedger<CommittedEvent>>
-  let mockStore: jest.Mocked<StoreAdapter<any, any>>
+  let mockLedger: jest.Mocked<EventLedger>
+  let mockStore: jest.Mocked<StoreAdapter<any>>
   let mockTemplateRenderer: jest.Mock
   let mockSystemAdapter: jest.Mocked<SystemAdapter>
   let mockFileAdapter: jest.Mocked<FileAdapter>
   let mockInjector: jest.Mocked<Injector>
-  let dispatcher: AgentDispatcher<any, any>
+  let dispatcher: AgentDispatcher<any>
 
   beforeEach(() => {
     mockAdapter = {
@@ -98,7 +98,7 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
       store: mockStore,
       templateRenderer: mockTemplateRenderer,
       systemAdapter: mockSystemAdapter,
-      fileAdapter: mockFileAdapter,
+      fileAdapter: mockFileAdapter as unknown as FileAdapter,
       injector: mockInjector,
     })
   })
@@ -277,6 +277,7 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
           prevHash: '',
           hash: '',
           volatility: 'durable',
+          authorId: 'test'
         }
         yield {
           type: 'Evt2',
@@ -288,6 +289,7 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
           prevHash: '',
           hash: '',
           volatility: 'durable',
+          authorId: 'test'
         }
         yield {
           type: 'Evt3',
@@ -299,6 +301,7 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
           prevHash: '',
           hash: '',
           volatility: 'durable',
+          authorId: 'test'
         }
         yield {
           type: 'Evt4',
@@ -310,6 +313,7 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
           prevHash: '',
           hash: '',
           volatility: 'durable',
+          authorId: 'test'
         }
       })
 

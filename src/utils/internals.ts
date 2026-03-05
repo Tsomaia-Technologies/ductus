@@ -1,4 +1,5 @@
 import * as zod from 'zod/v3'
+import { OutputEventStream } from '../interfaces/output-event-stream.js'
 import { BaseEvent, EventDefinition, EventPayloadShape, PayloadShape, Volatility } from '../interfaces/event.js'
 import { isSchemaType } from './schema-utils.js'
 import { PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
@@ -68,7 +69,7 @@ async function* executePipeline<TState>(
   steps: PipelineStep[],
   input: unknown,
   dispatcher: AgentDispatcher<TState>,
-): AsyncIterable<BaseEvent> {
+): OutputEventStream {
   let lastInvokeResult: unknown = input
 
   for (const step of steps) {
@@ -88,7 +89,7 @@ async function* executePipeline<TState>(
       case 'case':
         try {
           const matched = step.schema.parse(lastInvokeResult)
-          yield* executePipeline(step.then, matched, dispatcher)
+          yield* executePipeline([step.then], matched, dispatcher)
         } catch {
           // Schema didn't match — skip this case branch
         }

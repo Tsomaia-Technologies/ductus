@@ -1,3 +1,4 @@
+import { FileHandleAdapter } from './file-handle-adapter.js'
 import { Json } from './json.js'
 
 export interface FileAdapter {
@@ -130,4 +131,9 @@ export interface FileAdapter {
    * @param {string} absolutePath
    */
   delete(absolutePath: string): Promise<boolean>
+
+  /**
+   * Creates a detached file handle adapter instance.
+   */
+  createFileHandle(): FileHandleAdapter
 }

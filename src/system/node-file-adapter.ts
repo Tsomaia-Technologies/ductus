@@ -3,6 +3,8 @@ import * as fs from 'node:fs/promises'
 import { Json } from '../interfaces/json.js'
 import { createReadStream } from 'node:fs'
 import * as readline from 'node:readline'
+import { FileHandleAdapter } from '../interfaces/file-handle-adapter.js'
+import { NodeFileHandleAdapter } from './node-file-handle-adapter.js'
 
 export class NodeFileAdapter implements FileAdapter {
   async exists(absolutePath: string): Promise<boolean> {
@@ -137,5 +139,9 @@ export class NodeFileAdapter implements FileAdapter {
       if (error.code === 'ENOENT') return false
       throw error
     }
+  }
+
+  createFileHandle(): FileHandleAdapter {
+    return new NodeFileHandleAdapter()
   }
 }

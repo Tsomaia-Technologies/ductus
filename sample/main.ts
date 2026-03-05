@@ -5,7 +5,6 @@ import {
   isCommitedEvent,
   JsonlLedger,
   NodeFileAdapter,
-  NodeFileHandleAdapter,
   NodeSystemAdapter,
 } from 'ductus'
 import { TimerProcessor } from './processors/timer-processor.js'
@@ -29,13 +28,11 @@ async function main() {
 
   const multiplexer = new DuctusMultiplexer<DuctusEvent>()
   const fileAdapter = new NodeFileAdapter()
-  const fileHandleAdapter = new NodeFileHandleAdapter()
   const systemAdapter = new NodeSystemAdapter({
     defaultCwd: '/Users/torniketsomaia/projects/@tsomaia.tech/ductus',
   })
   const ledger = new JsonlLedger<DuctusEvent>({
     fileAdapter,
-    fileHandleAdapter,
     ledgerFileAbsolutePath: systemAdapter.resolveAbsolutePath('research/ledger.jsonl'),
     eventGuard: isCommitedEvent as any,
   })

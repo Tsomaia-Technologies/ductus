@@ -184,6 +184,7 @@ export class DuctusKernel<TState> {
 
     for await (const event of eventsOut) {
       if (this.canceller.isCancelled()) break
+      if (!event) continue
       await this.multiplexer.broadcast(event)
     }
   }

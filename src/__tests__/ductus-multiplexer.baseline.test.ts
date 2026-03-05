@@ -7,8 +7,8 @@ jest.mock('../utils/crypto-utils.js', () => ({
 }))
 
 describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
-  let mockLedger: jest.Mocked<EventLedger<any>>
-  let multiplexer: DuctusMultiplexer<any>
+  let mockLedger: jest.Mocked<EventLedger>
+  let multiplexer: DuctusMultiplexer
 
   beforeEach(() => {
     // Deterministic global mocks
@@ -40,8 +40,8 @@ describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
 
   describe('Sequence Advancing & Event Validation', () => {
     it('assigns incrementing sequences, timestamps, IDs, and sequential hash chains', async () => {
-      const e1 = { type: 'Evt1' }
-      const e2 = { type: 'Evt2' }
+      const e1 = { type: 'Evt1', payload: {}, volatility: 'durable' } as any
+      const e2 = { type: 'Evt2', payload: {}, volatility: 'durable' } as any
 
       await multiplexer.broadcast(e1)
       await multiplexer.broadcast(e2)
@@ -85,7 +85,7 @@ describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
       } as any)
 
       const multiplexer2 = new DuctusMultiplexer({ ledger: mockLedger })
-      const e = { type: 'CrashRecoveryEvent' }
+      const e = { type: 'CrashRecoveryEvent', payload: {}, volatility: 'durable' } as any
       await multiplexer2.broadcast(e)
 
       const commit = mockLedger.appendEvent.mock.calls[0][0]
@@ -105,7 +105,7 @@ describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
       jest.spyOn(sub1, 'push').mockResolvedValue(undefined)
       jest.spyOn(sub2, 'push').mockResolvedValue(undefined)
 
-      await multiplexer.broadcast({ type: 'BroadcastTest' })
+      await multiplexer.broadcast({ type: 'BroadcastTest', payload: {}, volatility: 'durable' } as any)
 
       expect(sub1.push).toHaveBeenCalledTimes(1)
       expect(sub2.push).toHaveBeenCalledTimes(1)
@@ -124,7 +124,7 @@ describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
       // Explicitly call the array cleanup block tied to the onUnsubscribe callback
       sub1.unsubscribe({ drain: false })
 
-      await multiplexer.broadcast({ type: 'UnseenEvent' })
+      await multiplexer.broadcast({ type: 'UnseenEvent', payload: {}, volatility: 'durable' } as any)
 
       // Assuming unsubscribe resolves the underlying generators,
       // the bridge array splice should eliminate it.
@@ -135,14 +135,14 @@ describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
       const listener = jest.fn()
       const off = multiplexer.onCommit(listener)
 
-      await multiplexer.broadcast({ type: 'SyncEvent' })
+      await multiplexer.broadcast({ type: 'SyncEvent', payload: {}, volatility: 'durable' } as any)
 
       expect(listener).toHaveBeenCalledTimes(1)
       expect(listener.mock.calls[0][0].type).toBe('SyncEvent')
 
       off() // Deregister
 
-      await multiplexer.broadcast({ type: 'SyncEvent2' })
+      await multiplexer.broadcast({ type: 'SyncEvent2', payload: {}, volatility: 'durable' } as any)
       expect(listener).toHaveBeenCalledTimes(1) // Not called again
     })
   })
