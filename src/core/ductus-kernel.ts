@@ -14,7 +14,7 @@ export interface KernelOptions<TState> {
   injector: Injector,
   multiplexer: Multiplexer
   processors: EventProcessor<TState>[]
-  ledger: EventLedger<CommittedEvent>
+  ledger: EventLedger
   store: StoreAdapter<TState>
   canceller?: CancellationToken
   shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
@@ -23,12 +23,12 @@ export interface KernelOptions<TState> {
 export class DuctusKernel<TState> {
   private readonly multiplexer: Multiplexer
   private readonly processors: EventProcessor<TState>[] = []
-  private readonly ledger: EventLedger<CommittedEvent>
+  private readonly ledger: EventLedger
   private readonly store: StoreAdapter<TState>
   private readonly use: Injector
   private readonly getState: () => TState
   private readonly canceller: Canceller
-  private readonly subscribers: EventSubscriber<CommittedEvent>[] = []
+  private readonly subscribers: EventSubscriber[] = []
   private mountResolver: Promise<void[]> = Promise.resolve<void[]>([])
   private readonly cascadingEvents = new LinkedList<{
     event: BaseEvent;

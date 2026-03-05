@@ -165,6 +165,9 @@ export function kernel<TState>(
     canceller,
   })
 
+  container.register(AgentDispatcher, dispatcher)
+  container.register(DuctusKernel, kernel)
+
   return { kernel, dispatcher }
 }
 
