@@ -29,6 +29,8 @@ export interface ContainerBuilder extends Buildable<ContainerEntity> {
 
   with(plugin: ContainerBuilder): this
 
+  entries(): Iterable<{ type: Type, entry: ContainerEntry }>
+
   service<T extends Type>(type: T, instance: InstanceType<Type>): this
 
   singleton<T extends Type>(type: T, factory: ServiceFactory): this

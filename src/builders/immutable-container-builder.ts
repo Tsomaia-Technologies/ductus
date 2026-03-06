@@ -28,6 +28,14 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
     ) as this
   }
 
+  *entries(): Iterable<{ type: Type, entry: ContainerEntry }> {
+    let current = this.head
+    while (current !== null) {
+      yield { type: current.type, entry: current.entry }
+      current = current.parent
+    }
+  }
+
   service<T extends Type>(type: T, instance: InstanceType<Type>): this {
     return new ImmutableContainerBuilder({
       type,
@@ -57,49 +65,38 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
       ? this.parentBuilder[BUILD]()
       : undefined
 
-    const builtImports = this.imports.map(plugin => plugin[BUILD]())
-
     return {
       use: (() => {
-        let fallbackInjector = (
-          type: Type,
-          options?: { optional?: boolean }
-        ): any => {
-          if (parentContainer) {
-            return parentContainer.use(type, options as any)
-          }
-          if (options?.optional) return undefined
-          throw new Error(`Type ${type.name} not registered.`)
-        }
-
-        for (let i = builtImports.length - 1; i >= 0; i--) {
-          const imported = builtImports[i]
-          const nextFallback = fallbackInjector
-          fallbackInjector = (type: Type, options?: { optional?: boolean }) => {
-            const result = imported.use(type, { optional: true })
-            if (result !== undefined) return result
-            return nextFallback(type, options)
-          }
-        }
-
         const services = new Map<Type, InstanceType<Type>>()
         const singletons = new Map<Type, ServiceFactory>()
         const transients = new Map<Type, ServiceFactory>()
         const currentlyResolving = new Set<Type>()
+        const parent = parentContainer
 
-        let current = this.head
-
-        while (current !== null) {
-          if (!services.has(current.type) && !singletons.has(current.type) && !transients.has(current.type)) {
-            if (current.entry.type === 'singleton') {
-              singletons.set(current.type, current.entry.factory)
-            } else if (current.entry.type === 'transient') {
-              transients.set(current.type, current.entry.factory)
+        for (const { type, entry } of this.entries()) {
+          if (!services.has(type) && !singletons.has(type) && !transients.has(type)) {
+            if (entry.type === 'singleton') {
+              singletons.set(type, entry.factory)
+            } else if (entry.type === 'transient') {
+              transients.set(type, entry.factory)
             } else {
-              services.set(current.type, current.entry.instance)
+              services.set(type, entry.instance)
             }
           }
-          current = current.parent
+        }
+
+        for (let i = this.imports.length - 1; i >= 0; i--) {
+          for (const { type, entry } of this.imports[i].entries()) {
+            if (!services.has(type) && !singletons.has(type) && !transients.has(type)) {
+              if (entry.type === 'singleton') {
+                singletons.set(type, entry.factory)
+              } else if (entry.type === 'transient') {
+                transients.set(type, entry.factory)
+              } else {
+                services.set(type, entry.instance)
+              }
+            }
+          }
         }
 
         return function injector<T extends Type>(
@@ -134,7 +131,12 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
             }
           }
 
-          return fallbackInjector(type, options)
+          if (parent) {
+            return parent.use(type, options as any)
+          }
+
+          if (options?.optional) return undefined as any
+          throw new Error(`Type ${type.name} not registered.`)
         }
       })(),
     }
