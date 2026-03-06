@@ -9,6 +9,7 @@ import ImplementationReaction from './reactions/ImplementationReaction.js'
 import ResolveCommentsReaction from './reactions/ResolveCommentsReaction.js'
 import ReviewReaction from './reactions/ReviewReaction.js'
 import LogProcessor from './processors/LogProcessor.js'
+import CompletionProcessor from './processors/CompletionProcessor.js'
 
 export default Ductus.flow()
   .initialState(initialState)
@@ -22,3 +23,4 @@ export default Ductus.flow()
   .reaction(ReviewReaction)
 
   .processor(LogProcessor)
+  .processor(CompletionProcessor)

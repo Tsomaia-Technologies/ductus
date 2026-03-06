@@ -79,6 +79,13 @@ export class CliAgentAdapter implements AgentAdapter {
           break
 
         case 'exit':
+          if (event.exitCode !== 0) {
+            yield {
+              type: 'error',
+              reason: `Process exited with code ${event.exitCode}${event.signal ? ` (signal: ${event.signal})` : ''}`,
+              timestamp: event.timestamp,
+            }
+          }
           yield {
             type: 'complete',
             timestamp: event.timestamp,
