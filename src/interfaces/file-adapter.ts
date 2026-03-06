@@ -70,6 +70,13 @@ export interface FileAdapter {
   readLinesJsonl(absolutePath: string): AsyncIterable<Json>
 
   /**
+   * Returns the last line of a file parsed as JSON, or null if the file is empty/missing
+   *
+   * @param {string} absolutePath
+   */
+  readLastLineJsonl(absolutePath: string): Promise<Json | null>
+
+  /**
    * Writes an arbitrary text to a file in utf-8 format.
    * Returns false if the file is already being used.
    *

@@ -88,6 +88,50 @@ export class NodeFileAdapter implements FileAdapter {
     }
   }
 
+  async readLastLineJsonl(absolutePath: string): Promise<Json | null> {
+    let fileHandle: fs.FileHandle | null = null
+    try {
+      fileHandle = await fs.open(absolutePath, 'r')
+      const stat = await fileHandle.stat()
+      if (stat.size === 0) return null
+
+      const chunkSize = 4096
+      const buffer = Buffer.alloc(chunkSize)
+      let position = stat.size
+      let leftover = ''
+
+      while (position > 0) {
+        const readLength = Math.min(chunkSize, position)
+        position -= readLength
+
+        const { bytesRead } = await fileHandle.read(buffer, 0, readLength, position)
+        const chunkStr = buffer.toString('utf8', 0, bytesRead)
+
+        const combined = chunkStr + leftover
+        const lines = combined.split('\n')
+
+        leftover = lines[0]
+
+        for (let i = lines.length - 1; i > 0; i--) {
+          const line = lines[i].trim()
+          if (line) {
+            return JSON.parse(line)
+          }
+        }
+      }
+
+      if (leftover.trim()) {
+        return JSON.parse(leftover.trim())
+      }
+      return null
+    } catch (e: any) {
+      if (e.code === 'ENOENT') return null
+      throw e
+    } finally {
+      await fileHandle?.close()
+    }
+  }
+
   async write(absolutePath: string, content: string): Promise<boolean> {
     try {
       await fs.writeFile(absolutePath, content, { encoding: 'utf8' })

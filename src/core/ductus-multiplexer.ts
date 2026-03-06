@@ -5,6 +5,7 @@ import { getEventHash, getInitialEventHash } from '../utils/crypto-utils.js'
 import { Multiplexer } from '../interfaces/multiplexer.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
+import { Mutex } from './mutex.js'
 
 export interface DuctusMultiplexerOptions {
   initialHash?: string
@@ -16,7 +17,7 @@ export class DuctusMultiplexer implements Multiplexer {
   private lastHash = getInitialEventHash()
   private lastSequenceNumber = 0
   private readonly bridges: BufferedSubscriber[] = []
-  private broadcastLock: Promise<unknown>
+  private readonly lockMutex = new Mutex()
   private commitListeners: Array<(event: CommittedEvent) => BaseEvent[] | void> = []
   private readonly ledger: EventLedger
 
@@ -26,7 +27,8 @@ export class DuctusMultiplexer implements Multiplexer {
     if (options.initialSequenceNumber) this.lastSequenceNumber = options.initialSequenceNumber
 
     // Pre-emptively hold the lock to sync with the ledger before first broadcast
-    this.broadcastLock = this.syncLedger()
+    // This floating promise is intentional, subsequent locks will wait in queue
+    this.lockMutex.lock(() => this.syncLedger()).catch(console.error)
   }
 
   subscribe(): BufferedSubscriber {
@@ -53,7 +55,7 @@ export class DuctusMultiplexer implements Multiplexer {
   }
 
   async broadcast(event: BaseEvent, context?: { causationId?: string, correlationId?: string }): Promise<void> {
-    return await this.lock(async () => {
+    return await this.lockMutex.lock(async () => {
       const commitedEvent = this.commitEvent(event, context)
       if (this.ledger) {
         await this.ledger.appendEvent(commitedEvent as unknown as CommittedEvent)
@@ -76,13 +78,6 @@ export class DuctusMultiplexer implements Multiplexer {
       this.lastSequenceNumber = lastEvent.sequenceNumber
       this.lastHash = lastEvent.hash
     }
-  }
-
-  private lock<T>(callback: () => T | Promise<T>): Promise<T> {
-    const turn = this.broadcastLock.then(callback)
-    this.broadcastLock = turn
-
-    return turn
   }
 
   private commitEvent(event: BaseEvent, context?: {

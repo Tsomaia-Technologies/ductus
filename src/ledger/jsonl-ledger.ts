@@ -4,14 +4,15 @@ import { FileHandleAdapter } from '../interfaces/file-handle-adapter.js'
 import { getInitialEventHash } from '../utils/crypto-utils.js'
 import { CommittedEvent } from '../interfaces/event.js'
 import { isCommitedEvent } from '../utils/guards.js'
+import { LedgerFileAdapter } from '../interfaces/ledger-file-adapter.js'
 
 export interface JsonLedgerOptions {
-  fileAdapter: FileAdapter
+  fileAdapter: LedgerFileAdapter
   ledgerFileAbsolutePath: string
 }
 
 export class JsonlLedger implements EventLedger {
-  private readonly fileAdapter: FileAdapter
+  private readonly fileAdapter: LedgerFileAdapter
   private readonly ledgerFileAbsolutePath: string
   private handlePromise: Promise<FileHandleAdapter> | null = null
 
@@ -21,8 +22,11 @@ export class JsonlLedger implements EventLedger {
     this.ledgerFileAbsolutePath = ledgerFileAbsolutePath
   }
 
-  async* readEvents(): AsyncIterable<CommittedEvent> {
-    const events = this.fileAdapter.readLinesJsonl(this.ledgerFileAbsolutePath)
+  async* readEvents(options?: { afterSequence?: number }): AsyncIterable<CommittedEvent> {
+    const afterSequence = options?.afterSequence
+    const events = afterSequence != null
+      ? this.fileAdapter.readLinesJsonlAfter(this.ledgerFileAbsolutePath, afterSequence)
+      : this.fileAdapter.readLinesJsonl(this.ledgerFileAbsolutePath)
     let verifiedPrevHash = getInitialEventHash()
 
     for await (const event of events) {
@@ -42,11 +46,14 @@ export class JsonlLedger implements EventLedger {
   }
 
   async readLastEvent(): Promise<CommittedEvent | null> {
-    let lastEvent: CommittedEvent | null = null
-    for await (const event of this.readEvents()) {
-      lastEvent = event
+    const rawEvent = await this.fileAdapter.readLastLineJsonl(this.ledgerFileAbsolutePath)
+    if (!rawEvent) return null
+
+    if (!isCommitedEvent(rawEvent)) {
+      throw new Error('Fatal error: detected invalid entry at the tail of the ledger.')
     }
-    return lastEvent
+
+    return rawEvent
   }
 
   async appendEvent(event: CommittedEvent): Promise<void> {

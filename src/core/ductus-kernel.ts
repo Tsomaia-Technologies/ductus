@@ -92,7 +92,15 @@ export class DuctusKernel<TState> {
     this.unsubscribeCommit?.()
 
     // Wait for all loops to exit
-    await this.mountResolver
+    const timeoutPromise = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error('Kernel shutdown timed out waiting for processors to exit.')), 5000)
+    )
+
+    try {
+      await Promise.race([this.mountResolver, timeoutPromise])
+    } catch (e: any) {
+      console.warn(`Ductus Framework Warning: ${e.message}`)
+    }
   }
 
   private async hydrateStore() {
@@ -145,11 +153,12 @@ export class DuctusKernel<TState> {
         let pointer: string | undefined = commitedEvent.eventId
         const depthLimit = 100 // Hard limit just in case
         let jumps = 0
-        while (pointer && jumps < depthLimit) {
+        while (pointer) {
           const node = this.causationGraph.get(pointer)
           if (!node) break
-          if (node.type === event.type) {
-            console.error(`Ductus Framework Error: Logical Event Cycle Detected! Event Type '${event.type}' caused by itself via causation chain. Halting propagation.`)
+
+          if (jumps >= depthLimit) {
+            console.error(`Ductus Framework Error: Maximum causation depth limit (${depthLimit}) reached at event '${event.type}'. Infinite recursive loop suspected. Halting propagation.`)
             this.canceller.cancel({ force: true })
             return
           }
