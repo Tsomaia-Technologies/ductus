@@ -1,0 +1,7 @@
+Implementation Summary:
+{{summary}}
+
+Checks:
+{% for check in checks %}
+- [{{check.result.success}}] {{check.command}} ({{check.cwd}})
+{% endfor %}

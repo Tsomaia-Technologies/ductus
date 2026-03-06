@@ -1,0 +1,7 @@
+Task Description:
+{{description}}
+
+Requirements:
+{% for req in requirements %}
+- {{req}}
+{% endfor %}
