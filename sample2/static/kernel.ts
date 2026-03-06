@@ -2,7 +2,7 @@ import Ductus, {
   DefaultDependencyContainer,
   DuctusMultiplexer,
   JsonlLedger,
-  NodeFileAdapter,
+  NodeLedgerFileAdapter,
   NodeSystemAdapter,
   TemplateRenderer,
 } from 'ductus'
@@ -12,7 +12,7 @@ import flow from './flow.js'
 const system = new NodeSystemAdapter({
   defaultCwd: __dirname,
 })
-const fileAdapter = new NodeFileAdapter()
+const fileAdapter = new NodeLedgerFileAdapter()
 const ledger = new JsonlLedger({
   fileAdapter,
   ledgerFileAbsolutePath: system.resolveAbsolutePath('ledger.jsonl'),

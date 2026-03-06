@@ -2,7 +2,7 @@ import Ductus, {
     DefaultDependencyContainer,
     DuctusMultiplexer,
     JsonlLedger,
-    NodeFileAdapter,
+    NodeLedgerFileAdapter,
     NodeSystemAdapter,
     TemplateRenderer,
 } from 'ductus'
@@ -17,9 +17,9 @@ const __dirname = path.dirname(__filename)
 const system = new NodeSystemAdapter({
     defaultCwd: path.join(__dirname, '../static/skills'),
 })
-const fileAdapter = new NodeFileAdapter()
+const fileAdapter = new NodeLedgerFileAdapter()
 const ledger = new JsonlLedger({
-    fileAdapter: fileAdapter as any, // Cast to any to satisfy the LedgerFileAdapter interface which NodeFileAdapter now implements but TS might be laggy
+    fileAdapter,
     ledgerFileAbsolutePath: path.join(__dirname, 'test-ledger.jsonl'),
 })
 const multiplexer = new DuctusMultiplexer({
