@@ -1,10 +1,10 @@
 import { ContainerBuilder, ContainerEntry, ServiceFactory } from '../interfaces/builders/container-builder.js'
-import { Type } from '../interfaces/event-generator.js'
+import { InferInjectable, Injectable, Token, Type } from '../interfaces/event-generator.js'
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { ContainerEntity } from '../interfaces/entities/container-entity.js'
 
 type RegistryNode = {
-  type: Type
+  type: Injectable
   entry: ContainerEntry
   parent: RegistryNode | null
 }
@@ -28,15 +28,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
     ) as this
   }
 
-  *entries(): Iterable<{ type: Type, entry: ContainerEntry }> {
-    let current = this.head
-    while (current !== null) {
-      yield { type: current.type, entry: current.entry }
-      current = current.parent
-    }
-  }
-
-  service<T extends Type>(type: T, instance: InstanceType<Type>): this {
+  service<T extends Type>(type: T, instance: InstanceType<T>): this {
     return new ImmutableContainerBuilder({
       type,
       entry: { type: 'service', instance },
@@ -44,7 +36,15 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
     }, this.parentBuilder, this.imports) as this
   }
 
-  singleton<T extends Type>(type: T, factory: ServiceFactory): this {
+  token<T>(token: Token<T>, instance: T): this {
+    return new ImmutableContainerBuilder({
+      type: token,
+      entry: { type: 'token', instance },
+      parent: this.head,
+    }, this.parentBuilder, this.imports) as this
+  }
+
+  singleton<T extends Injectable>(type: T, factory: ServiceFactory): this {
     return new ImmutableContainerBuilder({
       type,
       entry: { type: 'singleton', factory },
@@ -52,12 +52,20 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
     }, this.parentBuilder, this.imports) as this
   }
 
-  transient<T extends Type>(type: T, factory: ServiceFactory): this {
+  transient<T extends Injectable>(type: T, factory: ServiceFactory): this {
     return new ImmutableContainerBuilder({
       type,
       entry: { type: 'transient', factory },
       parent: this.head,
     }, this.parentBuilder, this.imports) as this
+  }
+
+  *entries(): Iterable<{ type: Injectable, entry: ContainerEntry }> {
+    let current = this.head
+    while (current !== null) {
+      yield { type: current.type, entry: current.entry }
+      current = current.parent
+    }
   }
 
   [BUILD](): ContainerEntity {
@@ -67,10 +75,10 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
 
     return {
       use: (() => {
-        const services = new Map<Type, InstanceType<Type>>()
-        const singletons = new Map<Type, ServiceFactory>()
-        const transients = new Map<Type, ServiceFactory>()
-        const currentlyResolving = new Set<Type>()
+        const services = new Map<Injectable, any>()
+        const singletons = new Map<Injectable, ServiceFactory>()
+        const transients = new Map<Injectable, ServiceFactory>()
+        const currentlyResolving = new Set<Injectable>()
         const parent = parentContainer
 
         for (const { type, entry } of this.entries()) {
@@ -99,23 +107,24 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
           }
         }
 
-        return function injector<T extends Type>(
+        return function injector<T extends Injectable>(
           type: T,
           options?: { optional?: boolean }
-        ): InstanceType<T> | (typeof options extends { optional: true } ? undefined : never) {
+        ): InferInjectable<T> | (typeof options extends { optional: true } ? undefined : never) {
 
           const cached = services.get(type)
-          if (cached) return cached as InstanceType<T>
+          if (cached) return cached as InferInjectable<T>
 
           const transientFactory = transients.get(type)
           if (transientFactory) {
-            return transientFactory(injector) as InstanceType<T>
+            return transientFactory(injector) as InferInjectable<T>
           }
 
           const singletonFactory = singletons.get(type)
           if (singletonFactory) {
             if (currentlyResolving.has(type)) {
-              throw new Error(`Circular dependency detected while resolving ${type.name}`)
+              const name = typeof type === 'function' ? type.name : type.toString()
+              throw new Error(`Circular dependency detected while resolving ${name}`)
             }
 
             currentlyResolving.add(type)
@@ -125,7 +134,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
               services.set(type, service)
               singletons.delete(type)
 
-              return service as InstanceType<T>
+              return service as InferInjectable<T>
             } finally {
               currentlyResolving.delete(type)
             }
@@ -136,7 +145,8 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
           }
 
           if (options?.optional) return undefined as any
-          throw new Error(`Type ${type.name} not registered.`)
+          const name = typeof type === 'function' ? type.name : type.toString()
+          throw new Error(`Type ${name} not registered.`)
         }
       })(),
     }

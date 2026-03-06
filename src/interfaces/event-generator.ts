@@ -3,20 +3,32 @@ import { OutputEventStream } from './output-event-stream.js'
 
 export type Type<T = any> = { new(...args: any[]): T }
 
+export interface Token<T> {
+  readonly symbol: symbol
+}
+
+export function Token<T>(description?: string): Token<T> {
+  return { symbol: Symbol(description) }
+}
+
+export type Injectable<T = any> = Type<T> | Token<T>
+
+export type InferInjectable<T> = T extends Type<infer U> ? U : T extends Token<infer U> ? U : never
+
 export interface InjectorOptions {
   optional?: boolean
 }
 
 export interface Injector {
-  <T extends { new(...args: any[]): any }>(type: T): InstanceType<T>
-  <T extends { new(...args: any[]): any }>(
+  <T extends Injectable>(type: T): InferInjectable<T>
+  <T extends Injectable>(
     type: T,
     options: { optional: false },
-  ): InstanceType<T>
-  <T extends { new(...args: any[]): any }>(
+  ): InferInjectable<T>
+  <T extends Injectable>(
     type: T,
     options: { optional: true },
-  ): InstanceType<T> | undefined
+  ): InferInjectable<T> | undefined
 }
 
 export type EventGenerator<TState> = (
