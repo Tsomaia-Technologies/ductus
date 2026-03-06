@@ -28,12 +28,18 @@ export class JsonlLedger implements EventLedger {
       ? this.fileAdapter.readLinesJsonlAfter(this.ledgerFileAbsolutePath, afterSequence)
       : this.fileAdapter.readLinesJsonl(this.ledgerFileAbsolutePath)
     let verifiedPrevHash = getInitialEventHash()
+    let isFirstEvent = afterSequence != null
 
     for await (const event of events) {
       const typedEvent = event as unknown
 
       if (!isCommitedEvent(typedEvent)) {
         throw new Error('Fatal error: detected invalid entry in the ledger, terminating.')
+      }
+
+      if (isFirstEvent) {
+        verifiedPrevHash = typedEvent.prevHash
+        isFirstEvent = false
       }
 
       if (typedEvent.prevHash !== verifiedPrevHash) {

@@ -4,6 +4,7 @@ import { CommittedEvent } from '../interfaces/event.js'
 
 export interface BufferedSubscriberOptions {
   bufferLimit?: number
+  bufferTimeoutMs?: number
 }
 
 export class BufferedSubscriber implements EventSubscriber {
@@ -12,9 +13,12 @@ export class BufferedSubscriber implements EventSubscriber {
   private readonly terminationListeners: Array<() => void> = []
   private isTerminated = false
   private readonly bufferLimit: number
+  private readonly bufferTimeoutMs: number
+  private readonly bufferDrainWakeUpQueue = new LinkedList<{ resolve: () => void, reject: (err: Error) => void, timer: NodeJS.Timeout }>()
 
   constructor(options?: BufferedSubscriberOptions) {
     this.bufferLimit = options?.bufferLimit ?? 10000
+    this.bufferTimeoutMs = options?.bufferTimeoutMs ?? 5000
   }
 
   async push(event: CommittedEvent): Promise<void> {
@@ -23,7 +27,15 @@ export class BufferedSubscriber implements EventSubscriber {
     }
 
     if (this.eventQueue.size >= this.bufferLimit) {
-      throw new Error(`Subscriber buffer overflow. Limit of ${this.bufferLimit} events reached. Consumer is deadlocked or too slow.`)
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          // Remove from queue technically not needed since we're rejecting, but clean up references if we wanted to
+          this.isTerminated = true // Force termination on timeout
+          reject(new Error(`Fatal: Subscriber buffer overflow. Limit of ${this.bufferLimit} events reached and timeout of ${this.bufferTimeoutMs}ms exceeded. Consumer is deadlocked.`))
+        }, this.bufferTimeoutMs)
+
+        this.bufferDrainWakeUpQueue.insertLast({ resolve, reject, timer })
+      })
     }
 
     this.eventQueue.insertLast(event)
@@ -37,6 +49,13 @@ export class BufferedSubscriber implements EventSubscriber {
   async* streamEvents(): AsyncIterable<CommittedEvent> {
     while (true) {
       const event = this.eventQueue.removeFirst()
+
+      // Wake up a blocked producer if queue space freed up
+      const bufferWaiter = this.bufferDrainWakeUpQueue.removeFirst()
+      if (bufferWaiter) {
+        clearTimeout(bufferWaiter.timer)
+        bufferWaiter.resolve()
+      }
 
       if (event) {
         yield event
@@ -57,6 +76,12 @@ export class BufferedSubscriber implements EventSubscriber {
 
     while (wakeUp = this.processorWakeUpQueue.removeFirst()) {
       wakeUp()
+    }
+
+    let bufferWaiter: any
+    while (bufferWaiter = this.bufferDrainWakeUpQueue.removeFirst()) {
+      clearTimeout(bufferWaiter.timer)
+      bufferWaiter.resolve() // Unblock any pending producers immediately since we're terminating anyway
     }
 
     let discardedEvents: CommittedEvent[] = []

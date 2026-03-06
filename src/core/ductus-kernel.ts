@@ -38,6 +38,7 @@ export class DuctusKernel<TState> {
   private unsubscribeCommit?: () => void
   private readonly shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
   private readonly causationGraph = new Map<string, { type: string, causationId?: string, sequence: number }>()
+  private isShuttingDown = false
 
   constructor(options: KernelOptions<TState>) {
     const {
@@ -75,7 +76,11 @@ export class DuctusKernel<TState> {
 
   async shutdown(options?: { force?: boolean }) {
     const force = options?.force ?? false
-    this.canceller.cancel({ force })
+    if (force) {
+      this.canceller.cancel({ force })
+    } else {
+      this.isShuttingDown = true
+    }
 
     // Unsubscribe all processor subscribers
     for (const subscriber of this.subscribers) {
@@ -93,7 +98,10 @@ export class DuctusKernel<TState> {
 
     // Wait for all loops to exit
     const timeoutPromise = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error('Kernel shutdown timed out waiting for processors to exit.')), 5000)
+      setTimeout(() => {
+        this.canceller.cancel({ force: true }) // Force kill the loops on timeout
+        reject(new Error('Kernel shutdown timed out waiting for processors to exit.'))
+      }, 5000)
     )
 
     try {
@@ -199,7 +207,7 @@ export class DuctusKernel<TState> {
       }
     } catch (e: any) {
       console.error(`Ductus Framework Error: Processor threw an unhandled exception. Initiating Kernel shutdown.`, e)
-      this.shutdown({ force: true }).catch()
+      this.shutdown({ force: true }).catch(err => console.error(`Ductus Framework Error during forced shutdown:`, err))
       throw e
     }
   }
@@ -212,6 +220,8 @@ export class DuctusKernel<TState> {
         if (wrapper) {
           await this.multiplexer.broadcast(wrapper.event, wrapper.context)
         } else {
+          if (this.isShuttingDown) break
+
           await new Promise<void>(resolve => {
             this.cascadeWakeUpResolvers.insertLast(resolve)
           })
@@ -219,7 +229,7 @@ export class DuctusKernel<TState> {
       }
     } catch (e: any) {
       console.error(`Ductus Framework Error: Cascading loop threw an unhandled exception. Initiating Kernel shutdown.`, e)
-      this.shutdown({ force: true }).catch()
+      this.shutdown({ force: true }).catch(err => console.error(`Ductus Framework Error during forced shutdown:`, err))
       throw e
     }
   }

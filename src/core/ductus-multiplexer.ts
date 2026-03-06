@@ -28,7 +28,7 @@ export class DuctusMultiplexer implements Multiplexer {
 
     // Pre-emptively hold the lock to sync with the ledger before first broadcast
     // This floating promise is intentional, subsequent locks will wait in queue
-    this.lockMutex.lock(() => this.syncLedger()).catch(console.error)
+    this.lockMutex.lock(() => this.syncLedger()).catch(err => console.error(`Ductus Framework Error during initial ledger sync:`, err))
   }
 
   subscribe(): BufferedSubscriber {
