@@ -108,6 +108,8 @@ export class DuctusKernel<TState> {
       await Promise.race([this.mountResolver, timeoutPromise])
     } catch (e: any) {
       console.warn(`Ductus Framework Warning: ${e.message}`)
+    } finally {
+      await this.ledger.dispose()
     }
   }
 

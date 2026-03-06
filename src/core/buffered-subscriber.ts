@@ -27,16 +27,20 @@ export class BufferedSubscriber implements EventSubscriber {
     }
 
     if (this.eventQueue.size >= this.bufferLimit) {
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          // Remove from queue technically not needed since we're rejecting, but clean up references if we wanted to
-          this.isTerminated = true // Force termination on timeout
-          reject(new Error(`Fatal: Subscriber buffer overflow. Limit of ${this.bufferLimit} events reached and timeout of ${this.bufferTimeoutMs}ms exceeded. Consumer is deadlocked.`))
-        }, this.bufferTimeoutMs)
-
-        this.bufferDrainWakeUpQueue.insertLast({ resolve, reject, timer })
-      })
+      throw new Error(`Fatal: Subscriber buffer overflow. Limit of ${this.bufferLimit} events reached. Consumer is too slow or deadlocked.`)
     }
+
+    // if (this.eventQueue.size >= this.bufferLimit) {
+    //   await new Promise<void>((resolve, reject) => {
+    //     const timer = setTimeout(() => {
+    //       // Remove from queue technically not needed since we're rejecting, but clean up references if we wanted to
+    //       this.isTerminated = true // Force termination on timeout
+    //       reject(new Error(`Fatal: Subscriber buffer overflow. Limit of ${this.bufferLimit} events reached and timeout of ${this.bufferTimeoutMs}ms exceeded. Consumer is deadlocked.`))
+    //     }, this.bufferTimeoutMs)
+    //
+    //     this.bufferDrainWakeUpQueue.insertLast({ resolve, reject, timer })
+    //   })
+    // }
 
     this.eventQueue.insertLast(event)
 

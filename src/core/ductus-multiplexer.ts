@@ -20,6 +20,7 @@ export class DuctusMultiplexer implements Multiplexer {
   private readonly lockMutex = new Mutex()
   private commitListeners: Array<(event: CommittedEvent) => BaseEvent[] | void> = []
   private readonly ledger: EventLedger
+  private initialSyncPromise: Promise<void>
 
   constructor(options: DuctusMultiplexerOptions) {
     this.ledger = options.ledger
@@ -27,8 +28,10 @@ export class DuctusMultiplexer implements Multiplexer {
     if (options.initialSequenceNumber) this.lastSequenceNumber = options.initialSequenceNumber
 
     // Pre-emptively hold the lock to sync with the ledger before first broadcast
-    // This floating promise is intentional, subsequent locks will wait in queue
-    this.lockMutex.lock(() => this.syncLedger()).catch(err => console.error(`Ductus Framework Error during initial ledger sync:`, err))
+    this.initialSyncPromise = this.lockMutex.lock(() => this.syncLedger()).catch(err => {
+      console.error(`Ductus Framework Error during initial ledger sync:`, err)
+      throw err // Re-throw so callers can catch it on broadcast
+    })
   }
 
   subscribe(): BufferedSubscriber {
@@ -55,6 +58,7 @@ export class DuctusMultiplexer implements Multiplexer {
   }
 
   async broadcast(event: BaseEvent, context?: { causationId?: string, correlationId?: string }): Promise<void> {
+    await this.initialSyncPromise
     return await this.lockMutex.lock(async () => {
       const commitedEvent = this.commitEvent(event, context)
       if (this.ledger) {

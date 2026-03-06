@@ -72,4 +72,12 @@ export class JsonlLedger implements EventLedger {
     const handle = await this.handlePromise
     await handle.appendJsonl(event as any)
   }
+
+  async dispose(): Promise<void> {
+    if (this.handlePromise) {
+      const handle = await this.handlePromise
+      await handle.close()
+      this.handlePromise = null
+    }
+  }
 }

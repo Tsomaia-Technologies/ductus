@@ -6,4 +6,6 @@ export interface EventLedger {
   readLastEvent(): Promise<CommittedEvent | null>
 
   appendEvent(event: CommittedEvent): Promise<void>
+
+  dispose(): Promise<void>
 }

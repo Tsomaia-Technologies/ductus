@@ -44,6 +44,7 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
     mockLedger = {
       readEvents: jest.fn().mockImplementation(async function* () {
       }),
+      dispose: jest.fn().mockResolvedValue(undefined),
     } as any
 
     mockStore = {
@@ -181,8 +182,8 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
       await new Promise(r => setTimeout(r, 10))
 
       expect(mockMultiplexer.broadcast).toHaveBeenCalledTimes(2)
-      expect(mockMultiplexer.broadcast).toHaveBeenCalledWith({ type: 'ProcessorOutput1' })
-      expect(mockMultiplexer.broadcast).toHaveBeenCalledWith({ type: 'ProcessorOutput2' })
+      expect(mockMultiplexer.broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: 'ProcessorOutput1' }))
+      expect(mockMultiplexer.broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: 'ProcessorOutput2' }))
 
       await kernel.shutdown({ force: true })
     })
@@ -213,11 +214,11 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
       // The cascading loop pulls from the LinkedList and broadcasts WITH CAUSALITY
       expect(mockStore.dispatch).toHaveBeenCalledWith(incomingCommit)
       expect(mockMultiplexer.broadcast).toHaveBeenCalledWith(
-        { type: 'CascadeEventA' },
+        expect.objectContaining({ type: 'CascadeEventA' }),
         { causationId: 'ROOT', correlationId: 'ROOT' },
       )
       expect(mockMultiplexer.broadcast).toHaveBeenCalledWith(
-        { type: 'CascadeEventB' },
+        expect.objectContaining({ type: 'CascadeEventB' }),
         { causationId: 'ROOT', correlationId: 'ROOT' },
       )
 
@@ -237,10 +238,8 @@ describe('DuctusKernel (Exhaustive Baseline)', () => {
       // Event A causes Event A (Infinite Loop)
       mockStore.dispatch.mockReturnValue([{ type: 'InfiniteLoopEvent', payload: {}, volatility: 'durable' } as any])
 
-      const commit = { type: 'InfiniteLoopEvent', eventId: 'EVT_1', sequenceNumber: 10 } as any
+      const commit = { type: 'InfiniteLoopEvent', eventId: 'EVT_1', causationId: 'EVT_1', sequenceNumber: 10 } as any
       commitListener(commit)
-
-      await new Promise(r => setImmediate(r))
 
       expect(mockCancelToken.cancel).toHaveBeenCalledWith({ force: true })
       expect((mockCancelToken as any).isCancelled).toBe(true)

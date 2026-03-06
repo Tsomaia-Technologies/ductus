@@ -26,6 +26,7 @@ describe('DuctusMultiplexer (Exhaustive Baseline)', () => {
       }),
       readLastEvent: jest.fn().mockResolvedValue(null),
       appendEvent: jest.fn().mockResolvedValue(undefined),
+      dispose: jest.fn().mockResolvedValue(undefined),
     } as any
 
     multiplexer = new DuctusMultiplexer({
