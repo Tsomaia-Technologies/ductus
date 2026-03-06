@@ -59,31 +59,29 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
 
     const builtImports = this.imports.map(plugin => plugin[BUILD]())
 
-    // Compose the fallback chain strictly at build-time. 
-    // This allows O(1) depth execution without looping arrays per-injection.
-    let fallbackInjector = (
-      type: Type,
-      options?: { optional?: boolean }
-    ): any => {
-      if (parentContainer) {
-        return parentContainer.use(type, options as any)
-      }
-      if (options?.optional) return undefined
-      throw new Error(`Type ${type.name} not registered.`)
-    }
-
-    for (let i = builtImports.length - 1; i >= 0; i--) {
-      const imported = builtImports[i]
-      const nextFallback = fallbackInjector
-      fallbackInjector = (type: Type, options?: { optional?: boolean }) => {
-        const result = imported.use(type, { optional: true })
-        if (result !== undefined) return result
-        return nextFallback(type, options)
-      }
-    }
-
     return {
       use: (() => {
+        let fallbackInjector = (
+          type: Type,
+          options?: { optional?: boolean }
+        ): any => {
+          if (parentContainer) {
+            return parentContainer.use(type, options as any)
+          }
+          if (options?.optional) return undefined
+          throw new Error(`Type ${type.name} not registered.`)
+        }
+
+        for (let i = builtImports.length - 1; i >= 0; i--) {
+          const imported = builtImports[i]
+          const nextFallback = fallbackInjector
+          fallbackInjector = (type: Type, options?: { optional?: boolean }) => {
+            const result = imported.use(type, { optional: true })
+            if (result !== undefined) return result
+            return nextFallback(type, options)
+          }
+        }
+
         const services = new Map<Type, InstanceType<Type>>()
         const singletons = new Map<Type, ServiceFactory>()
         const transients = new Map<Type, ServiceFactory>()
