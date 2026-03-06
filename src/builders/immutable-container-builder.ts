@@ -2,6 +2,7 @@ import { ContainerBuilder, ContainerEntry, ServiceFactory } from '../interfaces/
 import { InferInjectable, Injectable, Token, Type } from '../interfaces/event-generator.js'
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { ContainerEntity } from '../interfaces/entities/container-entity.js'
+import Container from '../../sample2/static/container.js'
 
 type RegistryNode = {
   type: Injectable
@@ -80,8 +81,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
         const transients = new Map<Injectable, ServiceFactory>()
         const currentlyResolving = new Set<Injectable>()
         const parent = parentContainer
-
-        for (const { type, entry } of this.entries()) {
+        const processEntry = (type: Injectable, entry: ContainerEntry) => {
           if (!services.has(type) && !singletons.has(type) && !transients.has(type)) {
             if (entry.type === 'singleton') {
               singletons.set(type, entry.factory)
@@ -93,17 +93,13 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
           }
         }
 
+        for (const { type, entry } of this.entries()) {
+          processEntry(type, entry)
+        }
+
         for (let i = this.imports.length - 1; i >= 0; i--) {
           for (const { type, entry } of this.imports[i].entries()) {
-            if (!services.has(type) && !singletons.has(type) && !transients.has(type)) {
-              if (entry.type === 'singleton') {
-                singletons.set(type, entry.factory)
-              } else if (entry.type === 'transient') {
-                transients.set(type, entry.factory)
-              } else {
-                services.set(type, entry.instance)
-              }
-            }
+            processEntry(type, entry)
           }
         }
 
