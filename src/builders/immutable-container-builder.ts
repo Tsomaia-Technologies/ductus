@@ -11,12 +11,21 @@ type RegistryNode = {
 
 export class ImmutableContainerBuilder implements ContainerBuilder {
   constructor(
-    private readonly head: RegistryNode | null = null,
+    public readonly head: RegistryNode | null = null,
     private readonly parentBuilder?: ContainerBuilder,
+    private readonly imports: ContainerBuilder[] = [],
   ) { }
 
   parent(builder: ContainerBuilder): this {
-    return new ImmutableContainerBuilder(this.head, builder) as this
+    return new ImmutableContainerBuilder(this.head, builder, this.imports) as this
+  }
+
+  with(plugin: ContainerBuilder): this {
+    return new ImmutableContainerBuilder(
+      this.head,
+      this.parentBuilder,
+      [...this.imports, plugin]
+    ) as this
   }
 
   service<T extends Type>(type: T, instance: InstanceType<Type>): this {
@@ -24,7 +33,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
       type,
       entry: { type: 'service', instance },
       parent: this.head,
-    }, this.parentBuilder) as this
+    }, this.parentBuilder, this.imports) as this
   }
 
   singleton<T extends Type>(type: T, factory: ServiceFactory): this {
@@ -32,7 +41,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
       type,
       entry: { type: 'singleton', factory },
       parent: this.head,
-    }, this.parentBuilder) as this
+    }, this.parentBuilder, this.imports) as this
   }
 
   transient<T extends Type>(type: T, factory: ServiceFactory): this {
@@ -40,7 +49,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
       type,
       entry: { type: 'transient', factory },
       parent: this.head,
-    }, this.parentBuilder) as this
+    }, this.parentBuilder, this.imports) as this
   }
 
   [BUILD](): ContainerEntity {
@@ -48,13 +57,37 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
       ? this.parentBuilder[BUILD]()
       : undefined
 
+    const builtImports = this.imports.map(plugin => plugin[BUILD]())
+
+    // Compose the fallback chain strictly at build-time. 
+    // This allows O(1) depth execution without looping arrays per-injection.
+    let fallbackInjector = (
+      type: Type,
+      options?: { optional?: boolean }
+    ): any => {
+      if (parentContainer) {
+        return parentContainer.use(type, options as any)
+      }
+      if (options?.optional) return undefined
+      throw new Error(`Type ${type.name} not registered.`)
+    }
+
+    for (let i = builtImports.length - 1; i >= 0; i--) {
+      const imported = builtImports[i]
+      const nextFallback = fallbackInjector
+      fallbackInjector = (type: Type, options?: { optional?: boolean }) => {
+        const result = imported.use(type, { optional: true })
+        if (result !== undefined) return result
+        return nextFallback(type, options)
+      }
+    }
+
     return {
       use: (() => {
         const services = new Map<Type, InstanceType<Type>>()
         const singletons = new Map<Type, ServiceFactory>()
         const transients = new Map<Type, ServiceFactory>()
         const currentlyResolving = new Set<Type>()
-        const parent = parentContainer
 
         let current = this.head
 
@@ -85,29 +118,25 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
           }
 
           const singletonFactory = singletons.get(type)
-          if (!singletonFactory) {
-            if (parent) {
-              return parent.use(type, options as any)
+          if (singletonFactory) {
+            if (currentlyResolving.has(type)) {
+              throw new Error(`Circular dependency detected while resolving ${type.name}`)
             }
-            if (options?.optional) return undefined as any
-            throw new Error(`Type ${type.name} not registered.`)
+
+            currentlyResolving.add(type)
+
+            try {
+              const service = singletonFactory(injector)
+              services.set(type, service)
+              singletons.delete(type)
+
+              return service as InstanceType<T>
+            } finally {
+              currentlyResolving.delete(type)
+            }
           }
 
-          if (currentlyResolving.has(type)) {
-            throw new Error(`Circular dependency detected while resolving ${type.name}`)
-          }
-
-          currentlyResolving.add(type)
-
-          try {
-            const service = singletonFactory(injector)
-            services.set(type, service)
-            singletons.delete(type)
-
-            return service as InstanceType<T>
-          } finally {
-            currentlyResolving.delete(type)
-          }
+          return fallbackInjector(type, options)
         }
       })(),
     }
