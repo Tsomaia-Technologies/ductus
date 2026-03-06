@@ -18,6 +18,7 @@ export interface KernelOptions<TState> {
   store: StoreAdapter<TState>
   canceller?: CancellationToken
   shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
+  subscriberOverflowStrategy?: 'fail' | 'block'
 }
 
 export class DuctusKernel<TState> {
@@ -49,6 +50,7 @@ export class DuctusKernel<TState> {
       injector,
       canceller,
       shouldTakeSnapshot,
+      subscriberOverflowStrategy = 'fail',
     } = options
     this.multiplexer = multiplexer
     this.processors = processors

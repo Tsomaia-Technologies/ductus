@@ -11,6 +11,8 @@ export interface DuctusMultiplexerOptions {
   initialHash?: string
   initialSequenceNumber?: number
   ledger: EventLedger
+  overflowStrategy?: 'fail' | 'block'
+  maxInFlightDelivery?: number
 }
 
 export class DuctusMultiplexer implements Multiplexer {
@@ -21,9 +23,16 @@ export class DuctusMultiplexer implements Multiplexer {
   private commitListeners: Array<(event: CommittedEvent) => BaseEvent[] | void> = []
   private readonly ledger: EventLedger
   private initialSyncPromise: Promise<void>
+  private iterationCount = 0
+  private deliveryPromiseChain: Promise<any> = Promise.resolve()
+  private readonly overflowStrategy: 'fail' | 'block'
+  private readonly maxInFlightDelivery: number
+  private inFlightCount = 0
 
   constructor(options: DuctusMultiplexerOptions) {
     this.ledger = options.ledger
+    this.overflowStrategy = options.overflowStrategy ?? 'fail'
+    this.maxInFlightDelivery = options.maxInFlightDelivery ?? 100
     if (options.initialHash) this.lastHash = options.initialHash
     if (options.initialSequenceNumber) this.lastSequenceNumber = options.initialSequenceNumber
 
@@ -35,7 +44,7 @@ export class DuctusMultiplexer implements Multiplexer {
   }
 
   subscribe(): BufferedSubscriber {
-    const bridge = new BufferedSubscriber()
+    const bridge = new BufferedSubscriber({ overflowStrategy: this.overflowStrategy })
     this.bridges.push(bridge)
 
     bridge.onUnsubscribe(() => {
@@ -59,20 +68,42 @@ export class DuctusMultiplexer implements Multiplexer {
 
   async broadcast(event: BaseEvent, context?: { causationId?: string, correlationId?: string }): Promise<void> {
     await this.initialSyncPromise
-    return await this.lockMutex.lock(async () => {
-      const commitedEvent = this.commitEvent(event, context)
+
+    // Phase 1: COMMIT (under lock)
+    const commitedEvent = await this.lockMutex.lock(async () => {
+      const commited = this.commitEvent(event, context)
       if (this.ledger) {
-        await this.ledger.appendEvent(commitedEvent as unknown as CommittedEvent)
+        await this.ledger.appendEvent(commited as unknown as CommittedEvent)
       }
 
-      this.lastSequenceNumber = commitedEvent.sequenceNumber
-      this.lastHash = commitedEvent.hash
+      this.lastSequenceNumber = commited.sequenceNumber
+      this.lastHash = commited.hash
 
       this.commitListeners.forEach(listener => {
-        listener(commitedEvent as unknown as CommittedEvent)
+        listener(commited as unknown as CommittedEvent)
       })
-      await this.invokeBridges(commitedEvent as unknown as CommittedEvent)
+
+      return commited as unknown as CommittedEvent
     })
+
+    // Phase 2: DELIVERY (sequenced but outside lock)
+    this.inFlightCount++
+    const currentDelivery = this.deliveryPromiseChain.then(async () => {
+      try {
+        await this.invokeBridges(commitedEvent)
+      } finally {
+        this.inFlightCount--
+      }
+    })
+    this.deliveryPromiseChain = currentDelivery
+
+    // If we're below the grace threshold, return immediately to allow for recursive/local cycles.
+    // Otherwise, wait for the delivery to catch up (backpressure).
+    if (this.inFlightCount < this.maxInFlightDelivery) {
+      return Promise.resolve()
+    }
+
+    return await currentDelivery
   }
 
   private async syncLedger() {
