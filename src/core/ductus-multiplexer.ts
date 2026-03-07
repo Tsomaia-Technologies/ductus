@@ -11,6 +11,8 @@ export interface DuctusMultiplexerOptions {
   initialHash?: string
   initialSequenceNumber?: number
   ledger: EventLedger
+  bufferLimit?: number
+  bufferTimeoutMs?: number
   overflowStrategy?: 'fail' | 'block'
   maxInFlightDelivery?: number
 }
@@ -25,12 +27,16 @@ export class DuctusMultiplexer implements Multiplexer {
   private initialSyncPromise: Promise<void>
   private iterationCount = 0
   private deliveryPromiseChain: Promise<any> = Promise.resolve()
+  private readonly bufferLimit?: number
+  private readonly bufferTimeoutMs?: number
   private readonly overflowStrategy: 'fail' | 'block'
   private readonly maxInFlightDelivery: number
   private inFlightCount = 0
 
   constructor(options: DuctusMultiplexerOptions) {
     this.ledger = options.ledger
+    this.bufferLimit = options.bufferLimit
+    this.bufferTimeoutMs = options.bufferTimeoutMs
     this.overflowStrategy = options.overflowStrategy ?? 'fail'
     this.maxInFlightDelivery = options.maxInFlightDelivery ?? 100
     if (options.initialHash) this.lastHash = options.initialHash
@@ -44,7 +50,11 @@ export class DuctusMultiplexer implements Multiplexer {
   }
 
   subscribe(): BufferedSubscriber {
-    const bridge = new BufferedSubscriber({ overflowStrategy: this.overflowStrategy })
+    const bridge = new BufferedSubscriber({
+      bufferLimit: this.bufferLimit,
+      bufferTimeoutMs: this.bufferTimeoutMs,
+      overflowStrategy: this.overflowStrategy,
+    })
     this.bridges.push(bridge)
 
     bridge.onUnsubscribe(() => {

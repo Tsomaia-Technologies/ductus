@@ -17,15 +17,33 @@ const templateRenderer: TemplateRenderer = (template, context) => {
 
 const container = Ductus.container()
 
-export async function runTests(flow: FlowBuilder<any>, subPath: string) {
+export interface TestRunnerOptions<TState> {
+  flow: FlowBuilder<TState>
+  dir: string
+  bufferLimit?: number
+  bufferTimeoutMs?: number
+  overflowStrategy?: 'fail' | 'block'
+}
+
+export async function runTests<TState>(params: TestRunnerOptions<TState>) {
+  const {
+    flow,
+    dir,
+    bufferLimit,
+    bufferTimeoutMs,
+    overflowStrategy = 'fail',
+  } = params;
   const system = new NodeSystemAdapter({ defaultCwd: __dirname })
   const fileAdapter = new NodeLedgerFileAdapter()
   const ledger = new JsonlLedger({
     fileAdapter,
-    ledgerFileAbsolutePath: system.resolveAbsolutePath(subPath, 'ledger.jsonl'),
+    ledgerFileAbsolutePath: system.resolveAbsolutePath(dir, 'ledger.jsonl'),
   })
   const multiplexer = new DuctusMultiplexer({
     ledger,
+    bufferLimit,
+    bufferTimeoutMs,
+    overflowStrategy,
   })
   const kernel = Ductus.kernel({
     flow,
