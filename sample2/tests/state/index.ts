@@ -95,8 +95,8 @@ const SlowProcessor = Ductus.processor<State>(async function* (events, getState)
 
 // D: auditor — collects all observations and validates correctness
 const AuditorProcessor = Ductus.processor<State>(async function* (events, getState) {
-  const fastObservations: { index: number, count: number }[] = []
-  const slowObservations: { index: number, count: number }[] = []
+  const fastObservations: { index: number, observedCount: number }[] = []
+  const slowObservations: { index: number, observedCount: number }[] = []
 
   for await (const event of events) {
     if (FastObserved.is(event)) {
