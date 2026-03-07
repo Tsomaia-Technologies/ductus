@@ -13,7 +13,7 @@ export interface DuctusMultiplexerOptions {
   ledger: EventLedger
   bufferLimit?: number
   bufferTimeoutMs?: number
-  overflowStrategy?: 'fail' | 'block'
+  overflowStrategy?: 'fail' | 'block' | 'throttle'
   maxInFlightDelivery?: number
 }
 
@@ -29,7 +29,7 @@ export class DuctusMultiplexer implements Multiplexer {
   private deliveryPromiseChain: Promise<any> = Promise.resolve()
   private readonly bufferLimit?: number
   private readonly bufferTimeoutMs?: number
-  private readonly overflowStrategy: 'fail' | 'block'
+  private readonly overflowStrategy: 'fail' | 'block' | 'throttle'
   private readonly maxInFlightDelivery: number
   private inFlightCount = 0
 
@@ -100,6 +100,14 @@ export class DuctusMultiplexer implements Multiplexer {
     })
 
     // Phase 2: DELIVERY (sequenced but outside lock)
+    if (this.overflowStrategy === 'block') {
+      // Deliver inline, fully await before returning to caller.
+      // Producer is held here until every bridge has accepted the event.
+      // No chain needed — sequential by nature since broadcast() itself is awaited.
+      await this.invokeBridges(commitedEvent)
+      return
+    }
+
     this.inFlightCount++
     const currentDelivery = this.deliveryPromiseChain.then(async () => {
       try {
@@ -115,7 +123,7 @@ export class DuctusMultiplexer implements Multiplexer {
 
     // If we're below the grace threshold, return immediately to allow for recursive/local cycles.
     // Otherwise, wait for the delivery to catch up (backpressure).
-    if (this.inFlightCount < this.maxInFlightDelivery) {
+    if (this.overflowStrategy === 'fail' && this.inFlightCount < this.maxInFlightDelivery) {
       return Promise.resolve()
     }
 

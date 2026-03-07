@@ -22,7 +22,7 @@ export interface TestRunnerOptions<TState> {
   dir: string
   bufferLimit?: number
   bufferTimeoutMs?: number
-  overflowStrategy?: 'fail' | 'block'
+  overflowStrategy?: 'fail' | 'block' | 'throttle'
 }
 
 export async function runTests<TState>(params: TestRunnerOptions<TState>) {

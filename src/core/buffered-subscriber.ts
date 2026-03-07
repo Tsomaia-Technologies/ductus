@@ -5,7 +5,7 @@ import { CommittedEvent } from '../interfaces/event.js'
 export interface BufferedSubscriberOptions {
   bufferLimit?: number
   bufferTimeoutMs?: number
-  overflowStrategy?: 'fail' | 'block'
+  overflowStrategy?: 'fail' | 'block' | 'throttle'
 }
 
 export class BufferedSubscriber implements EventSubscriber {
@@ -15,7 +15,7 @@ export class BufferedSubscriber implements EventSubscriber {
   private isTerminated = false
   private readonly bufferLimit: number
   private readonly bufferTimeoutMs: number
-  private readonly overflowStrategy: 'fail' | 'block'
+  private readonly overflowStrategy: 'fail' | 'block' | 'throttle'
   private readonly bufferDrainWakeUpQueue = new LinkedList<{ resolve: () => void, reject: (err: Error) => void, timer: NodeJS.Timeout }>()
 
   constructor(options?: BufferedSubscriberOptions) {
