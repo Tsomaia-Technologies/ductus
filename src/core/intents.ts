@@ -1,4 +1,4 @@
-import { BaseEvent, EventDefinition } from '../interfaces/event.js'
+import { BaseEvent, CommittedEvent, EventDefinition } from '../interfaces/event.js'
 import { createIntentFactory } from '../utils/internals.js'
 
 export const RequestIntent = createIntentFactory<'RequestIntent', {
@@ -8,6 +8,6 @@ export const RequestIntent = createIntentFactory<'RequestIntent', {
 }>('RequestIntent')
 
 export const ResponseIntent = createIntentFactory<'ResponseIntent', {
-  request: string | EventDefinition | BaseEvent
+  request: CommittedEvent
   response: BaseEvent
 }>('ResponseIntent')

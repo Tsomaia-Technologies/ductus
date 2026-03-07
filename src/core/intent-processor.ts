@@ -1,4 +1,4 @@
-import { RequestIntent } from './intents.js'
+import { RequestIntent, ResponseIntent } from './intents.js'
 import { Multiplexer } from '../interfaces/multiplexer.js'
 import { CancellationToken, Disposer } from '../interfaces/cancellation-token.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
@@ -65,6 +65,16 @@ export class IntentProcessor {
       })
 
       return await responsePromise
+    } else if (ResponseIntent.is(intent)) {
+      const { request, response } = intent.payload
+
+      await this.multiplexer.broadcast(response, {
+        chainId: request.chainId,
+        causationId: request.causationId,
+        correlationId: request.correlationId ?? request.eventId,
+      })
+
+      return undefined
     }
   }
 }
