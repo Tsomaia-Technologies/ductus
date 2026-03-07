@@ -6,3 +6,8 @@ export const RequestIntent = createIntentFactory<'RequestIntent', {
   response: string | EventDefinition
   timeoutMs?: number
 }>('RequestIntent')
+
+export const ResponseIntent = createIntentFactory<'ResponseIntent', {
+  request: string | EventDefinition | BaseEvent
+  response: BaseEvent
+}>('ResponseIntent')

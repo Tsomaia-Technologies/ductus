@@ -129,7 +129,7 @@ export class DuctusMultiplexer implements Multiplexer {
     const unhashedEvent: Omit<CommittedEvent, 'hash'> = {
       ...event,
       eventId,
-      ...(context?.chainId ? { causationId: context.chainId } : {}),
+      ...(context?.chainId ? { chainId: context.chainId } : {}),
       ...(context?.causationId ? { causationId: context.causationId } : {}),
       ...(context?.correlationId ? { correlationId: context.correlationId } : {}),
       sequenceNumber: nextSequenceNumber,

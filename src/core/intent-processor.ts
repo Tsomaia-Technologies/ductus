@@ -25,8 +25,9 @@ export class IntentProcessor {
       if (event.volatility !== 'intent') {
         if (!event) continue
         await this.multiplexer.broadcast(event)
+        nextValue = undefined
       } else {
-        await this.processIntent(event)
+        nextValue = await this.processIntent(event)
       }
     }
   }
