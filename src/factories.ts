@@ -9,13 +9,12 @@ import { ImmutableModelBuilder } from './builders/immutable-model-builder.js'
 import { ImmutableCliAdapterBuilder } from './builders/immutable-cli-adapter-builder.js'
 import { FlowEntity } from './interfaces/entities/flow-entity.js'
 import { EmitStep, InvokeStep } from './interfaces/entities/reaction-entity.js'
-import { EventDefinition, EventPayloadShape, PayloadShape } from './interfaces/event.js'
+import { EventDefinition } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { ImmutableRulesetBuilder } from './builders/immutable-ruleset-builder.js'
 import { AgentDispatcher, TemplateRenderer } from './core/agent-dispatcher.js'
 import { DuctusStore } from './core/ductus-store.js'
-import * as zod from 'zod/v3'
-import { createEventFactory, createProcessorAdapter, createReactionAdapter } from './utils/internals.js'
+import { createProcessorAdapter, createReactionAdapter } from './utils/internals.js'
 import { AgentBuilder } from './interfaces/builders/agent-builder.js'
 import { FlowBuilder } from './interfaces/builders/flow-builder.js'
 import { ModelBuilder } from './interfaces/builders/model-builder.js'
@@ -24,41 +23,42 @@ import { ReducerBuilder } from './interfaces/builders/reducer-builder.js'
 import { RulesetBuilder } from './interfaces/builders/ruleset-builder.js'
 import { SkillBuilder } from './interfaces/builders/skill-builder.js'
 import { ProcessorBuilder } from './interfaces/builders/processor-builder.js'
-import { AdapterBuilder } from './interfaces/builders/adapter-builder.js'
 import { Multiplexer } from './interfaces/multiplexer.js'
 import { EventLedger } from './interfaces/event-ledger.js'
-import { DependencyContainer } from './interfaces/dependency-container.js'
 import { CancellationToken } from './interfaces/cancellation-token.js'
 import { SystemAdapter } from './interfaces/system-adapter.js'
 import { FileAdapter } from './interfaces/file-adapter.js'
 import { AsyncEntity } from './interfaces/entities/async-entity.js'
-import { BUILD } from './interfaces/builders/__internal__.js'
+import { build } from './interfaces/builders/__internal__.js'
 import { ContainerBuilder } from './interfaces/builders/container-builder.js'
 import { ImmutableContainerBuilder } from './builders/immutable-container-builder.js'
+import { CliAdapterBuilder } from './interfaces/builders/cli-adapter-builder.js'
+import { event, signal } from './utils/event-utils.js'
+import {
+  _enum,
+  _null,
+  array,
+  boolean,
+  date,
+  discriminatedUnion,
+  literal,
+  nullable,
+  number,
+  object,
+  string,
+  union,
+} from './utils/schema-utils.js'
+import { BootEvent } from './core/events.js'
 
 export interface CreateKernelOptions<TState> {
   flow: FlowBuilder<TState>
   multiplexer: Multiplexer
   ledger: EventLedger
-  container: DependencyContainer
+  container: ContainerBuilder
   templateRenderer: TemplateRenderer
   systemAdapter: SystemAdapter
   fileAdapter: FileAdapter
   canceller?: CancellationToken
-}
-
-function event<TType extends string, TPayloadShape extends EventPayloadShape>(
-  type: TType,
-  payloadShape: PayloadShape<TPayloadShape>,
-) {
-  return createEventFactory({ type, payloadShape, volatility: 'durable' })
-}
-
-function signal<TType extends string, TPayloadShape extends EventPayloadShape>(
-  type: TType,
-  payloadShape: PayloadShape<TPayloadShape>,
-) {
-  return createEventFactory({ type, payloadShape, volatility: 'volatile' })
 }
 
 function agent(name: string): AgentBuilder {
@@ -93,7 +93,7 @@ function processor<TState>(generator: EventGenerator<TState>): ProcessorBuilder<
   return new ImmutableProcessorBuilder<TState>().processor(generator)
 }
 
-function adapter(type: 'cli'): AdapterBuilder {
+function adapter(type: 'cli'): CliAdapterBuilder {
   return new ImmutableCliAdapterBuilder()
 }
 
@@ -130,21 +130,26 @@ export function kernel<TState>(
   const {
     multiplexer,
     ledger,
-    container,
+    container: containerBuilder,
     canceller,
     templateRenderer,
     systemAdapter,
     fileAdapter,
   } = options
 
-  const flow = options.flow[BUILD]()
-  const use = container.use.bind(container) as Injector
+  const flow = build(options.flow)
 
   const store = new DuctusStore(
     flow.initialState,
     flow.reducer.reducer,
   )
 
+  const coreContainer = container()
+    .parent(containerBuilder)
+    .token(SystemAdapter, systemAdapter)
+    .token(FileAdapter, fileAdapter)
+
+  const { use } = build(coreContainer)
   const dispatcher = new AgentDispatcher({
     agents: flow.agents,
     ledger,
@@ -172,26 +177,12 @@ export function kernel<TState>(
     canceller,
   })
 
-  container.register(AgentDispatcher, dispatcher)
-  container.register(DuctusKernel, kernel)
-
   return kernel
 }
 
-const literal = zod.literal
-const boolean = zod.boolean
-const string = zod.string
-const number = zod.number
-const _null = zod.null
-const nullable = zod.nullable
-const date = zod.date
-const union = zod.union
-const discriminatedUnion = zod.discriminatedUnion
-const object = zod.strictObject
-const array = zod.array
-const _enum = zod.enum
-
 export default {
+  BootEvent,
+
   event,
   signal,
 

@@ -1,4 +1,7 @@
 import { Json } from './json.js'
+import { Token } from './event-generator.js'
+
+export const CacheAdapter = Token<CacheAdapter>()
 
 export interface CacheAdapter {
   has(key: string): Promise<boolean>

@@ -1,5 +1,8 @@
 import { CancellationToken } from './cancellation-token.js'
 import { SystemProcessAdapter } from './system-process-adapter.js'
+import { Token } from './event-generator.js'
+
+export const SystemAdapter = Token<SystemAdapter>()
 
 export interface SystemAdapter {
   /**
@@ -54,8 +57,17 @@ export interface SystemAdapter {
 
   /**
    * Terminates all commands and processes being run by this adapter
+   *
+   * @param params
    */
   terminate(params?: { force?: boolean }): Promise<void>
+
+  /**
+   * Prompts user input
+   *
+   * @param {string} query
+   */
+  prompt(query: string): Promise<string>
 }
 
 export interface SystemCommandOptions {

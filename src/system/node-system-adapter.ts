@@ -10,6 +10,7 @@ import {
 import { SystemProcessAdapter } from '../interfaces/system-process-adapter.js'
 import { NodeProcessAdapter } from './node-process-adapter.js'
 import { Canceller } from './canceller.js'
+import * as readline from 'node:readline/promises'
 
 export interface NodeSystemAdapterOptions {
   defaultEnv?: Record<string, string>
@@ -152,5 +153,18 @@ export class NodeSystemAdapter implements SystemAdapter {
     this.baseCanceller.cancel({ force })
 
     await Promise.all(terminationPromises)
+  }
+
+  async prompt(query: string): Promise<string> {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    })
+
+    try {
+      return await rl.question(query)
+    } finally {
+      rl.close()
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
-import { CliAdapterBuilder } from '../interfaces/builders/cli-adapter-builder.js'
+import { CliAdapterBuilder, DynamicCommand } from '../interfaces/builders/cli-adapter-builder.js'
 import { AdapterEntity } from '../interfaces/entities/adapter-entity.js'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { ModelEntity } from '../interfaces/entities/model-entity.js'
@@ -10,7 +10,7 @@ interface CliAdapterBuilderParams {
   cwd?: string
   readonly env: Record<string, string | undefined>
   timeoutMs?: number
-  command?: string
+  command?: string | DynamicCommand
   readonly args: string[]
 }
 
@@ -52,7 +52,7 @@ export class ImmutableCliAdapterBuilder implements CliAdapterBuilder {
     return this.clone({ timeoutMs })
   }
 
-  command(command: string): this {
+  command(command: string | DynamicCommand): this {
     return this.clone({ command })
   }
 
@@ -78,8 +78,12 @@ export class ImmutableCliAdapterBuilder implements CliAdapterBuilder {
     }
 
     return {
-      create(_agent: AgentEntity, _model: ModelEntity) {
-        return new CliAgentAdapter(config)
+      create(agent: AgentEntity, model: ModelEntity) {
+        return new CliAgentAdapter({
+          agent,
+          model,
+          ...config,
+        })
       },
     }
   }

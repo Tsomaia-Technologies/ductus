@@ -1,4 +1,7 @@
 import { Json } from './json.js'
+import { Token } from './event-generator.js'
+
+export const LoggerAdapter = Token<LoggerAdapter>()
 
 export interface LoggerAdapter {
   info(message: Json): void

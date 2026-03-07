@@ -1,4 +1,4 @@
-import { BUILD } from '../interfaces/builders/__internal__.js'
+import { build, BUILD } from '../interfaces/builders/__internal__.js'
 import { AgentBuilder, SkillRef } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
 import {
@@ -160,9 +160,9 @@ export class ImmutableAgentBuilder implements AgentBuilder {
       name: this.params.name,
       role: this.params.role,
       persona: this.params.persona,
-      skill: this.params.skills.map(skill => skill[BUILD]()),
+      skill: this.params.skills.map(build),
       rules: this.params.rules,
-      rulesets: this.params.rulesets.map(ruleset => ruleset[BUILD]()),
+      rulesets: this.params.rulesets.map(build),
       scope: this.params.scope,
       maxContextTokens: this.params.maxContextTokens,
       maxFailures: this.params.maxFailures,

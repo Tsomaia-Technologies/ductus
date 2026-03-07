@@ -1,6 +1,6 @@
 import { ContainerBuilder, ContainerEntry, ServiceFactory } from '../interfaces/builders/container-builder.js'
 import { InferInjectable, Injectable, Token, Type } from '../interfaces/event-generator.js'
-import { BUILD } from '../interfaces/builders/__internal__.js'
+import { build, BUILD } from '../interfaces/builders/__internal__.js'
 import { ContainerEntity } from '../interfaces/entities/container-entity.js'
 import Container from '../../sample2/static/container.js'
 
@@ -71,7 +71,7 @@ export class ImmutableContainerBuilder implements ContainerBuilder {
 
   [BUILD](): ContainerEntity {
     const parentContainer = this.parentBuilder
-      ? this.parentBuilder[BUILD]()
+      ? build(this.parentBuilder)
       : undefined
 
     return {

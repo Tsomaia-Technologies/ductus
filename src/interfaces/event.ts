@@ -13,9 +13,9 @@ export type EventPayloadShape = zod.ZodRawShape
 export type PayloadShape<T extends EventPayloadShape> = zod.ZodObject<T, 'strict'> | T
 
 export type EventDefinition<TType extends string = string, TPayloadShape extends EventPayloadShape = any> = {
-  (payload: PayloadShape<TPayloadShape>): BaseEvent<TType, typeof payload>
+  (payload: zod.input<zod.ZodObject<TPayloadShape, 'strict'>>): BaseEvent<TType, typeof payload>
 
-  readonly is: (event: BaseEvent) => event is BaseEvent<TType, zod.input<zod.ZodObject<TPayloadShape, 'strict'>>>
+  readonly is: (event: EventDefinition | BaseEvent) => event is BaseEvent<TType, zod.input<zod.ZodObject<TPayloadShape, 'strict'>>>
 
   readonly type: TType
   readonly volatility: Volatility

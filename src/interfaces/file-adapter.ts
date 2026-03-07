@@ -1,5 +1,8 @@
 import { FileHandleAdapter } from './file-handle-adapter.js'
 import { Json } from './json.js'
+import { Token } from './event-generator.js'
+
+export const FileAdapter = Token<FileAdapter>()
 
 export interface FileAdapter {
   /**

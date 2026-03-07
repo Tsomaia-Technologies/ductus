@@ -1,5 +1,10 @@
 import * as crypto from 'crypto'
 import { CommittedEvent } from '../interfaces/event.js'
+import { v4 } from 'uuid'
+
+export function uuid() {
+  return v4()
+}
 
 export function sha256(input: string) {
   return crypto.createHash('sha256').update(input).digest('hex')

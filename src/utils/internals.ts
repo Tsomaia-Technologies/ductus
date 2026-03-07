@@ -16,7 +16,7 @@ export function createEventFactory<TType extends string, TPayloadShape extends E
   const payloadSchema = isSchemaType(payloadShape)
     ? payloadShape
     : zod.strictObject(payloadShape)
-  type TPayload = zod.input<typeof payloadSchema>
+  type TPayload = zod.input<zod.ZodObject<TPayloadShape, 'strict'>>
   type TEvent = BaseEvent<TType, zod.input<zod.ZodObject<TPayloadShape, 'strict'>>>
 
   const createEvent = (payload: TPayload): BaseEvent<TType, TPayload> => {
@@ -34,7 +34,7 @@ export function createEventFactory<TType extends string, TPayloadShape extends E
     type,
     volatility,
     payloadSchema,
-    is: (event: BaseEvent): event is TEvent => event.type === type,
+    is: (event: EventDefinition | BaseEvent): event is TEvent => event.type === type,
   })
 
   return createEvent as unknown as EventDefinition<TType, TPayloadShape>
@@ -75,7 +75,7 @@ async function* executePipeline<TState>(
   for (const step of steps) {
     switch (step.type) {
       case 'emit':
-        yield step.event(lastInvokeResult)
+        yield step.event(lastInvokeResult as Parameters<typeof step.event>[0])
         break
 
       case 'invoke':

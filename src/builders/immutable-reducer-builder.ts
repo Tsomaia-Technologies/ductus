@@ -1,4 +1,4 @@
-import { BUILD } from '../interfaces/builders/__internal__.js'
+import { build, BUILD } from '../interfaces/builders/__internal__.js'
 import { ReducerBuilder } from '../interfaces/builders/reducer-builder.js'
 import { ReducerEntity } from '../interfaces/entities/reducer-entity.js'
 import { BaseEvent, EventDefinition, EventPayloadShape } from '../interfaces/event.js'
@@ -40,7 +40,7 @@ export class ImmutableReducerBuilder<TState> implements ReducerBuilder<TState> {
 
   [BUILD](): ReducerEntity<TState> {
     const handlers = [...this.params.handlers]
-    const combinedReducers = this.params.combined.map((r) => r[BUILD]())
+    const combinedReducers = this.params.combined.map(build)
 
     return {
       reducer: (state: TState, event: BaseEvent): [TState, BaseEvent[]] => {

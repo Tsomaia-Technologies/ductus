@@ -1,5 +1,8 @@
 import { EventSubscriber } from './event-subscriber.js'
 import { BaseEvent, CommittedEvent } from './event.js'
+import { Token } from './event-generator.js'
+
+export const Multiplexer = Token<Multiplexer>()
 
 export interface Multiplexer {
   /**

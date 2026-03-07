@@ -4,9 +4,14 @@ import { AgentChunk } from '../interfaces/agent-chunk.js'
 import { NodeSystemAdapter } from '../system/node-system-adapter.js'
 import { SystemProcessAdapter } from '../interfaces/system-process-adapter.js'
 import { InvocationContext } from '../core/pipeline/agent-interceptor.js'
+import { DynamicCommand } from '../interfaces/builders/cli-adapter-builder.js'
+import { ModelEntity } from '../interfaces/entities/model-entity.js'
+import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 
-export interface CliAdapterConfig {
-  command: string
+export interface CliAdapterParams {
+  agent: AgentEntity
+  model: ModelEntity
+  command: string | DynamicCommand
   args: string[]
   cwd: string
   env: Record<string, string | undefined>
@@ -21,11 +26,11 @@ export class CliAgentAdapter implements AgentAdapter {
   private processAdapter: SystemProcessAdapter | null = null
   private systemAdapter: NodeSystemAdapter | null = null
 
-  constructor(private readonly config: CliAdapterConfig) {
+  constructor(private readonly params: CliAdapterParams) {
   }
 
   async initialize(context?: AgentContext): Promise<void> {
-    const { command, args, cwd, env, timeoutMs } = this.config
+    const { model, command, args, cwd, env, timeoutMs } = this.params
 
     const resolvedEnv: Record<string, string> = Object.fromEntries(
       Object.entries(env).filter(
@@ -42,7 +47,8 @@ export class CliAgentAdapter implements AgentAdapter {
       defaultEnv: resolvedEnv,
     })
 
-    this.processAdapter = this.systemAdapter.spawn(command, args, {
+    const cmd = typeof command === 'function' ? command(model) : command
+    this.processAdapter = this.systemAdapter.spawn(cmd, args, {
       cwd,
       env: resolvedEnv,
       timeoutMs,

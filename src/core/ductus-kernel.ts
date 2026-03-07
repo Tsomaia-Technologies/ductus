@@ -9,6 +9,7 @@ import { EventSubscriber } from '../interfaces/event-subscriber.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
+import { BootEvent } from './events.js'
 
 export interface KernelOptions<TState> {
   injector: Injector,
@@ -70,6 +71,10 @@ export class DuctusKernel<TState> {
       ...this.processors.map(processor => this.mountProcessor(processor)),
       this.mountCascadingEvents(),
     ])
+
+    await this.multiplexer.broadcast(
+      BootEvent({ timestamp: Date.now() })
+    )
   }
 
   async monitor() {

@@ -1,4 +1,4 @@
-import { BUILD } from '../interfaces/builders/__internal__.js'
+import { build, BUILD } from '../interfaces/builders/__internal__.js'
 import { FlowBuilder } from '../interfaces/builders/flow-builder.js'
 import { ReducerBuilder } from '../interfaces/builders/reducer-builder.js'
 import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
@@ -65,14 +65,14 @@ export class ImmutableFlowBuilder<TState> implements FlowBuilder<TState> {
 
     return {
       initialState: this.params.initialState,
-      reducer: this.params.reducer[BUILD](),
+      reducer: build(this.params.reducer),
       agents: this.params.agents.map((a) => ({
-        agent: a.agent[BUILD](),
-        model: a.model[BUILD](),
-        adapter: a.adapter[BUILD](),
+        agent: build(a.agent),
+        model: build(a.model),
+        adapter: build(a.adapter),
       })),
-      reactions: this.params.reactions.map((r) => r[BUILD]()),
-      processors: this.params.processors.map((p) => p[BUILD]()),
+      reactions: this.params.reactions.map(build),
+      processors: this.params.processors.map(build),
     }
   }
 

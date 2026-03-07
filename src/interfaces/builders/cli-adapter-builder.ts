@@ -1,4 +1,7 @@
 import { AdapterBuilder } from './adapter-builder.js'
+import { ModelEntity } from '../entities/model-entity.js'
+
+export type DynamicCommand = (model: ModelEntity) => string
 
 export interface CliAdapterBuilder extends AdapterBuilder {
   apiKey(apiKey: string): this
@@ -11,7 +14,7 @@ export interface CliAdapterBuilder extends AdapterBuilder {
 
   timeoutMs(timeoutMs: number): this
 
-  command(command: string): this
+  command(command: string | DynamicCommand): this
 
   args(...args: string[]): this
 }
