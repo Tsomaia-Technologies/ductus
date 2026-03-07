@@ -43,7 +43,6 @@ export * from './interfaces/entities/reducer-entity.js'
 export * from './interfaces/entities/ruleset-entity.js'
 export * from './interfaces/entities/skill-entity.js'
 
-export * from './interfaces/action.js'
 export * from './interfaces/agent-chunk.js'
 export * from './interfaces/agent-context.js'
 export * from './interfaces/agent-tool-call.js'

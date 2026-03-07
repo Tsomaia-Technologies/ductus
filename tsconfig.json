@@ -12,10 +12,7 @@
     "resolveJsonModule": true,
     "declaration": true,
     "jsx": "react-jsx",
-    "baseUrl": "./",
-    "paths": {
-
-    }
+    "baseUrl": "./"
   },
   "isolatedModules": true,
   "include": [

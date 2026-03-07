@@ -1,22 +1,11 @@
 {
+  "extends": "../tsconfig.json",
   "compilerOptions": {
-    "target": "ES2021",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "baseUrl": "..",
     "outDir": "./dist",
-    "rootDir": "../",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "jsx": "react-jsx",
     "paths": {
-      "ductus": ["../src/index.ts"]
+      "ductus": ["./src/index.ts"]
     }
   },
-  "isolatedModules": true,
-  "include": ["../src/**/*", "./**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["."]
 }
