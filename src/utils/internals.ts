@@ -1,6 +1,13 @@
 import * as zod from 'zod/v3'
 import { OutputEventStream } from '../interfaces/output-event-stream.js'
-import { BaseEvent, EventDefinition, EventPayloadShape, PayloadShape, Volatility } from '../interfaces/event.js'
+import {
+  BaseEvent,
+  EventDefinition,
+  EventPayloadShape,
+  IntentDefinition,
+  PayloadShape,
+  Volatility,
+} from '../interfaces/event.js'
 import { isSchemaType } from './schema-utils.js'
 import { PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
 import { AgentDispatcher } from '../core/agent-dispatcher.js'
@@ -38,6 +45,29 @@ export function createEventFactory<TType extends string, TPayloadShape extends E
   })
 
   return createEvent as unknown as EventDefinition<TType, TPayloadShape>
+}
+
+export function createIntentFactory<TType extends string, TPayload>(
+  type: TType
+): IntentDefinition<TType, TPayload> {
+  type TEvent = BaseEvent<TType, TPayload>
+
+  const createIntent = (payload: TPayload): BaseEvent<TType, TPayload> => {
+    return {
+      type,
+      payload,
+      volatility: 'intent',
+      isCommited: false,
+    }
+  }
+
+  Object.assign(createIntent, {
+    type,
+    volatility: 'intent',
+    is: (event: EventDefinition | BaseEvent): event is TEvent => event.type === type,
+  })
+
+  return createIntent as unknown as IntentDefinition<TType, TPayload>
 }
 
 export function createProcessorAdapter<TState>(

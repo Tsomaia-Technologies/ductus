@@ -13,6 +13,7 @@ export const date = zod.date
 export const union = zod.union
 export const discriminatedUnion = zod.discriminatedUnion
 export const object = zod.strictObject
+export const looseObject = zod.object
 export const array = zod.array
 export const _enum = zod.enum
 

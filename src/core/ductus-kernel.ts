@@ -10,6 +10,7 @@ import { Injector } from '../interfaces/event-generator.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { BootEvent } from './events.js'
+import { IntentProcessor } from './intent-processor.js'
 
 export interface KernelOptions<TState> {
   injector: Injector,
@@ -19,7 +20,6 @@ export interface KernelOptions<TState> {
   store: StoreAdapter<TState>
   canceller?: CancellationToken
   shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
-  subscriberOverflowStrategy?: 'fail' | 'block'
 }
 
 export class DuctusKernel<TState> {
@@ -41,6 +41,7 @@ export class DuctusKernel<TState> {
   private readonly shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
   private readonly causationGraph = new Map<string, { type: string, causationId?: string, sequence: number }>()
   private isShuttingDown = false
+  private readonly intentProcessor: IntentProcessor
 
   constructor(options: KernelOptions<TState>) {
     const {
@@ -51,7 +52,6 @@ export class DuctusKernel<TState> {
       injector,
       canceller,
       shouldTakeSnapshot,
-      subscriberOverflowStrategy = 'fail',
     } = options
     this.multiplexer = multiplexer
     this.processors = processors
@@ -61,6 +61,7 @@ export class DuctusKernel<TState> {
     this.use = injector
     this.canceller = new Canceller({ base: canceller })
     this.shouldTakeSnapshot = shouldTakeSnapshot
+    this.intentProcessor = new IntentProcessor(this.multiplexer)
   }
 
   async boot() {
@@ -209,11 +210,10 @@ export class DuctusKernel<TState> {
         this.use,
       )
 
-      for await (const event of eventsOut) {
-        if (this.canceller.isCancelled()) break
-        if (!event) continue
-        await this.multiplexer.broadcast(event)
-      }
+      await this.intentProcessor.process(
+        eventsOut[Symbol.asyncIterator](),
+        this.canceller,
+      )
     } catch (e: any) {
       console.error(`Ductus Framework Error: Processor threw an unhandled exception. Initiating Kernel shutdown.`, e)
       this.shutdown({ force: true }).catch(err => console.error(`Ductus Framework Error during forced shutdown:`, err))

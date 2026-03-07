@@ -14,9 +14,7 @@
     "jsx": "react-jsx",
     "baseUrl": "./",
     "paths": {
-      "ductus": [
-        "./src/index.ts"
-      ]
+
     }
   },
   "isolatedModules": true,

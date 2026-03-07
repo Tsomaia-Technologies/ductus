@@ -1,5 +1,5 @@
-import { EventPayloadShape, PayloadShape } from 'ductus'
 import { createEventFactory } from './internals.js'
+import { EventPayloadShape, PayloadShape } from '../interfaces/event.js'
 
 export function event<TType extends string, TPayloadShape extends EventPayloadShape>(
   type: TType,
@@ -13,4 +13,12 @@ export function signal<TType extends string, TPayloadShape extends EventPayloadS
   payloadShape: PayloadShape<TPayloadShape>,
 ) {
   return createEventFactory({ type, payloadShape, volatility: 'volatile' })
+}
+
+
+export function intent<TType extends string, TPayloadShape extends EventPayloadShape>(
+  type: TType,
+  payloadShape: PayloadShape<TPayloadShape>,
+) {
+  return createEventFactory({ type, payloadShape, volatility: 'intent' })
 }

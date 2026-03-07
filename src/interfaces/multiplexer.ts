@@ -22,7 +22,10 @@ export interface Multiplexer {
    * Broadcasts event drafts as commited events to all subscribers
    *
    * @param {TEvent} event
-   * @param {{ causationId?: string, correlationId?: string }} [context]
+   * @param {{ causationId?: string, correlationId?: string, chainId?: string }} [context]
    */
-  broadcast(event: BaseEvent, context?: { causationId?: string, correlationId?: string }): Promise<void>
+  broadcast(
+    event: BaseEvent,
+    context?: { causationId?: string, correlationId?: string, chainId?: string },
+  ): Promise<void>
 }

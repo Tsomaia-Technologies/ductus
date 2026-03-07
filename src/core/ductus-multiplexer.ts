@@ -66,7 +66,10 @@ export class DuctusMultiplexer implements Multiplexer {
     }
   }
 
-  async broadcast(event: BaseEvent, context?: { causationId?: string, correlationId?: string }): Promise<void> {
+  async broadcast(
+    event: BaseEvent,
+    context?: { causationId?: string, correlationId?: string, chainId?: string },
+  ): Promise<void> {
     await this.initialSyncPromise
 
     // Phase 1: COMMIT (under lock)
@@ -117,7 +120,8 @@ export class DuctusMultiplexer implements Multiplexer {
 
   private commitEvent(event: BaseEvent, context?: {
     causationId?: string,
-    correlationId?: string
+    correlationId?: string,
+    chainId?: string
   }): DeeplyReadonly<CommittedEvent> {
     const nextSequenceNumber = this.lastSequenceNumber + 1
     const eventId = crypto.randomUUID()
@@ -125,6 +129,7 @@ export class DuctusMultiplexer implements Multiplexer {
     const unhashedEvent: Omit<CommittedEvent, 'hash'> = {
       ...event,
       eventId,
+      ...(context?.chainId ? { causationId: context.chainId } : {}),
       ...(context?.causationId ? { causationId: context.causationId } : {}),
       ...(context?.correlationId ? { correlationId: context.correlationId } : {}),
       sequenceNumber: nextSequenceNumber,

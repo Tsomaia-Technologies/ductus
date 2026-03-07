@@ -1,4 +1,5 @@
-import { Json, LoggerAdapter } from 'ductus'
+import { LoggerAdapter } from '../interfaces/logger-adapter.js'
+import { Json } from '../interfaces/json.js'
 
 export class ConsoleLogger implements LoggerAdapter {
   info(message: Json) {
