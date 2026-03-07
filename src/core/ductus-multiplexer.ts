@@ -96,6 +96,9 @@ export class DuctusMultiplexer implements Multiplexer {
         await this.invokeBridges(commitedEvent)
       } finally {
         this.inFlightCount--
+        if (this.inFlightCount === 0) {
+          this.deliveryPromiseChain = Promise.resolve()
+        }
       }
     })
     this.deliveryPromiseChain = currentDelivery
