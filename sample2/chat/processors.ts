@@ -29,6 +29,6 @@ export const InputProcessor = Ductus.processor(async function* (events, getState
 
 export const LogProcessor = Ductus.processor(async function* (events, getState, use) {
   for await (const event of events) {
-    console.log(event.type)
+    // console.log(event.type)
   }
 })

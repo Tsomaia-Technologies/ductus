@@ -1,12 +1,12 @@
 import Ductus from 'ductus'
 import { ExploreOutput } from './schemas.js'
 
-export const SystemPromptQuery = Ductus.event('UserInputRequest', {
+export const SystemPromptQuery = Ductus.event('SystemPromptQuery', {
   requestId: Ductus.string(),
   query: Ductus.string(),
 })
 
-export const SystemPromptResponse = Ductus.event('UserInputRequest', {
+export const SystemPromptResponse = Ductus.event('SystemPromptResponse', {
   requestId: Ductus.string(),
   response: Ductus.string(),
 })
