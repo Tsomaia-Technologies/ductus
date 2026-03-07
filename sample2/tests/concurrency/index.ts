@@ -108,4 +108,7 @@ const Flow = Ductus.flow()
   .processor(FastProcessor)
   .processor(ObserverProcessor)
 
-runTests(Flow, 'concurrency').catch(console.error)
+runTests({
+  flow: Flow,
+  dir: 'concurrency',
+}).catch(console.error)

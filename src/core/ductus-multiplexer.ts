@@ -6,6 +6,7 @@ import { BroadcastingContext, Multiplexer } from '../interfaces/multiplexer.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { Mutex } from './mutex.js'
+import { HotEventSubscriber } from '../interfaces/hot-event-subscriber.js'
 
 export interface DuctusMultiplexerOptions {
   initialHash?: string
@@ -104,7 +105,7 @@ export class DuctusMultiplexer implements Multiplexer {
       // Deliver inline, fully await before returning to caller.
       // Producer is held here until every bridge has accepted the event.
       // No chain needed — sequential by nature since broadcast() itself is awaited.
-      await this.invokeBridges(commitedEvent)
+      await this.invokeBridges(commitedEvent, context?.sourceSubscriber)
       return
     }
 
@@ -168,7 +169,17 @@ export class DuctusMultiplexer implements Multiplexer {
     return freezeEvent(commitedEvent)
   }
 
-  private async invokeBridges(event: CommittedEvent) {
+  private async invokeBridges(event: CommittedEvent, sourceSubscriber?: HotEventSubscriber) {
+    if (this.overflowStrategy === 'block' && sourceSubscriber) {
+      const others = this.bridges.filter(bridge => bridge !== sourceSubscriber)
+
+      await Promise.all(others.map(bridge => bridge.push(event)))
+
+      this.deliveryPromiseChain = this.deliveryPromiseChain
+        .then(() => sourceSubscriber.push(event))
+      return
+    }
+
     await Promise.all(this.bridges.map(bridge => bridge.push(event)))
   }
 }

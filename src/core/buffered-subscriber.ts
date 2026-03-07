@@ -1,6 +1,6 @@
 import { LinkedList } from './linked-list.js'
-import { EventSubscriber } from '../interfaces/event-subscriber.js'
 import { CommittedEvent } from '../interfaces/event.js'
+import { HotEventSubscriber } from '../interfaces/hot-event-subscriber.js'
 
 export interface BufferedSubscriberOptions {
   bufferLimit?: number
@@ -8,7 +8,7 @@ export interface BufferedSubscriberOptions {
   overflowStrategy?: 'fail' | 'block' | 'throttle'
 }
 
-export class BufferedSubscriber implements EventSubscriber {
+export class BufferedSubscriber implements HotEventSubscriber {
   private readonly eventQueue = new LinkedList<CommittedEvent>()
   private readonly processorWakeUpQueue = new LinkedList<() => void>()
   private readonly terminationListeners: Array<() => void> = []
@@ -16,7 +16,11 @@ export class BufferedSubscriber implements EventSubscriber {
   private readonly bufferLimit: number
   private readonly bufferTimeoutMs: number
   private readonly overflowStrategy: 'fail' | 'block' | 'throttle'
-  private readonly bufferDrainWakeUpQueue = new LinkedList<{ resolve: () => void, reject: (err: Error) => void, timer: NodeJS.Timeout }>()
+  private readonly bufferDrainWakeUpQueue = new LinkedList<{
+    resolve: () => void,
+    reject: (err: Error) => void,
+    timer: NodeJS.Timeout
+  }>()
 
   constructor(options?: BufferedSubscriberOptions) {
     this.bufferLimit = options?.bufferLimit ?? 10000

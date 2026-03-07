@@ -156,4 +156,7 @@ const Flow = Ductus.flow<State>()
   .processor(SlowProcessor)
   .processor(AuditorProcessor)
 
-runTests(Flow, 'state').catch(console.error)
+runTests({
+  flow: Flow,
+  dir: 'state'
+}).catch(console.error)

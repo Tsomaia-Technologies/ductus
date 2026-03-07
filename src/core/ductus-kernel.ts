@@ -213,6 +213,7 @@ export class DuctusKernel<TState> {
         subscriber.streamEvents(),
         process,
         this.canceller,
+        subscriber,
       )
     } catch (e: any) {
       console.error(`Ductus Framework Error: Processor threw an unhandled exception. Initiating Kernel shutdown.`, e)
