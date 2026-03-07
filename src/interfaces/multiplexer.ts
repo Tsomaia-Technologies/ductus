@@ -4,6 +4,12 @@ import { Token } from './event-generator.js'
 
 export const Multiplexer = Token<Multiplexer>()
 
+export interface BroadcastingContext {
+  causationId?: string
+  correlationId?: string
+  chainId?: string
+}
+
 export interface Multiplexer {
   /**
    * Creates subscriber to the commited events and returns it
@@ -26,6 +32,6 @@ export interface Multiplexer {
    */
   broadcast(
     event: BaseEvent,
-    context?: { causationId?: string, correlationId?: string, chainId?: string },
+    context?: BroadcastingContext,
   ): Promise<void>
 }

@@ -203,15 +203,15 @@ export class DuctusKernel<TState> {
       const subscriber = this.multiplexer.subscribe()
       this.subscribers.push(subscriber)
 
-      const eventsIn = subscriber.streamEvents()
-      const eventsOut = processor.process(
+      const process = (eventsIn: AsyncIterable<CommittedEvent>) => processor.process(
         eventsIn,
         this.getState,
         this.use,
       )
 
       await this.intentProcessor.process(
-        eventsOut[Symbol.asyncIterator](),
+        subscriber.streamEvents(),
+        process,
         this.canceller,
       )
     } catch (e: any) {

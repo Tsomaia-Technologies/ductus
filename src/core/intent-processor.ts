@@ -1,5 +1,5 @@
 import { RequestIntent, ResponseIntent } from './intents.js'
-import { Multiplexer } from '../interfaces/multiplexer.js'
+import { BroadcastingContext, Multiplexer } from '../interfaces/multiplexer.js'
 import { CancellationToken, Disposer } from '../interfaces/cancellation-token.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { clearTimeout } from 'node:timers'
@@ -9,10 +9,23 @@ export class IntentProcessor {
   }
 
   async process(
-    eventsOut: AsyncIterator<BaseEvent | undefined>,
+    eventsIn: AsyncIterable<CommittedEvent>,
+    processor: (eventsIn: AsyncIterable<CommittedEvent>) => AsyncIterable<BaseEvent | undefined>,
     canceller: CancellationToken,
   ): Promise<void> {
     let nextValue: unknown | undefined = undefined
+    let trigger = {
+      current: undefined as CommittedEvent | undefined,
+    }
+
+    const chainedEventsIn = (async function* () {
+      for await (const event of eventsIn) {
+        trigger.current = event
+        yield event
+      }
+    })()
+
+    const eventsOut = processor(chainedEventsIn)[Symbol.asyncIterator]()
 
     while (true) {
       if (canceller.isCancelled()) break
@@ -22,17 +35,22 @@ export class IntentProcessor {
       if (done) break
       if (!event) continue
 
+      const context: BroadcastingContext = {
+        causationId: trigger.current?.eventId,
+        correlationId: trigger.current?.correlationId ?? trigger.current?.eventId,
+      }
+
       if (event.volatility !== 'intent') {
         if (!event) continue
-        await this.multiplexer.broadcast(event)
+        await this.multiplexer.broadcast(event, context)
         nextValue = undefined
       } else {
-        nextValue = await this.processIntent(event)
+        nextValue = await this.processIntent(event, context)
       }
     }
   }
 
-  private async processIntent(intent: BaseEvent) {
+  private async processIntent(intent: BaseEvent, context: BroadcastingContext) {
     if (RequestIntent.is(intent)) {
       const { event, response, timeoutMs } = intent.payload
       const chainId = crypto.randomUUID()
@@ -61,6 +79,7 @@ export class IntentProcessor {
       })
 
       await this.multiplexer.broadcast(event, {
+        ...context,
         chainId,
       })
 
@@ -70,7 +89,7 @@ export class IntentProcessor {
 
       await this.multiplexer.broadcast(response, {
         chainId: request.chainId,
-        causationId: request.causationId,
+        causationId: request.eventId,
         correlationId: request.correlationId ?? request.eventId,
       })
 

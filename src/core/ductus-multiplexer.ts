@@ -2,7 +2,7 @@ import { BufferedSubscriber } from './buffered-subscriber.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { freezeEvent } from '../utils/object.utils.js'
 import { getEventHash, getInitialEventHash } from '../utils/crypto-utils.js'
-import { Multiplexer } from '../interfaces/multiplexer.js'
+import { BroadcastingContext, Multiplexer } from '../interfaces/multiplexer.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { Mutex } from './mutex.js'
@@ -68,7 +68,7 @@ export class DuctusMultiplexer implements Multiplexer {
 
   async broadcast(
     event: BaseEvent,
-    context?: { causationId?: string, correlationId?: string, chainId?: string },
+    context?: BroadcastingContext,
   ): Promise<void> {
     await this.initialSyncPromise
 
