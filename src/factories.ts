@@ -18,7 +18,7 @@ import { createReactionAdapter } from './utils/internals.js'
 import { AgentBuilder } from './interfaces/builders/agent-builder.js'
 import { FlowBuilder } from './interfaces/builders/flow-builder.js'
 import { ModelBuilder } from './interfaces/builders/model-builder.js'
-import { ReactionBuilder } from './interfaces/builders/reaction-builder.js'
+import { EmitBuildStep, InvokeBuildStep, ReactionBuilder } from './interfaces/builders/reaction-builder.js'
 import { ReducerBuilder } from './interfaces/builders/reducer-builder.js'
 import { RulesetBuilder } from './interfaces/builders/ruleset-builder.js'
 import { SkillBuilder } from './interfaces/builders/skill-builder.js'
@@ -97,10 +97,10 @@ function processor<TState>(
   generatorOrName: string | EventGenerator<TState>,
   generator?: EventGenerator<TState>,
 ): ProcessorBuilder<TState> {
+  const gen = typeof generatorOrName !== 'string' ? generatorOrName : generator
   const name = typeof generatorOrName === 'string'
     ? generatorOrName
-    : generator?.name ?? null
-  const gen = typeof generatorOrName !== 'string' ? generatorOrName : generator
+    : gen?.name ?? null
 
   if (!gen) {
     throw new Error('Processor requires a generator function.')
@@ -123,14 +123,14 @@ function async<TState>(
   }
 }
 
-function emit(event: EventDefinition): EmitStep {
+function emit(event: EventDefinition): EmitBuildStep {
   return {
     type: 'emit',
     event,
   }
 }
 
-function invoke(agent: AgentBuilder, skill: SkillBuilder): InvokeStep {
+function invoke(agent: AgentBuilder, skill: SkillBuilder): InvokeBuildStep {
   return {
     type: 'invoke',
     agent,

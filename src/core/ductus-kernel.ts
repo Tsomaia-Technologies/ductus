@@ -218,7 +218,7 @@ export class DuctusKernel<TState> {
   private async mountProcessor(processor: EventProcessor<TState>) {
     try {
       const subscriber = this.multiplexer.subscribe({
-        name: processor.name ? `${processor.name} Subscriber` : null,
+        name: processor.name ? `${processor.name}Subscriber` : null,
       })
       this.subscribers.push(subscriber)
 

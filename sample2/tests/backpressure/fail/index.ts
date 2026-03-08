@@ -28,7 +28,7 @@ const FastDone = Ductus.event('FastDone', {
 })
 
 // A: emits 20 events rapidly
-const ProducerProcessor = Ductus.processor(async function* (events) {
+const ProducerProcessor = Ductus.processor(async function* ProducerProcessor(events) {
   for await (const event of events) {
     if (Ductus.BootEvent.is(event)) {
       console.log('[A] Emitting rapidly...')
@@ -43,7 +43,7 @@ const ProducerProcessor = Ductus.processor(async function* (events) {
 })
 
 // B: fast consumer — processes instantly, should be fine
-const FastConsumer = Ductus.processor(async function* (events) {
+const FastConsumer = Ductus.processor(async function* FastConsumer(events) {
   let count = 0
   for await (const event of events) {
     if (WorkItem.is(event)) {
@@ -55,7 +55,7 @@ const FastConsumer = Ductus.processor(async function* (events) {
 })
 
 // C: slow consumer — 500ms per event, buffer of 5 means it will overflow
-const SlowConsumer = Ductus.processor(async function* (events) {
+const SlowConsumer = Ductus.processor(async function* SlowConsumer(events) {
   for await (const event of events) {
     if (WorkItem.is(event)) {
       console.log(`[C] Starting slow work on ${event.payload.index}...`)
