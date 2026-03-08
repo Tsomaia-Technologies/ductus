@@ -1,10 +1,21 @@
 import { CommittedEvent } from './event.js'
+import { Disposer } from './cancellation-token.js'
 
 export interface EventSubscriber {
   /**
    * Returns the name of the subscriber
    */
   name(): string | null
+
+  enqueue(event: CommittedEvent): void
+
+  isConsuming(): boolean
+
+  consume<T>(callback: () => Promise<T>): Promise<T>
+
+  waitForDrain(): Promise<void>
+
+  onDrain(callback: () => void): Disposer
 
   /**
    * Returns asynchronous stream of events
@@ -26,4 +37,5 @@ export interface EventSubscriber {
    * @param callback
    */
   onUnsubscribe(callback: () => void): void
+
 }

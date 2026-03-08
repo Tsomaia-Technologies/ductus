@@ -11,7 +11,6 @@ import { StoreAdapter } from '../interfaces/store-adapter.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { BootEvent } from './events.js'
 import { IntentProcessor } from './intent-processor.js'
-import { HotEventSubscriber } from '../interfaces/hot-event-subscriber.js'
 import { EventSequencer } from '../interfaces/event-sequencer.js'
 
 export interface KernelOptions<TState> {
@@ -223,7 +222,7 @@ export class DuctusKernel<TState> {
       await this.intentProcessor.process({
         eventsIn: subscriber.streamEvents(),
         processor: process,
-        sourceSubscriber: subscriber as HotEventSubscriber,
+        sourceSubscriber: subscriber,
         canceller: this.canceller,
       })
     } catch (e: any) {

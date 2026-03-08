@@ -1,15 +1,15 @@
-import { HotEventSubscriber } from '../../interfaces/hot-event-subscriber.js'
 import { CommittedEvent } from '../../interfaces/event.js'
 import { LinkedList } from '../linked-list.js'
 import { Disposer } from '../../interfaces/cancellation-token.js'
 import { DefaultEventListener } from '../default-event-listener.js'
 import { DefaultDeferrer } from '../default-deferrer.js'
+import { EventSubscriber } from '../../interfaces/event-subscriber.js'
 
 export interface BlockingSubscriberOptions {
   name?: string | null
 }
 
-export class EventChannel implements HotEventSubscriber {
+export class EventChannel implements EventSubscriber {
   private eventQueue = new LinkedList<CommittedEvent>()
   private readonly streamDeferrer = new DefaultDeferrer()
   private readonly drainDeferrer = new DefaultDeferrer()
@@ -32,8 +32,14 @@ export class EventChannel implements HotEventSubscriber {
     return this._isConsuming
   }
 
-  setConsuming(consuming: boolean) {
-    this._isConsuming = consuming
+  async consume<T>(callback: () => Promise<T>): Promise<T> {
+    this._isConsuming = true
+
+    try {
+      return await callback()
+    } finally {
+      this._isConsuming = false
+    }
   }
 
   enqueue(event: CommittedEvent): void {

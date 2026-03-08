@@ -4,7 +4,7 @@ import { CancellationToken, Disposer } from '../interfaces/cancellation-token.js
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { clearTimeout } from 'node:timers'
 import { EventSequencer } from '../interfaces/event-sequencer.js'
-import { HotEventSubscriber } from '../interfaces/hot-event-subscriber.js'
+import { EventSubscriber } from '../interfaces/event-subscriber.js'
 
 export class IntentProcessor {
   constructor(
@@ -14,7 +14,7 @@ export class IntentProcessor {
   }
 
   async process(params: {
-    sourceSubscriber?: HotEventSubscriber
+    sourceSubscriber?: EventSubscriber
     eventsIn: AsyncIterable<CommittedEvent>
     processor: (eventsIn: AsyncIterable<CommittedEvent>) => AsyncIterable<BaseEvent | undefined>
     canceller: CancellationToken
@@ -42,9 +42,11 @@ export class IntentProcessor {
     while (true) {
       if (canceller.isCancelled()) break
 
-      sourceSubscriber?.setConsuming(true)
-      const { value: event, done } = await eventsOut.next(nextValue)
-      sourceSubscriber?.setConsuming(false)
+      const { value: event, done } = await this.consumeNext(
+        eventsOut,
+        nextValue,
+        sourceSubscriber,
+      )
 
       if (done) {
         console.log(`[INTENT] generator done, unsubscribing ${sourceSubscriber?.name()}`)
@@ -69,6 +71,18 @@ export class IntentProcessor {
         nextValue = await this.processIntent(event, context)
       }
     }
+  }
+
+  private async consumeNext(
+    eventsOut: AsyncIterator<BaseEvent | undefined>,
+    nextValue: unknown,
+    sourceSubscriber?: EventSubscriber,
+  ) {
+    if (sourceSubscriber) {
+      return await sourceSubscriber.consume(() => eventsOut.next(nextValue))
+    }
+
+    return await eventsOut.next(nextValue)
   }
 
   private async processIntent(intent: BaseEvent, context: BroadcastingContext) {
