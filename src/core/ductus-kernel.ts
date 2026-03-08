@@ -11,6 +11,7 @@ import { StoreAdapter } from '../interfaces/store-adapter.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { BootEvent } from './events.js'
 import { IntentProcessor } from './intent-processor.js'
+import { HotEventSubscriber } from '../interfaces/hot-event-subscriber.js'
 
 export interface KernelOptions<TState> {
   injector: Injector,
@@ -213,7 +214,7 @@ export class DuctusKernel<TState> {
         subscriber.streamEvents(),
         process,
         this.canceller,
-        subscriber,
+        subscriber as HotEventSubscriber,
       )
     } catch (e: any) {
       console.error(`Ductus Framework Error: Processor threw an unhandled exception. Initiating Kernel shutdown.`, e)

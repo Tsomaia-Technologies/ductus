@@ -77,14 +77,8 @@ export class DuctusMultiplexer implements Multiplexer {
     }
   }
 
-  async broadcast(
-    event: BaseEvent,
-    context?: BroadcastingContext,
-  ): Promise<void> {
-    await this.initialSyncPromise
-
-    // Phase 1: COMMIT (under lock)
-    const commitedEvent = await this.lockMutex.lock(async () => {
+  private async commitEventUnderLock(event: BaseEvent, context?: BroadcastingContext) {
+    return await this.lockMutex.lock(async () => {
       const commited = this.commitEvent(event, context)
       if (this.ledger) {
         await this.ledger.appendEvent(commited as unknown as CommittedEvent)
@@ -99,15 +93,25 @@ export class DuctusMultiplexer implements Multiplexer {
 
       return commited as unknown as CommittedEvent
     })
+  }
 
-    // Phase 2: DELIVERY (sequenced but outside lock)
+  async broadcast(
+    event: BaseEvent,
+    context?: BroadcastingContext,
+  ): Promise<void> {
+    await this.initialSyncPromise
+
     if (this.overflowStrategy === 'block') {
       // Deliver inline, fully await before returning to caller.
       // Producer is held here until every bridge has accepted the event.
       // No chain needed — sequential by nature since broadcast() itself is awaited.
+      await this.waitForSubscriberCapacity()
+      const commitedEvent = await this.commitEventUnderLock(event, context)
       await this.invokeBridges(commitedEvent, context?.sourceSubscriber)
       return
     }
+
+    const commitedEvent = await this.commitEventUnderLock(event, context)
 
     this.inFlightCount++
     const currentDelivery = this.deliveryPromiseChain.then(async () => {
@@ -170,8 +174,11 @@ export class DuctusMultiplexer implements Multiplexer {
   }
 
   private async invokeBridges(event: CommittedEvent, sourceSubscriber?: HotEventSubscriber) {
+    console.log(`[INVOKE] type=${event.type} bridges=${this.bridges.length} hasSource=${!!sourceSubscriber}`)
     if (this.overflowStrategy === 'block' && sourceSubscriber) {
       const others = this.bridges.filter(bridge => bridge !== sourceSubscriber)
+      console.log(`[INVOKE] block mode: others=${others.length} selfDeferred=1`)
+      others.forEach((b, i) => console.log(`[INVOKE] other[${i}] queueSize=${(b as any).eventQueue.size}`))
 
       await Promise.all(others.map(bridge => bridge.push(event)))
 
@@ -181,5 +188,30 @@ export class DuctusMultiplexer implements Multiplexer {
     }
 
     await Promise.all(this.bridges.map(bridge => bridge.push(event)))
+  }
+
+  private async waitForSubscriberCapacity(sourceSubscriber?: HotEventSubscriber): Promise<void> {
+    const fullSubscribers = this.bridges.filter(b => b.isFull() && b !== sourceSubscriber)
+
+    if (fullSubscribers.length === 0) {
+      return
+    }
+
+    console.log(`<==================================== FULL: ${this.bridges.filter(b => b.isFull()).length}/${this.bridges.length}  ====================================>`)
+
+    await new Promise<void>(resolve => {
+      let resolved = false
+      for (const subscriber of fullSubscribers) {
+        subscriber.onDrain(() => {
+          if (!resolved) {
+            console.log('<==================================== DRAINED ====================================>')
+            resolved = true
+            resolve()
+          }
+        })
+      }
+    })
+
+    await this.waitForSubscriberCapacity(sourceSubscriber)
   }
 }

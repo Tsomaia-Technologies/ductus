@@ -45,6 +45,8 @@ export class IntentProcessor {
 
       if (event.volatility !== 'intent') {
         if (!event) continue
+        console.log(`[INTENT] broadcasting type=${event.type} sourceSubscriber=${!!context.sourceSubscriber}`)
+
         await this.multiplexer.broadcast(event, context)
         nextValue = undefined
       } else {

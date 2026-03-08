@@ -55,6 +55,7 @@ export async function runTests<TState>(params: TestRunnerOptions<TState>) {
     fileAdapter,
   })
 
+  // setInterval(() => {}, 1000) // so that process does not auto-exit
   await kernel.boot()
   await kernel.monitor()
 }

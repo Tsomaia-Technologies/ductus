@@ -89,8 +89,24 @@ function skill(name: string): SkillBuilder {
   return new ImmutableSkillBuilder().name(name)
 }
 
-function processor<TState>(generator: EventGenerator<TState>): ProcessorBuilder<TState> {
-  return new ImmutableProcessorBuilder<TState>().processor(generator)
+function processor<TState>(generator: EventGenerator<TState>): ProcessorBuilder<TState>
+function processor<TState>(name: string, generator: EventGenerator<TState>): ProcessorBuilder<TState>
+function processor<TState>(
+  generatorOrName: string | EventGenerator<TState>,
+  generator?: EventGenerator<TState>,
+): ProcessorBuilder<TState> {
+  const name = typeof generatorOrName === 'string'
+    ? generatorOrName
+    : generator?.name ?? null
+  const gen = typeof generatorOrName !== 'string' ? generatorOrName : generator
+
+  if (!gen) {
+    throw new Error('Processor requires a generator function.')
+  }
+
+  return new ImmutableProcessorBuilder<TState>()
+    .name(name)
+    .processor(gen)
 }
 
 function adapter(type: 'cli'): CliAdapterBuilder {

@@ -4,6 +4,7 @@ import { ProcessorEntity } from '../interfaces/entities/processor-entity.js'
 import { EventGenerator } from '../interfaces/event-generator.js'
 
 interface ProcessorBuilderParams<TState> {
+  name?: string | null
   generator?: EventGenerator<TState>
 }
 
@@ -14,6 +15,10 @@ export class ImmutableProcessorBuilder<TState> implements ProcessorBuilder<TStat
     this.params = {}
   }
 
+  name(name: string | null) {
+    return this.clone({ name })
+  }
+
   processor(generator: EventGenerator<TState>): this {
     return this.clone({ generator })
   }
@@ -22,6 +27,7 @@ export class ImmutableProcessorBuilder<TState> implements ProcessorBuilder<TStat
     if (!this.params.generator) throw new Error('Processor requires a generator function.')
 
     return {
+      name: this.params.name ?? null,
       processor: this.params.generator,
     }
   }

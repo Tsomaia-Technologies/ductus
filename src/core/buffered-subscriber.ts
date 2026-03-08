@@ -10,6 +10,7 @@ export interface BufferedSubscriberOptions {
 
 export class BufferedSubscriber implements HotEventSubscriber {
   private readonly eventQueue = new LinkedList<CommittedEvent>()
+  private readonly drainListeners = new LinkedList<() => void>()
   private readonly processorWakeUpQueue = new LinkedList<() => void>()
   private readonly terminationListeners: Array<() => void> = []
   private isTerminated = false
@@ -29,11 +30,15 @@ export class BufferedSubscriber implements HotEventSubscriber {
   }
 
   async push(event: CommittedEvent): Promise<void> {
+    console.log(`[PUSH] type=${event.type} queueSize=${this.eventQueue.size} limit=${this.bufferLimit}`)
+
     if (this.isTerminated) {
       return
     }
 
     if (this.eventQueue.size >= this.bufferLimit) {
+      console.log(`[PUSH] SUSPENDING — buffer full for type=${event.type}`)
+
       if (this.overflowStrategy === 'fail') {
         throw new Error(`Fatal: Subscriber buffer overflow. Limit of ${this.bufferLimit} events reached. Consumer is too slow or deadlocked.`)
       }
@@ -46,6 +51,7 @@ export class BufferedSubscriber implements HotEventSubscriber {
 
         this.bufferDrainWakeUpQueue.insertLast({ resolve, reject, timer })
       })
+      console.log(`[PUSH] RESUMED after drain for type=${event.type}`)
     }
 
     this.eventQueue.insertLast(event)
@@ -63,11 +69,13 @@ export class BufferedSubscriber implements HotEventSubscriber {
       // Wake up a blocked producer if queue space freed up
       const bufferWaiter = this.bufferDrainWakeUpQueue.removeFirst()
       if (bufferWaiter) {
+        console.log(`[STREAM] waking drain waiter, queueSize after remove=${this.eventQueue.size}`)
         clearTimeout(bufferWaiter.timer)
         bufferWaiter.resolve()
       }
 
       if (event) {
+        this.triggerDrainListeners()
         yield event
       } else {
         if (this.isTerminated) return
@@ -76,6 +84,18 @@ export class BufferedSubscriber implements HotEventSubscriber {
           this.processorWakeUpQueue.insertLast(resolve)
         })
       }
+    }
+  }
+
+  isFull() {
+    return this.eventQueue.size >= this.bufferLimit
+  }
+
+  onDrain(callback: () => void) {
+    const token = this.drainListeners.insertLast(callback)
+
+    return () => {
+      this.drainListeners.removeByToken(token)
     }
   }
 
@@ -108,5 +128,13 @@ export class BufferedSubscriber implements HotEventSubscriber {
 
   onUnsubscribe(callback: () => void) {
     this.terminationListeners.push(callback)
+  }
+
+  private triggerDrainListeners() {
+    let current: (() => void) | null = null
+
+    while (current = this.drainListeners.removeFirst()) {
+      current()
+    }
   }
 }

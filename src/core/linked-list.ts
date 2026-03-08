@@ -1,5 +1,6 @@
 interface LinkedListNode<T> {
   value: T
+  token: symbol
   previous: LinkedListNode<T> | null
   next: LinkedListNode<T> | null
 }
@@ -7,6 +8,7 @@ interface LinkedListNode<T> {
 export class LinkedList<T> {
   private first: LinkedListNode<T> | null = null
   private last: LinkedListNode<T> | null = null
+  private registry = new Map<symbol, LinkedListNode<T>>()
   private length: number = 0
 
   get size(): number {
@@ -14,8 +16,10 @@ export class LinkedList<T> {
   }
 
   insertFirst(value: T) {
+    const token = Symbol()
     const newNode: LinkedListNode<T> = {
       value,
+      token,
       previous: null,
       next: this.first,
     }
@@ -27,11 +31,16 @@ export class LinkedList<T> {
     }
     this.first = newNode
     ++this.length
+    this.registry.set(token, newNode)
+
+    return token
   }
 
   insertLast(value: T) {
+    const token = Symbol()
     const newNode: LinkedListNode<T> = {
       value,
+      token,
       previous: this.last,
       next: null,
     }
@@ -43,6 +52,9 @@ export class LinkedList<T> {
     }
     this.last = newNode
     ++this.length
+    this.registry.set(token, newNode)
+
+    return token
   }
 
   removeFirst(): T | null {
@@ -50,16 +62,21 @@ export class LinkedList<T> {
       return null
     }
 
-    const value = this.first.value
+    const node = this.first
     this.first = this.first.next
     if (this.first) {
       this.first.previous = null
     } else {
       this.last = null
     }
-    --this.length
 
-    return value
+    node.previous = null
+    node.next = null
+
+    --this.length
+    this.registry.delete(node.token)
+
+    return node.value
   }
 
   removeLast(): T | null {
@@ -67,16 +84,43 @@ export class LinkedList<T> {
       return null
     }
 
-    const value = this.last.value
+    const node = this.last
     this.last = this.last.previous
     if (this.last) {
       this.last.next = null
     } else {
       this.first = null
     }
+
+    node.previous = null
+    node.next = null
+
+    --this.length
+    this.registry.delete(node.token)
+
+    return node.value
+  }
+
+  removeByToken(token: symbol): T | null {
+    const node = this.registry.get(token)
+    if (!node) return null
+
+    const prev = node.previous
+    const next = node.next
+
+    if (prev) prev.next = next
+    else this.first = next
+
+    if (next) next.previous = prev
+    else this.last = prev
+
+    this.registry.delete(token)
     --this.length
 
-    return value
+    node.previous = null
+    node.next = null
+
+    return node.value
   }
 
   toArray() {
@@ -97,5 +141,28 @@ export class LinkedList<T> {
     this.first = null
     this.last = null
     this.length = 0
+    this.registry.clear()
+  }
+
+  *values() {
+    let current = this.first
+
+    while (current) {
+      yield current.value
+      current = current.next
+    }
+  }
+
+  *backwards() {
+    let current = this.last
+
+    while (current) {
+      yield current.value
+      current = current.previous
+    }
+  }
+
+  *[Symbol.iterator]() {
+    yield* this.values()
   }
 }

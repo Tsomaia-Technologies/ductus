@@ -54,7 +54,7 @@ const ProducerProcessor = Ductus.processor(async function* (events) {
       }
 
       console.log('[A] Done emitting')
-      break
+      // break
     }
   }
 })
