@@ -21,6 +21,14 @@ export class ImmutableSkillBuilder implements SkillBuilder {
     return this.clone({ name })
   }
 
+  getName() {
+    if (!this.params.name) {
+      throw new Error('The agent does not have a name defined')
+    }
+
+    return this.params.name
+  }
+
   input(schema: Schema, template?: string): this {
     return this.clone({
       inputSchema: schema,

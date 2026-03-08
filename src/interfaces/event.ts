@@ -11,6 +11,10 @@ export interface BaseEvent<T extends string = string, P = unknown> {
 
 export type EventPayloadShape = zod.ZodRawShape
 export type PayloadShape<T extends EventPayloadShape> = zod.ZodObject<T, 'strict'> | T
+export type Infer<T extends PayloadShape<any>> =
+  T extends PayloadShape<infer U>
+    ? zod.input<zod.ZodObject<U, 'strict'>>
+    : never
 
 export interface BaseEventDefinition<TType extends string = string, TPayload = any> {
   (payload: TPayload): BaseEvent<TType, typeof payload>
