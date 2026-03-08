@@ -130,7 +130,7 @@ function emit(event: EventDefinition): EmitStep {
   }
 }
 
-function invoke(agent: string, skill: string): InvokeStep {
+function invoke(agent: AgentBuilder, skill: SkillBuilder): InvokeStep {
   return {
     type: 'invoke',
     agent,
