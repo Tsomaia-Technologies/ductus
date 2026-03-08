@@ -1,7 +1,7 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { InvokeCursorBuilder, ReactionBuilder } from '../interfaces/builders/reaction-builder.js'
 import { InvokeStep, PipelineAction, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
-import { EventDefinition, Infer } from '../interfaces/event.js'
+import { EventDefinition } from '../interfaces/event.js'
 import { Schema } from '../interfaces/schema.js'
 import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
@@ -12,7 +12,7 @@ interface ReactionBuilderParams {
   readonly pipeline: PipelineStep[]
 }
 
-export class ImmutableReactionBuilder<T extends Schema = any, U extends Schema = any>
+export class ImmutableReactionBuilder<T = any, U = any>
   implements ReactionBuilder<T, U> {
   private params: ReactionBuilderParams
 
@@ -25,16 +25,16 @@ export class ImmutableReactionBuilder<T extends Schema = any, U extends Schema =
   }
 
   name(name: string) {
-    return this.clone({ name })
+    return this.clone<T, U>({ name })
   }
 
   when(...events: EventDefinition[]) {
-    return this.clone({
+    return this.clone<T, U>({
       triggers: [...this.params.triggers, ...events],
     })
   }
 
-  invoke<TInput extends Schema, TOutput extends Schema>(
+  invoke<TInput, TOutput>(
     agent: AgentBuilder,
     skill: SkillBuilder<TInput, TOutput>,
   ): InvokeCursorBuilder<TInput, TOutput> {
@@ -46,14 +46,12 @@ export class ImmutableReactionBuilder<T extends Schema = any, U extends Schema =
   }
 
   emit(event: EventDefinition) {
-    return this.clone({
+    return this.clone<T, U>({
       pipeline: [...this.params.pipeline, { type: 'emit', event }],
     })
   }
 
-  map<O extends Schema>(
-    transform: (input: Infer<U>) => Infer<O>,
-  ): ReactionBuilder<U, O> {
+  map<O>(transform: (input: U) => O): ReactionBuilder<U, O> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'map', transform }],
     })
@@ -71,17 +69,17 @@ export class ImmutableReactionBuilder<T extends Schema = any, U extends Schema =
     }
   }
 
-  private clone<TInput extends Schema, TOutput extends Schema>(
+  private clone<TInput, TOutput>(
     params: Partial<ReactionBuilderParams>,
-  ): ImmutableReactionBuilder<TInput, TOutput> {
+  ): ReactionBuilder<TInput, TOutput> {
     const Constructor = this.constructor as new (
-      params: ReactionBuilderParams
-    ) => ImmutableReactionBuilder<TInput, TOutput>
+      params: ReactionBuilderParams,
+    ) => ReactionBuilder<TInput, TOutput>
     return new Constructor({ ...this.params, ...params })
   }
 }
 
-class ImmutableInvokeCursorBuilder<T extends Schema = any, U extends Schema = any>
+class ImmutableInvokeCursorBuilder<T = any, U = any>
   implements InvokeCursorBuilder<T, U> {
   constructor(
     private readonly parentParams: ReactionBuilderParams,
@@ -110,14 +108,14 @@ class ImmutableInvokeCursorBuilder<T extends Schema = any, U extends Schema = an
     return this.escape().when(...events)
   }
 
-  invoke<TInput extends Schema, TOutput extends Schema>(
+  invoke<TInput, TOutput>(
     agent: AgentBuilder,
     skill: SkillBuilder<TInput, TOutput>,
   ): InvokeCursorBuilder<TInput, TOutput> {
     return this.escape().invoke(agent, skill)
   }
 
-  map<O extends Schema>(transform: (input: Infer<U>) => Infer<O>): ReactionBuilder<U, O> {
+  map<O>(transform: (input: U) => O): ReactionBuilder<U, O> {
     return this.escape().map(transform)
   }
 
@@ -126,7 +124,7 @@ class ImmutableInvokeCursorBuilder<T extends Schema = any, U extends Schema = an
   }
 
   private escape(): ReactionBuilder<T, U> {
-    return new ImmutableReactionBuilder({
+    return new ImmutableReactionBuilder<T, U>({
       ...this.parentParams,
       pipeline: [...this.parentParams.pipeline, this.invokeStep, ...this.cases],
     })

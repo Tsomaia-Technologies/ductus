@@ -54,7 +54,7 @@ export type PipelineStep =
   | PipelineAction
   | CaseStep
 
-export interface ReactionEntity<T extends Schema = any, U extends Schema = any> {
+export interface ReactionEntity {
   name?: string | null
   triggers: string[]
   pipeline: PipelineStep[]

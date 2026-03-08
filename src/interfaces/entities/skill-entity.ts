@@ -1,10 +1,10 @@
 import { Schema } from '../schema.js'
 
-export interface SkillEntity<T extends Schema = any, U extends Schema = any> {
+export interface SkillEntity {
   name: string
   input: {
-    schema: T
+    schema: Schema
     payload?: string
   }
-  output: U
+  output: Schema
 }
