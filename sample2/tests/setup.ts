@@ -80,6 +80,9 @@ export async function runTests<TState>(params: TestRunnerOptions<TState>) {
     fileAdapter,
   })
 
+  const ledgerPath = system.resolveAbsolutePath(dir, 'ledger.jsonl')
+  await fileAdapter.delete(ledgerPath)
+
   // setInterval(() => {}, 1000) // so that process does not auto-exit
   await kernel.boot()
   await kernel.monitor()

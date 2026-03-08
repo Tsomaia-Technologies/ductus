@@ -23,6 +23,7 @@ import { runTests } from '../setup.js'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 const TOTAL = 20
+let OVERFLOW_STRATEGY: 'fail' | 'block' | 'throttle' = 'block' as any
 
 // ── Events ──────────────────────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ const SlowProcessor = Ductus.processor<State>(async function* (events, getState)
 })
 
 // D: auditor — collects all observations and validates correctness
-const AuditorProcessor = Ductus.processor<State>(async function* (events, getState) {
+const AuditorProcessor = Ductus.processor<State>(async function* AuditorProcessor(events, getState) {
   const fastObservations: { index: number, observedCount: number }[] = []
   const slowObservations: { index: number, observedCount: number }[] = []
 
@@ -124,21 +125,47 @@ const AuditorProcessor = Ductus.processor<State>(async function* (events, getSta
         violations.forEach(v => console.log(`    ✗ index=${v.index} but observedCount=${v.observedCount}`))
       }
 
-      // 3. Slow processor: because it waits 200ms, all increments will have
-      //    been committed by the time it reads. Every observation should === TOTAL
-      const slowAllFinal = slowObservations.every(({ observedCount }) => observedCount === TOTAL)
-      console.log(`[D] Slow observations all see final state (${TOTAL}) → ${slowAllFinal ? '✓ PASS' : '✗ FAIL'}`)
-      if (!slowAllFinal) {
-        const violations = slowObservations.filter(({ observedCount }) => observedCount !== TOTAL)
+      // 3. Slow processor: observations should be non-decreasing
+//    (state only goes up, so each successive read should be >= the previous)
+      const slowNonDecreasing = slowObservations.every((o, i) =>
+        i === 0 || o.observedCount >= slowObservations[i - 1].observedCount
+      )
+      console.log(`[D] Slow observations non-decreasing → ${slowNonDecreasing ? '✓ PASS' : '✗ FAIL'}`)
+// 4. Slow processor: every observation should be >= its index
+//    (by the time Slow processes CI(i), at least i events have been committed)
+      const slowMinimum = slowObservations.every(({ index, observedCount }) => observedCount >= index)
+      console.log(`[D] Slow observations >= index → ${slowMinimum ? '✓ PASS' : '✗ FAIL'}`)
+      if (!slowMinimum) {
+        const violations = slowObservations.filter(({ index, observedCount }) => observedCount < index)
         violations.forEach(v => console.log(`    ✗ index=${v.index} observedCount=${v.observedCount}`))
       }
+// 5. Slow processor: last observation should see final state
+//    (by the time the last event is processed, all events are committed)
+      const slowFinalCorrect = slowObservations[slowObservations.length - 1].observedCount === TOTAL
+      console.log(`[D] Slow last observation sees final state (${TOTAL}) → ${slowFinalCorrect ? '✓ PASS' : '✗ FAIL'}`)
 
-      // 4. Fast processor observations should be strictly increasing
+      // 6. Fast processor observations should be strictly increasing
       //    (it processes events in order, state only goes up)
       const fastIncreasing = fastObservations.every((o, i) =>
         i === 0 || o.observedCount >= fastObservations[i - 1].observedCount
       )
       console.log(`[D] Fast observations non-decreasing → ${fastIncreasing ? '✓ PASS' : '✗ FAIL'}`)
+
+      if (OVERFLOW_STRATEGY === 'fail') {
+        // With non-blocking strategies (e.g. fail-first), the producer bursts all events
+        // before SlowProcessor reads state, so every observation should see the final count.
+        // With blocking, the producer is rate-limited by the slowest consumer, so
+        // intermediate observations see incremental state — this assertion doesn't apply.
+
+        // 7. Slow processor: because it waits 200ms, all increments will have
+        //    been committed by the time it reads. Every observation should === TOTAL
+        const slowAllFinal = slowObservations.every(({ observedCount }) => observedCount === TOTAL)
+        console.log(`[D] Slow observations all see final state (${TOTAL}) → ${slowAllFinal ? '✓ PASS' : '✗ FAIL'}`)
+        if (!slowAllFinal) {
+          const violations = slowObservations.filter(({ observedCount }) => observedCount !== TOTAL)
+          violations.forEach(v => console.log(`    ✗ index=${v.index} observedCount=${v.observedCount}`))
+        }
+      }
 
       console.log('=====================\n')
       break
@@ -159,5 +186,5 @@ const Flow = Ductus.flow<State>()
 runTests({
   flow: Flow,
   dir: 'state',
-  overflowStrategy: 'block',
+  overflowStrategy: OVERFLOW_STRATEGY,
 }).catch(console.error)
