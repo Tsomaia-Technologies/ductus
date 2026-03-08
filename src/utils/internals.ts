@@ -9,7 +9,7 @@ import {
   Volatility,
 } from '../interfaces/event.js'
 import { isSchemaType } from './schema-utils.js'
-import { PipelineContext, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
+import { ErrorStep, PipelineContext, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
 import { AgentDispatcher } from '../core/agent-dispatcher.js'
 import { EventProcessor } from '../interfaces/event-processor.js'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
@@ -147,13 +147,15 @@ async function* executePipeline<TState>(
           break
       }
     } catch (error) {
-      const errorStep = steps.slice(i + 1).find(step => step.type === 'error')
+      const errorRelativeIndex = steps.slice(i + 1).findIndex(step => step.type === 'error')
 
-      if (errorStep) {
+      if (errorRelativeIndex !== -1) {
+        const errorStep = steps[i + 1 + errorRelativeIndex] as ErrorStep
         lastInvokeResult = errorStep.transform(error, buildContext())
+        i = i + 1 + errorRelativeIndex
+      } else {
+        return
       }
-
-      return
     }
   }
 }
