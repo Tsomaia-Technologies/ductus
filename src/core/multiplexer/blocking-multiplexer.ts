@@ -24,7 +24,9 @@ export class BlockingMultiplexer implements Multiplexer {
     return subscriber
   }
 
-  async broadcast(event: BaseEvent, context?: BroadcastingContext): Promise<CommittedEvent> {
+  async broadcast(event: BaseEvent, context: BroadcastingContext): Promise<CommittedEvent> {
+    const { sourceSubscriber } = context
+
     return await this.lockMutex.lock(async () => {
       const commitedEvent = await this.sequencer.commit(event, {
         causationId: context?.causationId,
@@ -33,8 +35,11 @@ export class BlockingMultiplexer implements Multiplexer {
         sourceSubscriber: context?.sourceSubscriber,
       })
 
+      const otherSubscribers = this.subscribers.filter(subscriber => {
+        return subscriber !== sourceSubscriber
+      })
       await Promise.all(
-        this.subscribers.map(subscriber => subscriber.push(commitedEvent)),
+        otherSubscribers.map(subscriber => subscriber.push(commitedEvent)),
       )
 
       return commitedEvent

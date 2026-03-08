@@ -1,12 +1,11 @@
 import { EventSubscriber } from './event-subscriber.js'
 import { BaseEvent, CommittedEvent } from './event.js'
-import { HotEventSubscriber } from './hot-event-subscriber.js'
 
 export interface BroadcastingContext {
+  sourceSubscriber: EventSubscriber
   causationId?: string
   correlationId?: string
   chainId?: string
-  sourceSubscriber?: HotEventSubscriber
 }
 
 export interface Multiplexer {
@@ -25,6 +24,6 @@ export interface Multiplexer {
    */
   broadcast(
     event: BaseEvent,
-    context?: BroadcastingContext,
+    context: BroadcastingContext,
   ): Promise<CommittedEvent>
 }
