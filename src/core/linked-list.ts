@@ -148,8 +148,9 @@ export class LinkedList<T> {
     let current = this.first
 
     while (current) {
+      const next = current.next
       yield current.value
-      current = current.next
+      current = next
     }
   }
 
@@ -157,8 +158,9 @@ export class LinkedList<T> {
     let current = this.last
 
     while (current) {
+      const previous = current.previous
       yield current.value
-      current = current.previous
+      current = previous
     }
   }
 

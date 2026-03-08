@@ -22,7 +22,6 @@ function mockCommittedEvent(
     eventId: VALID_UUID,
     type,
     payload,
-    authorId: "proc-1",
     timestamp: 0,
     sequenceNumber: 1,
     prevHash: VALID_SHA256,

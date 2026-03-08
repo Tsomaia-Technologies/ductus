@@ -22,7 +22,6 @@ function mockEnqueuedEvent(
     eventId: VALID_UUID,
     type,
     payload,
-    authorId: "state-machine",
     timestamp: 0,
     sequenceNumber: 1,
     prevHash: VALID_SHA256,

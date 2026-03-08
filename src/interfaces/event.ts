@@ -48,5 +48,4 @@ export type CommittedEvent<T extends BaseEvent = BaseEvent> = T & {
   isCommited: true
   hash: string
   timestamp: number
-  authorId: string
 }

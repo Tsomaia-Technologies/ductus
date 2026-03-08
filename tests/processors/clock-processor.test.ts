@@ -20,7 +20,6 @@ function mockEvent(
     eventId: VALID_UUID,
     type,
     payload: {},
-    authorId: "bootstrap",
     timestamp,
     volatility: "durable" as const,
     isReplay,

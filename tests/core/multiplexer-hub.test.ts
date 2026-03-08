@@ -17,7 +17,6 @@ describe("MultiplexerHub", () => {
     const base = {
       type: "TEST",
       payload: { id: "sensitive" },
-      authorId: "proc-1",
       timestamp: 0,
       volatility: "durable-draft" as const,
     };
@@ -48,7 +47,6 @@ describe("MultiplexerHub", () => {
     const base = {
       type: "SAME",
       payload: { x: 1 },
-      authorId: "a",
       timestamp: 0,
       volatility: "durable-draft" as const,
     };
@@ -78,7 +76,6 @@ describe("MultiplexerHub", () => {
       eventId: "550e8400-e29b-41d4-a716-446655440000",
       type: "REPLAY",
       payload: {},
-      authorId: "a",
       timestamp: 0,
       sequenceNumber: 1,
       prevHash: "x",

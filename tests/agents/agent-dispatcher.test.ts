@@ -44,9 +44,9 @@ describe("AgentDispatcher", () => {
       const context: AgentContext = {
         messages: [
           { role: "user", content: "m0", timestamp: 0 },
-          { role: "assistant", content: "m1", authorId: "a1", toolCalls: [], timestamp: 1 },
+          { role: "assistant", content: "m1", toolCalls: [], timestamp: 1 },
           { role: "user", content: "m2", timestamp: 2 },
-          { role: "assistant", content: "m3", authorId: "a2", toolCalls: [], timestamp: 3 },
+          { role: "assistant", content: "m3", toolCalls: [], timestamp: 3 },
           { role: "user", content: "m4", timestamp: 4 },
         ],
         stats: { inputTokens: 0, outputTokens: 0, turns: 0 },

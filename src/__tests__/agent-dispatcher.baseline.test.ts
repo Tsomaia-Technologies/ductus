@@ -277,7 +277,6 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
           prevHash: '',
           hash: '',
           volatility: 'durable',
-          authorId: 'test'
         }
         yield {
           type: 'Evt2',
@@ -289,7 +288,6 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
           prevHash: '',
           hash: '',
           volatility: 'durable',
-          authorId: 'test'
         }
         yield {
           type: 'Evt3',
@@ -301,7 +299,6 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
           prevHash: '',
           hash: '',
           volatility: 'durable',
-          authorId: 'test'
         }
         yield {
           type: 'Evt4',
@@ -313,7 +310,6 @@ describe('AgentDispatcher (Exhaustive Baseline)', () => {
           prevHash: '',
           hash: '',
           volatility: 'durable',
-          authorId: 'test'
         }
       })
 

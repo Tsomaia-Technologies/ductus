@@ -18,7 +18,6 @@ export function getEventHash(event: Omit<CommittedEvent, 'hash'>) {
   const hashPayload = JSON.stringify({
     type: event.type,
     payload: event.payload,
-    authorId: event.authorId,
     timestamp: event.timestamp,
     volatility: event.volatility,
 

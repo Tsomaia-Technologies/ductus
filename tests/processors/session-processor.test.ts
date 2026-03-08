@@ -17,7 +17,6 @@ function mockEnqueuedEvent(type: string, isReplay = false): Parameters<AsyncEven
     eventId: VALID_UUID,
     type,
     payload: {},
-    authorId: "bootstrapper",
     timestamp: 0,
     sequenceNumber: 1,
     prevHash: VALID_SHA256,

@@ -20,7 +20,6 @@ function mockEvent(
     eventId: VALID_UUID,
     type,
     payload,
-    authorId: "agent-processor",
     timestamp: Date.now(),
     volatility: "durable",
     isReplay,

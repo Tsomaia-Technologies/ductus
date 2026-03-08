@@ -18,7 +18,6 @@ function mockCommittedEvent(volatility: "durable" | "volatile"): CommittedEvent 
     eventId: VALID_UUID,
     type: "TEST",
     payload: {},
-    authorId: "proc-1",
     timestamp: 0,
     sequenceNumber: 1,
     prevHash: VALID_SHA256,

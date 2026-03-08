@@ -12,7 +12,6 @@ class ClockGeneratorProcessor implements EventProcessor {
         for (let i = 0; i < 5; i++) {
             yield createTick({
                 payload: { ms: 1000, isReplay: false },
-                authorId: "clock",
                 timestamp: Date.now() + i * 1000
             });
             // Simulate real-world asynchronous delay
