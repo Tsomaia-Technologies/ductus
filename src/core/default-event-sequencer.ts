@@ -1,4 +1,4 @@
-import { CommitContext, EventSequencer } from '../interfaces/event-sequencer.js'
+import { CommitContext, CommitEventData, EventSequencer } from '../interfaces/event-sequencer.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { getEventHash, getInitialEventHash } from '../utils/crypto-utils.js'
@@ -9,7 +9,7 @@ import { DefaultEventListener } from './default-event-listener.js'
 
 export class DefaultEventSequencer implements EventSequencer {
   private readonly lockMutex = new Mutex()
-  private readonly commitListener = new DefaultEventListener<CommittedEvent>()
+  private readonly commitListener = new DefaultEventListener<CommitEventData>()
   private lastHash: string = getInitialEventHash()
   private lastSequenceNumber = 0
   private isHydrated = false
@@ -29,13 +29,16 @@ export class DefaultEventSequencer implements EventSequencer {
 
       this.lastSequenceNumber = commitedEvent.sequenceNumber
       this.lastHash = commitedEvent.hash
-      this.commitListener.trigger(commitedEvent)
+      this.commitListener.trigger({
+        event: commitedEvent,
+        sourceSubscriber: context?.sourceSubscriber,
+      })
 
       return commitedEvent
     })
   }
 
-  onCommit(callback: (event: CommittedEvent) => void): () => void {
+  onCommit(callback: (event: CommitEventData) => void): () => void {
     return this.commitListener.on(callback)
   }
 

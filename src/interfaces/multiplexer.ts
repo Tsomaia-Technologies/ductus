@@ -21,14 +21,6 @@ export interface Multiplexer {
   subscribe(params?: { name?: string | null }): EventSubscriber
 
   /**
-   * Registers synchronous listener that is invoked when event is commited and is about to be broadcasted,
-   * but right before broadcasting it.
-   *
-   * @param callback
-   */
-  onCommit(callback: (event: CommittedEvent) => void): () => void
-
-  /**
    * Broadcasts event drafts as commited events to all subscribers
    *
    * @param {TEvent} event

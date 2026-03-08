@@ -1,5 +1,41 @@
-import { Multiplexer } from '../../interfaces/multiplexer.js'
+import { BroadcastingContext, Multiplexer } from '../../interfaces/multiplexer.js'
+import { EventSubscriber } from '../../interfaces/event-subscriber.js'
+import { BaseEvent } from '../../interfaces/event.js'
+import { EventSequencer } from '../../interfaces/event-sequencer.js'
+import { BlockingSubscriber } from '../subscriber/blocking-subscriber.js'
+import { Mutex } from '../mutex.js'
 
-export class BlockingMultiplexer<TState> implements Multiplexer<TState> {
+export class BlockingMultiplexer implements Multiplexer {
+  private readonly subscribers: BlockingSubscriber[] = []
+  private readonly lockMutex = new Mutex()
 
+  constructor(private readonly sequencer: EventSequencer) {
+  }
+
+  subscribe(params?: { name?: string | null }): EventSubscriber {
+    const subscriber = new BlockingSubscriber({ name: params?.name })
+    this.subscribers.push(subscriber)
+
+    subscriber.onUnsubscribe(() => {
+      const index = this.subscribers.indexOf(subscriber)
+      this.subscribers.splice(index, 1)
+    })
+
+    return subscriber
+  }
+
+  async broadcast(event: BaseEvent, context?: BroadcastingContext): Promise<void> {
+    return await this.lockMutex.lock(async () => {
+      const commitedEvent = await this.sequencer.commit(event, {
+        causationId: context?.causationId,
+        correlationId: context?.correlationId,
+        chainId: context?.chainId,
+        sourceSubscriber: context?.sourceSubscriber,
+      })
+
+      await Promise.all(
+        this.subscribers.map(subscriber => subscriber.push(commitedEvent)),
+      )
+    })
+  }
 }
