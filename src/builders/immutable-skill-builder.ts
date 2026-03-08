@@ -11,7 +11,7 @@ interface SkillBuilderParams {
   outputSchema?: Schema
 }
 
-export class ImmutableSkillBuilder<T = any, U = any> implements SkillBuilder<T, U> {
+export class ImmutableSkillBuilder<T = unknown> implements SkillBuilder<T> {
   constructor(private readonly params: SkillBuilderParams = {}) {
   }
 
@@ -19,15 +19,15 @@ export class ImmutableSkillBuilder<T = any, U = any> implements SkillBuilder<T, 
     return this.clone({ name })
   }
 
-  input<I extends Schema>(schema: I, template?: string) {
-    return this.clone<I, U>({
+  input(schema: Schema, template?: string) {
+    return this.clone({
       inputSchema: schema,
       inputTemplate: template,
     })
   }
 
   output<O extends Schema>(schema: O) {
-    return this.clone<T, Infer<O>>({ outputSchema: schema })
+    return this.clone<Infer<O>>({ outputSchema: schema })
   }
 
   [BUILD](): SkillEntity {
@@ -45,9 +45,9 @@ export class ImmutableSkillBuilder<T = any, U = any> implements SkillBuilder<T, 
     }
   }
 
-  private clone<T, U>(params: Partial<SkillBuilderParams>): SkillBuilder<T, U> {
-    const Constructor = this.constructor as new (params?: SkillBuilderParams) => ImmutableSkillBuilder<T, U>
-    const clone = new Constructor({ ...this.params, ...params })
-    return clone
+  private clone<U>(params: Partial<SkillBuilderParams>): SkillBuilder<U> {
+    const Constructor = this.constructor as new (params?: SkillBuilderParams) => ImmutableSkillBuilder<U>
+
+    return new Constructor({ ...this.params, ...params })
   }
 }
