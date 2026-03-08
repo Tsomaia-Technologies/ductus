@@ -66,7 +66,6 @@ export class IntentProcessor {
         console.log(`[INTENT] broadcasting type=${event.type} sourceSubscriber=${context?.sourceSubscriber?.name() ?? !!context?.sourceSubscriber}`)
 
         nextValue = await this.multiplexer.broadcast(event, context)
-        await this.multiplexer.waitForConsumers(sourceSubscriber)
       } else {
         nextValue = await this.processIntent(event, context)
       }

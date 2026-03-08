@@ -26,6 +26,4 @@ export interface Multiplexer {
     event: BaseEvent,
     context?: BroadcastingContext,
   ): Promise<CommittedEvent>
-
-  waitForConsumers(excludeSubscriber?: EventSubscriber): Promise<void>
 }

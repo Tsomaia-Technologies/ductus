@@ -41,10 +41,12 @@ export class BlockingMultiplexer implements Multiplexer {
       }
     })
 
+    await this.waitForConsumers(context?.sourceSubscriber)
+
     return commitedEvent
   }
 
-  async waitForConsumers(excludeSubscriber?: EventSubscriber): Promise<void> {
+  private async waitForConsumers(excludeSubscriber?: EventSubscriber): Promise<void> {
     const targets = this.subscribers.filter(subscriber => {
       return subscriber !== excludeSubscriber && subscriber.isConsuming()
     })
