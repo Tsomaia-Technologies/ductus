@@ -4,7 +4,7 @@ import Ductus, {
   JsonlLedger,
   NodeLedgerFileAdapter,
   NodeSystemAdapter,
-  TemplateRenderer,
+  TemplateRenderer, ThrottleMultiplexer,
 } from 'ductus'
 import { fileURLToPath } from 'url'
 import path from 'path'
@@ -51,6 +51,12 @@ function createMultiplexer<TState>(params: TestRunnerOptions<TState> & {
       })
 
     case 'throttle':
+      return new ThrottleMultiplexer({
+        sequencer,
+        highWaterMark: bufferLimit,
+        stallTimeoutMs: bufferTimeoutMs,
+      })
+
     default:
       throw new Error(`Unsupported overflowStrategy: ${overflowStrategy}`)
   }
