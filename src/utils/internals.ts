@@ -133,8 +133,8 @@ async function* executePipeline<TState>(
           try {
             const matched = step.schema.parse(lastInvokeResult)
             yield* executePipeline([step.then], matched, dispatcher, triggerEvent)
-          } catch {
-            // Schema didn't match — skip this case branch
+          } catch (error) {
+            if (!(error instanceof zod.ZodError)) throw error
           }
           break
 

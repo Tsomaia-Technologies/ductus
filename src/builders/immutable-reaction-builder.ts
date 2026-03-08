@@ -7,7 +7,7 @@ import {
   ReactionBuilder,
 } from '../interfaces/builders/reaction-builder.js'
 import { PipelineAction, PipelineContext, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
-import { EventDefinition } from '../interfaces/event.js'
+import { EventDefinition, EventPayloadShape } from '../interfaces/event.js'
 import { Schema } from '../interfaces/schema.js'
 import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
@@ -51,27 +51,29 @@ export class ImmutableReactionBuilder<T = any, U = any>
     })
   }
 
-  emit(event: EventDefinition) {
+  emit(
+    event: EventDefinition<string, U extends EventPayloadShape ? U : never>,
+  ) {
     return this.clone<T, U>({
       pipeline: [...this.params.pipeline, { type: 'emit', event }],
     })
   }
 
-  map<O>(transform: (input: U) => O): ReactionBuilder<U, O> {
+  map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<U, O> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'map', transform }],
     })
   }
 
   assert(
-    validate: (error: unknown, context: PipelineContext) => void,
+    validate: (data: U, context: PipelineContext) => void,
   ): ReactionBuilder<T, U> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'assert', validate }],
     })
   }
 
-  error<O>(transform: (error: unknown) => O): ReactionBuilder<U, O> {
+  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, O> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'error', transform }],
     })
@@ -137,7 +139,9 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
     return this.with({ type: 'case', schema, then: action })
   }
 
-  emit(event: EventDefinition): ReactionBuilder {
+  emit(
+    event: EventDefinition<string, U extends EventPayloadShape ? U : never>,
+  ) {
     return this.escape().emit(event)
   }
 
@@ -152,17 +156,17 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
     return this.escape().invoke(agent, skill)
   }
 
-  map<O>(transform: (input: U) => O): ReactionBuilder<U, O> {
+  map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<U, O> {
     return this.escape().map(transform)
   }
 
   assert(
-    validate: (error: unknown, context: PipelineContext) => void,
+    validate: (data: U, context: PipelineContext) => void,
   ): ReactionBuilder<T, U> {
     return this.escape().assert(validate)
   }
 
-  error<O>(transform: (error: unknown) => O): ReactionBuilder<U, O> {
+  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, O> {
     return this.escape().error(transform)
   }
 

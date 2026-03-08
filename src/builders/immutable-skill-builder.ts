@@ -2,6 +2,7 @@ import { BUILD } from '../interfaces/builders/__internal__.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
 import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 import { Schema } from '../interfaces/schema.js'
+import { Infer } from '../interfaces/event.js'
 
 interface SkillBuilderParams {
   name?: string
@@ -26,7 +27,7 @@ export class ImmutableSkillBuilder<T = any, U = any> implements SkillBuilder<T, 
   }
 
   output<O extends Schema>(schema: Schema) {
-    return this.clone<T, O>({ outputSchema: schema })
+    return this.clone<T, Infer<O>>({ outputSchema: schema })
   }
 
   [BUILD](): SkillEntity {

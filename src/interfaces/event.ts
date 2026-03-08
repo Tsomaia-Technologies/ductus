@@ -1,4 +1,5 @@
 import * as zod from 'zod/v3'
+import { Schema } from './schema.js'
 
 export type Volatility = 'durable' | 'volatile' | 'intent'
 
@@ -11,10 +12,7 @@ export interface BaseEvent<T extends string = string, P = unknown> {
 
 export type EventPayloadShape = zod.ZodRawShape
 export type PayloadShape<T extends EventPayloadShape> = zod.ZodObject<T, 'strict'> | T
-export type Infer<T extends PayloadShape<any>> =
-  T extends PayloadShape<infer U>
-    ? zod.input<zod.ZodObject<U, 'strict'>>
-    : never
+export type Infer<T extends Schema> = zod.input<T>
 
 export interface BaseEventDefinition<TType extends string = string, TPayload = any> {
   (payload: TPayload): BaseEvent<TType, typeof payload>

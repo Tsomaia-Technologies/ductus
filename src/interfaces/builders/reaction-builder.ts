@@ -1,6 +1,6 @@
 import { Buildable } from './__internal__.js'
 import { PipelineContext, ReactionEntity } from '../entities/reaction-entity.js'
-import { EventDefinition } from '../event.js'
+import { EventDefinition, EventPayloadShape } from '../event.js'
 import { Schema } from '../schema.js'
 import { AgentBuilder } from './agent-builder.js'
 import { SkillBuilder } from './skill-builder.js'
@@ -32,9 +32,9 @@ export interface AssertBuildStep<T = any> {
   validate: (data: T, context: PipelineContext) => void
 }
 
-export interface ErrorBuildStep {
+export interface ErrorBuildStep<U = any> {
   type: 'error'
-  transform: (error: unknown, context: PipelineContext) => void
+  transform: (error: unknown, context: PipelineContext) => U
 }
 
 export type PipelineBuildAction =
@@ -58,15 +58,17 @@ export interface ReactionBuilder<T = any, U = any> extends Buildable<ReactionEnt
     skill: SkillBuilder<TInput, TOutput>,
   ): InvokeCursorBuilder<TInput, TOutput>
 
-  emit(event: EventDefinition): ReactionBuilder<T, U>
-
-  map<O>(transform: (input: U) => O): ReactionBuilder<U, O>
-
-  assert(
-    validate: (error: unknown, context: PipelineContext) => void,
+  emit(
+    event: EventDefinition<string, U extends EventPayloadShape ? U : never>,
   ): ReactionBuilder<T, U>
 
-  error<O>(transform: (error: unknown) => O): ReactionBuilder<U, O>
+  map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<U, O>
+
+  assert(
+    validate: (data: U, context: PipelineContext) => void,
+  ): ReactionBuilder<T, U>
+
+  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, O>
 }
 
 /**

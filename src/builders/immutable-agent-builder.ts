@@ -89,7 +89,7 @@ export class ImmutableAgentBuilder implements AgentBuilder {
 
   rule(rule: string): this {
     return this.clone({
-      rules: [...this.params.rules, ...rule],
+      rules: [...this.params.rules, rule],
     })
   }
 
