@@ -4,9 +4,13 @@ import { CancellationToken, Disposer } from '../interfaces/cancellation-token.js
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { clearTimeout } from 'node:timers'
 import { HotEventSubscriber } from '../interfaces/hot-event-subscriber.js'
+import { EventSequencer } from '../interfaces/event-sequencer.js'
 
 export class IntentProcessor {
-  constructor(private readonly multiplexer: Multiplexer) {
+  constructor(
+    private readonly multiplexer: Multiplexer,
+    private readonly sequencer: EventSequencer,
+  ) {
   }
 
   async process(params: {
@@ -57,8 +61,7 @@ export class IntentProcessor {
         if (!event) continue
         console.log(`[INTENT] broadcasting type=${event.type} sourceSubscriber=${!!context.sourceSubscriber}`)
 
-        await this.multiplexer.broadcast(event, context)
-        nextValue = undefined
+        nextValue = await this.multiplexer.broadcast(event, context)
       } else {
         nextValue = await this.processIntent(event, context)
       }
@@ -84,7 +87,7 @@ export class IntentProcessor {
           ? ((event: BaseEvent) => event.type === response)
           : ((event: BaseEvent) => event.type === response.type)
 
-        unsubscribe = this.multiplexer.onCommit(event => {
+        unsubscribe = this.sequencer.onCommit(({ event }) => {
           if (event.chainId === chainId && predicate(event)) {
             if (timer) clearTimeout(timer)
             unsubscribe?.()

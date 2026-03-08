@@ -1,6 +1,6 @@
 import { BroadcastingContext, Multiplexer } from '../../interfaces/multiplexer.js'
 import { EventSubscriber } from '../../interfaces/event-subscriber.js'
-import { BaseEvent } from '../../interfaces/event.js'
+import { BaseEvent, CommittedEvent } from '../../interfaces/event.js'
 import { EventSequencer } from '../../interfaces/event-sequencer.js'
 import { BlockingSubscriber } from '../subscriber/blocking-subscriber.js'
 import { Mutex } from '../mutex.js'
@@ -24,7 +24,7 @@ export class BlockingMultiplexer implements Multiplexer {
     return subscriber
   }
 
-  async broadcast(event: BaseEvent, context?: BroadcastingContext): Promise<void> {
+  async broadcast(event: BaseEvent, context?: BroadcastingContext): Promise<CommittedEvent> {
     return await this.lockMutex.lock(async () => {
       const commitedEvent = await this.sequencer.commit(event, {
         causationId: context?.causationId,
@@ -36,6 +36,8 @@ export class BlockingMultiplexer implements Multiplexer {
       await Promise.all(
         this.subscribers.map(subscriber => subscriber.push(commitedEvent)),
       )
+
+      return commitedEvent
     })
   }
 }

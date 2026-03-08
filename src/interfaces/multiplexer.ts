@@ -1,9 +1,6 @@
 import { EventSubscriber } from './event-subscriber.js'
 import { BaseEvent, CommittedEvent } from './event.js'
-import { Token } from './event-generator.js'
 import { HotEventSubscriber } from './hot-event-subscriber.js'
-
-export const Multiplexer = Token<Multiplexer>()
 
 export interface BroadcastingContext {
   causationId?: string
@@ -29,5 +26,5 @@ export interface Multiplexer {
   broadcast(
     event: BaseEvent,
     context?: BroadcastingContext,
-  ): Promise<void>
+  ): Promise<CommittedEvent>
 }
