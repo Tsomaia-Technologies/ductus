@@ -49,10 +49,12 @@ import {
   union,
 } from './utils/schema-utils.js'
 import { BootEvent } from './core/events.js'
+import { EventSequencer } from './interfaces/event-sequencer.js'
 
 export interface CreateKernelOptions<TState> {
   flow: FlowBuilder<TState>
   multiplexer: Multiplexer
+  sequencer: EventSequencer
   ledger: EventLedger
   container: ContainerBuilder
   templateRenderer: TemplateRenderer
@@ -145,6 +147,7 @@ export function kernel<TState>(
 ) {
   const {
     multiplexer,
+    sequencer,
     ledger,
     container: containerBuilder,
     canceller,
@@ -182,6 +185,7 @@ export function kernel<TState>(
 
   return new DuctusKernel({
     multiplexer,
+    sequencer,
     processors: [...flow.processors, ...reactionProcessors],
     ledger,
     store,
