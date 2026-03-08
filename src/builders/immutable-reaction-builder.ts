@@ -18,8 +18,7 @@ interface ReactionBuilderParams {
   readonly pipeline: PipelineBuildStep[]
 }
 
-export class ImmutableReactionBuilder<T = any, U = any>
-  implements ReactionBuilder<T, U> {
+export class ImmutableReactionBuilder<U = any> implements ReactionBuilder<U> {
   private params: ReactionBuilderParams
 
   constructor(params?: ReactionBuilderParams) {
@@ -31,11 +30,11 @@ export class ImmutableReactionBuilder<T = any, U = any>
   }
 
   name(name: string) {
-    return this.clone<T, U>({ name })
+    return this.clone<U>({ name })
   }
 
   when(...events: EventDefinition[]) {
-    return this.clone<T, U>({
+    return this.clone<U>({
       triggers: [...this.params.triggers, ...events],
     })
   }
@@ -43,8 +42,8 @@ export class ImmutableReactionBuilder<T = any, U = any>
   invoke<TInput, TOutput>(
     agent: AgentBuilder,
     skill: SkillBuilder<TInput, TOutput>,
-  ): InvokeCursorBuilder<TInput, TOutput> {
-    return new ImmutableInvokeCursorBuilder<TInput, TOutput>(this.params, {
+  ): InvokeCursorBuilder<TOutput> {
+    return new ImmutableInvokeCursorBuilder<TOutput>(this.params, {
       type: 'invoke',
       agent,
       skill,
@@ -52,12 +51,12 @@ export class ImmutableReactionBuilder<T = any, U = any>
   }
 
   emit(event: BaseEventDefinition<string, U>) {
-    return this.clone<T, U>({
+    return this.clone<U>({
       pipeline: [...this.params.pipeline, { type: 'emit', event }],
     })
   }
 
-  map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<U, O> {
+  map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<O> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'map', transform }],
     })
@@ -65,13 +64,13 @@ export class ImmutableReactionBuilder<T = any, U = any>
 
   assert(
     validate: (data: U, context: PipelineContext) => void,
-  ): ReactionBuilder<T, U> {
+  ): ReactionBuilder<U> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'assert', validate }],
     })
   }
 
-  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, U | O> {
+  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U | O> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'error', transform }],
     })
@@ -110,18 +109,18 @@ export class ImmutableReactionBuilder<T = any, U = any>
     }
   }
 
-  private clone<TInput, TOutput>(
+  private clone<TOutput>(
     params: Partial<ReactionBuilderParams>,
-  ): ReactionBuilder<TInput, TOutput> {
+  ): ReactionBuilder<TOutput> {
     const Constructor = this.constructor as new (
       params: ReactionBuilderParams,
-    ) => ReactionBuilder<TInput, TOutput>
+    ) => ReactionBuilder<TOutput>
     return new Constructor({ ...this.params, ...params })
   }
 }
 
-class ImmutableInvokeCursorBuilder<T = any, U = any>
-  implements InvokeCursorBuilder<T, U> {
+class ImmutableInvokeCursorBuilder<U = any>
+  implements InvokeCursorBuilder<U> {
   constructor(
     private readonly parentParams: ReactionBuilderParams,
     private readonly invokeStep: InvokeBuildStep,
@@ -133,7 +132,7 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
     return this.escape().name(name)
   }
 
-  case(schema: Schema, action: PipelineBuildAction): InvokeCursorBuilder<T, U> {
+  case(schema: Schema, action: PipelineBuildAction): InvokeCursorBuilder<U> {
     return this.with({ type: 'case', schema, then: action })
   }
 
@@ -148,21 +147,21 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
   invoke<TInput, TOutput>(
     agent: AgentBuilder,
     skill: SkillBuilder<TInput, TOutput>,
-  ): InvokeCursorBuilder<TInput, TOutput> {
+  ): InvokeCursorBuilder<TOutput> {
     return this.escape().invoke(agent, skill)
   }
 
-  map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<U, O> {
+  map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<O> {
     return this.escape().map(transform)
   }
 
   assert(
     validate: (data: U, context: PipelineContext) => void,
-  ): ReactionBuilder<T, U> {
+  ): ReactionBuilder<U> {
     return this.escape().assert(validate)
   }
 
-  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, U | O> {
+  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U | O> {
     return this.escape().error(transform)
   }
 
@@ -170,7 +169,7 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
     return this.escape()[BUILD]()
   }
 
-  private with(step: PipelineBuildStep): InvokeCursorBuilder<T, U> {
+  private with(step: PipelineBuildStep): InvokeCursorBuilder<U> {
     return new ImmutableInvokeCursorBuilder(
       this.parentParams,
       this.invokeStep,
@@ -178,8 +177,8 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
     )
   }
 
-  private escape(): ReactionBuilder<T, U> {
-    return new ImmutableReactionBuilder<T, U>({
+  private escape(): ReactionBuilder<U> {
+    return new ImmutableReactionBuilder<U>({
       ...this.parentParams,
       pipeline: [...this.parentParams.pipeline, this.invokeStep, ...this.steps],
     })
