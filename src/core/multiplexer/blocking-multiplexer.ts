@@ -2,18 +2,18 @@ import { BroadcastingContext, Multiplexer } from '../../interfaces/multiplexer.j
 import { EventSubscriber } from '../../interfaces/event-subscriber.js'
 import { BaseEvent, CommittedEvent } from '../../interfaces/event.js'
 import { EventSequencer } from '../../interfaces/event-sequencer.js'
-import { BlockingSubscriber } from '../subscriber/blocking-subscriber.js'
+import { EventChannel } from '../subscriber/event-channel.js'
 import { Mutex } from '../mutex.js'
 
 export class BlockingMultiplexer implements Multiplexer {
-  private readonly subscribers: BlockingSubscriber[] = []
+  private readonly subscribers: EventChannel[] = []
   private readonly lockMutex = new Mutex()
 
   constructor(private readonly sequencer: EventSequencer) {
   }
 
   subscribe(params?: { name?: string | null }): EventSubscriber {
-    const subscriber = new BlockingSubscriber({ name: params?.name })
+    const subscriber = new EventChannel({ name: params?.name })
     this.subscribers.push(subscriber)
 
     subscriber.onUnsubscribe(() => {
@@ -33,16 +33,22 @@ export class BlockingMultiplexer implements Multiplexer {
       sourceSubscriber: context?.sourceSubscriber,
     })
 
-    const promises = await this.lockMutex.lock(async () => {
-      const otherSubscribers = this.subscribers.filter(subscriber => {
-        return subscriber !== sourceSubscriber
-      })
-
-      return otherSubscribers.map(subscriber => subscriber.push(commitedEvent))
+    await this.lockMutex.lock(async () => {
+      for (const subscriber of this.subscribers) {
+        if (subscriber !== sourceSubscriber) {
+          subscriber.enqueue(commitedEvent)
+        }
+      }
     })
 
-    await Promise.all(promises)
-
     return commitedEvent
+  }
+
+  async waitForConsumers(excludeSubscriber?: EventSubscriber): Promise<void> {
+    const targets = this.subscribers.filter(subscriber => {
+      return subscriber !== excludeSubscriber && subscriber.isConsuming()
+    })
+
+    await Promise.all(targets.map(target => target.waitForDrain()))
   }
 }

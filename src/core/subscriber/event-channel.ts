@@ -9,7 +9,7 @@ export interface BlockingSubscriberOptions {
   name?: string | null
 }
 
-export class BlockingSubscriber implements HotEventSubscriber {
+export class EventChannel implements HotEventSubscriber {
   private eventQueue = new LinkedList<CommittedEvent>()
   private readonly streamDeferrer = new DefaultDeferrer()
   private readonly drainDeferrer = new DefaultDeferrer()
@@ -18,6 +18,7 @@ export class BlockingSubscriber implements HotEventSubscriber {
   private readonly _name: string | null
   private isTerminationRequested = false
   private isTerminated = false
+  private _isConsuming = false
 
   constructor(options?: BlockingSubscriberOptions) {
     this._name = options?.name ?? null
@@ -27,17 +28,26 @@ export class BlockingSubscriber implements HotEventSubscriber {
     return this._name
   }
 
-  async push(event: CommittedEvent): Promise<void> {
-    if (this.isTerminated || this.isTerminationRequested) return
+  isConsuming(): boolean {
+    return this._isConsuming
+  }
 
-    if (this.eventQueue.size > 0 || this.drainDeferrer.isWaiting()) {
-      await this.drainDeferrer.sleep()
-    }
+  setConsuming(consuming: boolean) {
+    this._isConsuming = consuming
+  }
 
+  enqueue(event: CommittedEvent): void {
     if (this.isTerminated || this.isTerminationRequested) return
 
     this.eventQueue.insertLast(event)
     this.streamDeferrer.wakeUpNext()
+  }
+
+  async waitForDrain(): Promise<void> {
+    if (this.isTerminated || this.isTerminationRequested) return
+    if (this.eventQueue.size === 0) return
+
+    await this.drainDeferrer.sleep()
   }
 
   async* streamEvents() {
@@ -61,10 +71,6 @@ export class BlockingSubscriber implements HotEventSubscriber {
         await this.streamDeferrer.sleep()
       }
     }
-  }
-
-  isFull(): boolean {
-    return false
   }
 
   unsubscribe({ drain = true }: { drain?: boolean } = {}): CommittedEvent[] {

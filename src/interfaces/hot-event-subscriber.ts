@@ -3,9 +3,13 @@ import { EventSubscriber } from './event-subscriber.js'
 import { Disposer } from './cancellation-token.js'
 
 export interface HotEventSubscriber extends EventSubscriber {
-  push(event: CommittedEvent): Promise<void>
+  enqueue(event: CommittedEvent): void
 
-  isFull(): boolean
+  isConsuming(): boolean
+
+  setConsuming(consuming: boolean): void
+
+  waitForDrain(): Promise<void>
 
   onDrain(callback: () => void): Disposer
 }

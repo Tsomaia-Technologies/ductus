@@ -1,4 +1,4 @@
-import { DuctusMultiplexer } from '../core/ductus-multiplexer.js'
+import { DuctusMultiplexer } from '../../../moxite/research/ductus-multiplexer.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 
 jest.mock('../utils/crypto-utils.js', () => ({
