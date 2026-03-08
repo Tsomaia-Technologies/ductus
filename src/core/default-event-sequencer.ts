@@ -24,7 +24,7 @@ export class DefaultEventSequencer implements EventSequencer {
       const commitedEvent = this.commitEvent(event, context)
 
       if (this.ledger) {
-        await this.ledger.appendEvent(commitedEvent as unknown as CommittedEvent)
+        await this.ledger.appendEvent(commitedEvent)
       }
 
       this.lastSequenceNumber = commitedEvent.sequenceNumber
