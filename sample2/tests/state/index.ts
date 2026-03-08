@@ -158,5 +158,6 @@ const Flow = Ductus.flow<State>()
 
 runTests({
   flow: Flow,
-  dir: 'state'
+  dir: 'state',
+  overflowStrategy: 'block',
 }).catch(console.error)
