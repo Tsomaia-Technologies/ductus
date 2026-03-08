@@ -26,8 +26,8 @@ export class ImmutableSkillBuilder<T = unknown> implements SkillBuilder<T> {
     })
   }
 
-  output<O extends Schema>(schema: O) {
-    return this.clone<Infer<O>>({ outputSchema: schema })
+  output<U extends Schema>(schema: U) {
+    return this.clone<Infer<U>>({ outputSchema: schema })
   }
 
   [BUILD](): SkillEntity {

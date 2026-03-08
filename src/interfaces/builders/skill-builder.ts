@@ -8,5 +8,5 @@ export interface SkillBuilder<T = unknown> extends Buildable<SkillEntity> {
 
   input(schema: Schema, template?: string): SkillBuilder<T>
 
-  output<TOutput extends Schema>(schema: TOutput): SkillBuilder<Infer<TOutput>>
+  output<U extends Schema>(schema: U): SkillBuilder<Infer<U>>
 }

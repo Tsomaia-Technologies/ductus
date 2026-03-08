@@ -5,10 +5,10 @@ import { Schema } from '../schema.js'
 import { AgentBuilder } from './agent-builder.js'
 import { SkillBuilder } from './skill-builder.js'
 
-export interface InvokeBuildStep<T extends Schema = any, U extends Schema = any> {
+export interface InvokeBuildStep<T = any> {
   type: 'invoke'
   agent: AgentBuilder
-  skill: SkillBuilder<T, U>
+  skill: SkillBuilder<T>
 }
 
 export interface CaseBuildStep {
@@ -53,18 +53,13 @@ export interface ReactionBuilder<T = any> extends Buildable<ReactionEntity> {
 
   when(...events: EventDefinition[]): ReactionBuilder<T>
 
-  invoke<TInput, TOutput>(
-    agent: AgentBuilder,
-    skill: SkillBuilder<TInput, TOutput>,
-  ): InvokeCursorBuilder<TOutput>
+  invoke<U>(agent: AgentBuilder, skill: SkillBuilder<U>): InvokeCursorBuilder<U>
 
   emit(event: BaseEventDefinition<string, T>): ReactionBuilder<T>
 
   map<U>(transform: (input: T, context: PipelineContext) => U): ReactionBuilder<U>
 
-  assert(
-    validate: (data: T, context: PipelineContext) => void,
-  ): ReactionBuilder<T>
+  assert(validate: (data: T, context: PipelineContext) => void): ReactionBuilder<T>
 
   error<U>(transform: (error: unknown, context: PipelineContext) => U): ReactionBuilder<T | U>
 }

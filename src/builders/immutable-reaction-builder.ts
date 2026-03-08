@@ -18,7 +18,7 @@ interface ReactionBuilderParams {
   readonly pipeline: PipelineBuildStep[]
 }
 
-export class ImmutableReactionBuilder<T = any> implements ReactionBuilder<T> {
+export class ImmutableReactionBuilder<T = unknown> implements ReactionBuilder<T> {
   private params: ReactionBuilderParams
 
   constructor(params?: ReactionBuilderParams) {
@@ -39,11 +39,8 @@ export class ImmutableReactionBuilder<T = any> implements ReactionBuilder<T> {
     })
   }
 
-  invoke<TInput, TOutput>(
-    agent: AgentBuilder,
-    skill: SkillBuilder<TInput, TOutput>,
-  ): InvokeCursorBuilder<TOutput> {
-    return new ImmutableInvokeCursorBuilder<TOutput>(this.params, {
+  invoke<U>(agent: AgentBuilder, skill: SkillBuilder<U>): InvokeCursorBuilder<U> {
+    return new ImmutableInvokeCursorBuilder<U>(this.params, {
       type: 'invoke',
       agent,
       skill,
@@ -57,7 +54,7 @@ export class ImmutableReactionBuilder<T = any> implements ReactionBuilder<T> {
   }
 
   map<U>(transform: (input: T, context: PipelineContext) => U): ReactionBuilder<U> {
-    return this.clone({
+    return this.clone<U>({
       pipeline: [...this.params.pipeline, { type: 'map', transform }],
     })
   }
@@ -109,17 +106,17 @@ export class ImmutableReactionBuilder<T = any> implements ReactionBuilder<T> {
     }
   }
 
-  private clone<TOutput>(
+  private clone<U>(
     params: Partial<ReactionBuilderParams>,
-  ): ReactionBuilder<TOutput> {
+  ): ReactionBuilder<U> {
     const Constructor = this.constructor as new (
       params: ReactionBuilderParams,
-    ) => ReactionBuilder<TOutput>
+    ) => ReactionBuilder<U>
     return new Constructor({ ...this.params, ...params })
   }
 }
 
-class ImmutableInvokeCursorBuilder<T = any>
+class ImmutableInvokeCursorBuilder<T = unknown>
   implements InvokeCursorBuilder<T> {
   constructor(
     private readonly parentParams: ReactionBuilderParams,
@@ -144,10 +141,7 @@ class ImmutableInvokeCursorBuilder<T = any>
     return this.escape().when(...events)
   }
 
-  invoke<TInput, TOutput>(
-    agent: AgentBuilder,
-    skill: SkillBuilder<TInput, TOutput>,
-  ): InvokeCursorBuilder<TOutput> {
+  invoke<U>(agent: AgentBuilder, skill: SkillBuilder<U>): InvokeCursorBuilder<U> {
     return this.escape().invoke(agent, skill)
   }
 
