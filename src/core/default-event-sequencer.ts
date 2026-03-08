@@ -7,25 +7,20 @@ import { Mutex } from './mutex.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { DefaultEventListener } from './default-event-listener.js'
 
-export interface DefaultEventSequencerOptions {
-  ledger: EventLedger
-  initialHash?: string
-}
-
 export class DefaultEventSequencer implements EventSequencer {
-  private readonly ledger: EventLedger
   private readonly lockMutex = new Mutex()
   private readonly commitListener = new DefaultEventListener<CommittedEvent>()
-  private lastHash: string
+  private lastHash: string = getInitialEventHash()
   private lastSequenceNumber = 0
+  private isHydrated = false
 
-  constructor(options: DefaultEventSequencerOptions) {
-    this.ledger = options.ledger
-    this.lastHash = options?.initialHash ?? getInitialEventHash()
+  constructor(private readonly ledger: EventLedger) {
   }
 
   async commit(event: BaseEvent, context?: CommitContext): Promise<CommittedEvent> {
     return await this.lockMutex.lock(async () => {
+      await this.ensureHydrated()
+
       const commitedEvent = this.commitEvent(event, context)
 
       if (this.ledger) {
@@ -42,6 +37,18 @@ export class DefaultEventSequencer implements EventSequencer {
 
   onCommit(callback: (event: CommittedEvent) => void): () => void {
     return this.commitListener.on(callback)
+  }
+
+  private async ensureHydrated() {
+    if (this.isHydrated) return
+    const lastEvent = await this.ledger.readLastEvent()
+
+    if (lastEvent) {
+      this.lastHash = lastEvent.hash
+      this.lastSequenceNumber = lastEvent.sequenceNumber
+    }
+
+    this.isHydrated = true
   }
 
   private commitEvent(event: BaseEvent, context?: CommitContext): DeeplyReadonly<CommittedEvent> {
