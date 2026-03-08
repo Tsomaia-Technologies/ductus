@@ -48,32 +48,32 @@ export type PipelineBuildStep =
   | PipelineBuildAction
   | CaseBuildStep
 
-export interface ReactionBuilder<U = any> extends Buildable<ReactionEntity> {
-  name(name: string): ReactionBuilder< U>
+export interface ReactionBuilder<T = any> extends Buildable<ReactionEntity> {
+  name(name: string): ReactionBuilder< T>
 
-  when(...events: EventDefinition[]): ReactionBuilder<U>
+  when(...events: EventDefinition[]): ReactionBuilder<T>
 
   invoke<TInput, TOutput>(
     agent: AgentBuilder,
     skill: SkillBuilder<TInput, TOutput>,
   ): InvokeCursorBuilder<TOutput>
 
-  emit(event: BaseEventDefinition<string, U>): ReactionBuilder<U>
+  emit(event: BaseEventDefinition<string, T>): ReactionBuilder<T>
 
-  map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<O>
+  map<U>(transform: (input: T, context: PipelineContext) => U): ReactionBuilder<U>
 
   assert(
-    validate: (data: U, context: PipelineContext) => void,
-  ): ReactionBuilder<U>
+    validate: (data: T, context: PipelineContext) => void,
+  ): ReactionBuilder<T>
 
-  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U | O>
+  error<U>(transform: (error: unknown, context: PipelineContext) => U): ReactionBuilder<T | U>
 }
 
 /**
  * Cursor builder returned by .invoke() — provides .case() for branching
  * and escape methods to return to the main reaction builder.
  */
-export interface InvokeCursorBuilder<U>
-  extends ReactionBuilder<U> {
-  case(schema: Schema, action: PipelineBuildAction): InvokeCursorBuilder<U>
+export interface InvokeCursorBuilder<T>
+  extends ReactionBuilder<T> {
+  case(schema: Schema, action: PipelineBuildAction): InvokeCursorBuilder<T>
 }
