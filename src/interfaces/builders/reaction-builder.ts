@@ -1,5 +1,5 @@
 import { Buildable } from './__internal__.js'
-import { PipelineAction, ReactionEntity } from '../entities/reaction-entity.js'
+import { PipelineAction, PipelineContext, ReactionEntity } from '../entities/reaction-entity.js'
 import { EventDefinition, Infer } from '../event.js'
 import { Schema } from '../schema.js'
 import { AgentBuilder } from './agent-builder.js'
@@ -18,6 +18,12 @@ export interface ReactionBuilder<T = any, U = any> extends Buildable<ReactionEnt
   emit(event: EventDefinition): ReactionBuilder<T, U>
 
   map<O>(transform: (input: U) => O): ReactionBuilder<U, O>
+
+  assert(
+    validate: (error: unknown, context: PipelineContext) => void,
+  ): ReactionBuilder<T, U>
+
+  error<O>(transform: (error: unknown) => O): ReactionBuilder<U, O>
 }
 
 /**

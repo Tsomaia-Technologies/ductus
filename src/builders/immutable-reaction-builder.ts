@@ -1,6 +1,12 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
 import { InvokeCursorBuilder, ReactionBuilder } from '../interfaces/builders/reaction-builder.js'
-import { InvokeStep, PipelineAction, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
+import {
+  InvokeStep,
+  PipelineAction,
+  PipelineContext,
+  PipelineStep,
+  ReactionEntity,
+} from '../interfaces/entities/reaction-entity.js'
 import { EventDefinition } from '../interfaces/event.js'
 import { Schema } from '../interfaces/schema.js'
 import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
@@ -54,6 +60,20 @@ export class ImmutableReactionBuilder<T = any, U = any>
   map<O>(transform: (input: U) => O): ReactionBuilder<U, O> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'map', transform }],
+    })
+  }
+
+  assert(
+    validate: (error: unknown, context: PipelineContext) => void,
+  ): ReactionBuilder<T, U> {
+    return this.clone({
+      pipeline: [...this.params.pipeline, { type: 'assert', validate }],
+    })
+  }
+
+  error<O>(transform: (error: unknown) => O): ReactionBuilder<U, O> {
+    return this.clone({
+      pipeline: [...this.params.pipeline, { type: 'error', transform }],
     })
   }
 
@@ -117,6 +137,16 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
 
   map<O>(transform: (input: U) => O): ReactionBuilder<U, O> {
     return this.escape().map(transform)
+  }
+
+  assert(
+    validate: (error: unknown, context: PipelineContext) => void,
+  ): ReactionBuilder<T, U> {
+    return this.escape().assert(validate)
+  }
+
+  error<O>(transform: (error: unknown) => O): ReactionBuilder<U, O> {
+    return this.escape().error(transform)
   }
 
   [BUILD](): ReactionEntity {
