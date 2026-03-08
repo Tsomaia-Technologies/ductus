@@ -1,4 +1,4 @@
-import { CommittedEvent, EventDefinition } from '../event.js'
+import { BaseEventDefinition, CommittedEvent, EventDefinition } from '../event.js'
 import { Schema } from '../schema.js'
 import { AgentEntity } from './agent-entity.js'
 import { SkillEntity } from './skill-entity.js'
@@ -23,7 +23,7 @@ export interface CaseStep {
 
 export interface EmitStep {
   type: 'emit'
-  event: EventDefinition
+  event: BaseEventDefinition
 }
 
 export interface MapStep<T = any, U = any> {

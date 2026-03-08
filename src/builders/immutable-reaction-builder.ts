@@ -7,7 +7,7 @@ import {
   ReactionBuilder,
 } from '../interfaces/builders/reaction-builder.js'
 import { PipelineAction, PipelineContext, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
-import { EventDefinition, EventPayloadShape } from '../interfaces/event.js'
+import { BaseEventDefinition, EventDefinition, EventPayloadShape } from '../interfaces/event.js'
 import { Schema } from '../interfaces/schema.js'
 import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
@@ -52,7 +52,7 @@ export class ImmutableReactionBuilder<T = any, U = any>
   }
 
   emit(
-    event: EventDefinition<string, U extends EventPayloadShape ? U : never>,
+    event: BaseEventDefinition<string, U extends EventPayloadShape ? U : never>,
   ) {
     return this.clone<T, U>({
       pipeline: [...this.params.pipeline, { type: 'emit', event }],
@@ -140,7 +140,7 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
   }
 
   emit(
-    event: EventDefinition<string, U extends EventPayloadShape ? U : never>,
+    event: BaseEventDefinition<string, U extends EventPayloadShape ? U : never>,
   ) {
     return this.escape().emit(event)
   }

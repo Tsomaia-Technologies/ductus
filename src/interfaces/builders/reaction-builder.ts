@@ -19,7 +19,7 @@ export interface CaseBuildStep {
 
 export interface EmitBuildStep {
   type: 'emit'
-  event: EventDefinition
+  event: BaseEventDefinition
 }
 
 export interface MapBuildStep<T = any, U = any> {
