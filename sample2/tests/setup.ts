@@ -1,9 +1,17 @@
-import Ductus, { FlowBuilder, JsonlLedger, NodeLedgerFileAdapter, NodeSystemAdapter, TemplateRenderer } from 'ductus'
+import Ductus, {
+  FailFirstMultiplexer,
+  FlowBuilder,
+  JsonlLedger,
+  NodeLedgerFileAdapter,
+  NodeSystemAdapter,
+  TemplateRenderer,
+} from 'ductus'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import { render } from '@tsomaiatech/moxite'
 import { BlockingMultiplexer } from '../../src/core/multiplexer/blocking-multiplexer.js'
 import { DefaultEventSequencer } from '../../src/core/default-event-sequencer.js'
+import { EventSequencer } from '../../src/interfaces/event-sequencer.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -22,14 +30,34 @@ export interface TestRunnerOptions<TState> {
   overflowStrategy?: 'fail' | 'block' | 'throttle'
 }
 
-export async function runTests<TState>(params: TestRunnerOptions<TState>) {
+function createMultiplexer<TState>(params: TestRunnerOptions<TState> & {
+  sequencer: EventSequencer
+}) {
   const {
-    flow,
-    dir,
-    bufferLimit,
+    bufferLimit = 100,
     bufferTimeoutMs,
     overflowStrategy = 'fail',
+    sequencer,
   } = params
+
+  switch (overflowStrategy) {
+    case 'block':
+      return new BlockingMultiplexer(sequencer)
+
+    case 'fail':
+      return new FailFirstMultiplexer({
+        maxQueueSize: bufferLimit,
+        sequencer,
+      })
+
+    case 'throttle':
+    default:
+      throw new Error(`Unsupported overflowStrategy: ${overflowStrategy}`)
+  }
+}
+
+export async function runTests<TState>(params: TestRunnerOptions<TState>) {
+  const { flow, dir } = params
   const system = new NodeSystemAdapter({ defaultCwd: __dirname })
   const fileAdapter = new NodeLedgerFileAdapter()
   const ledger = new JsonlLedger({
@@ -37,7 +65,10 @@ export async function runTests<TState>(params: TestRunnerOptions<TState>) {
     ledgerFileAbsolutePath: system.resolveAbsolutePath(dir, 'ledger.jsonl'),
   })
   const sequencer = new DefaultEventSequencer(ledger)
-  const multiplexer = new BlockingMultiplexer(sequencer)
+  const multiplexer = createMultiplexer({
+    ...params,
+    sequencer,
+  })
   const kernel = Ductus.kernel({
     flow,
     multiplexer,
