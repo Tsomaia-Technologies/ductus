@@ -2,8 +2,6 @@ import { CommittedEvent, EventDefinition } from '../event.js'
 import { Schema } from '../schema.js'
 import { AgentEntity } from './agent-entity.js'
 import { SkillEntity } from './skill-entity.js'
-import { AgentBuilder } from '../builders/agent-builder.js'
-import { SkillBuilder } from '../builders/skill-builder.js'
 
 export interface PipelineContext {
   agent?: AgentEntity
@@ -11,10 +9,10 @@ export interface PipelineContext {
   triggerEvent: CommittedEvent
 }
 
-export interface InvokeStep<T extends Schema = any, U extends Schema = any> {
+export interface InvokeStep {
   type: 'invoke'
-  agent: AgentBuilder
-  skill: SkillBuilder<T, U>
+  agent: string
+  skill: string
 }
 
 export interface CaseStep {

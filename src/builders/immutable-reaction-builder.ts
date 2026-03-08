@@ -1,12 +1,12 @@
 import { BUILD } from '../interfaces/builders/__internal__.js'
-import { InvokeCursorBuilder, ReactionBuilder } from '../interfaces/builders/reaction-builder.js'
 import {
-  InvokeStep,
-  PipelineAction,
-  PipelineContext,
-  PipelineStep,
-  ReactionEntity,
-} from '../interfaces/entities/reaction-entity.js'
+  InvokeBuildStep,
+  InvokeCursorBuilder,
+  PipelineBuildAction,
+  PipelineBuildStep,
+  ReactionBuilder,
+} from '../interfaces/builders/reaction-builder.js'
+import { PipelineAction, PipelineContext, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
 import { EventDefinition } from '../interfaces/event.js'
 import { Schema } from '../interfaces/schema.js'
 import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
@@ -15,7 +15,7 @@ import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
 interface ReactionBuilderParams {
   name?: string
   readonly triggers: Array<EventDefinition>
-  readonly pipeline: PipelineStep[]
+  readonly pipeline: PipelineBuildStep[]
 }
 
 export class ImmutableReactionBuilder<T = any, U = any>
@@ -82,10 +82,31 @@ export class ImmutableReactionBuilder<T = any, U = any>
       throw new Error('Reaction requires at least one event in .when()')
     }
 
+    const buildAction = (action: PipelineBuildAction): PipelineAction => {
+      if (action.type === 'invoke') {
+        return {
+          type: 'invoke',
+          agent: action.agent.getName(),
+          skill: action.skill.getName(),
+        }
+      }
+
+      return action
+    }
+
     return {
       name: this.params.name ?? null,
       triggers: this.params.triggers.map(event => event.type),
-      pipeline: [...this.params.pipeline],
+      pipeline: this.params.pipeline.map((step) => {
+        if (step.type === 'case') {
+          return {
+            ...step,
+            then: buildAction(step.then),
+          }
+        }
+
+        return buildAction(step)
+      }),
     }
   }
 
@@ -103,8 +124,8 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
   implements InvokeCursorBuilder<T, U> {
   constructor(
     private readonly parentParams: ReactionBuilderParams,
-    private readonly invokeStep: InvokeStep,
-    private readonly cases: PipelineStep[] = [],
+    private readonly invokeStep: InvokeBuildStep,
+    private readonly cases: PipelineBuildStep[] = [],
   ) {
   }
 
@@ -112,7 +133,7 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
     return this.escape().name(name)
   }
 
-  case(schema: Schema, action: PipelineAction): InvokeCursorBuilder<T, U> {
+  case(schema: Schema, action: PipelineBuildAction): InvokeCursorBuilder<T, U> {
     return new ImmutableInvokeCursorBuilder<T, U>(
       this.parentParams,
       this.invokeStep,

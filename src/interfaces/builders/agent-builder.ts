@@ -19,6 +19,8 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
    */
   readonly skills: Record<string, SkillRef>
 
+  getName(): string
+
   name(name: string): this
 
   role(role: string): this
