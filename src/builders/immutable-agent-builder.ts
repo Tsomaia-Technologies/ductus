@@ -70,14 +70,6 @@ export class ImmutableAgentBuilder implements AgentBuilder {
     return this.clone({ name })
   }
 
-  getName() {
-    if (!this.params.name) {
-      throw new Error('The agent does not have a name defined')
-    }
-
-    return this.params.name
-  }
-
   role(role: string): this {
     return this.clone({ role })
   }

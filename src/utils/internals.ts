@@ -1,7 +1,7 @@
 import * as zod from 'zod/v3'
 import { OutputEventStream } from '../interfaces/output-event-stream.js'
 import {
-  BaseEvent,
+  BaseEvent, CommittedEvent,
   EventDefinition,
   EventPayloadShape,
   IntentDefinition,
@@ -9,11 +9,13 @@ import {
   Volatility,
 } from '../interfaces/event.js'
 import { isSchemaType } from './schema-utils.js'
-import { PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
+import { PipelineContext, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
 import { AgentDispatcher } from '../core/agent-dispatcher.js'
 import { EventGenerator } from '../interfaces/event-generator.js'
 import { EventProcessor } from '../interfaces/event-processor.js'
 import { ProcessorEntity } from '../interfaces/entities/processor-entity.js'
+import { AgentEntity } from '../interfaces/entities/agent-entity.js'
+import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 
 export function createEventFactory<TType extends string, TPayloadShape extends EventPayloadShape>(params: {
   type: TType
@@ -85,6 +87,7 @@ export function createReactionAdapter<TState>(
           reaction.pipeline,
           event.payload,
           dispatcher,
+          event,
         )
       }
     },
@@ -95,32 +98,64 @@ async function* executePipeline<TState>(
   steps: PipelineStep[],
   input: unknown,
   dispatcher: AgentDispatcher<TState>,
+  triggerEvent: CommittedEvent,
 ): OutputEventStream {
   let lastInvokeResult: unknown = input
+  let lastAgent: AgentEntity | undefined
+  let lastSkill: SkillEntity | undefined
 
-  for (const step of steps) {
-    switch (step.type) {
-      case 'emit':
-        yield step.event(lastInvokeResult as Parameters<typeof step.event>[0])
-        break
+  const buildContext = (): PipelineContext => ({
+    agent: lastAgent,
+    skill: lastSkill,
+    triggerEvent,
+  })
 
-      case 'invoke':
-        lastInvokeResult = await dispatcher.invokeAndParse(
-          step.agent,
-          step.skill,
-          lastInvokeResult,
-        )
-        break
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i]
 
-      case 'case':
-        try {
-          const matched = step.schema.parse(lastInvokeResult)
-          yield* executePipeline([step.then], matched, dispatcher)
-        } catch {
-          // Schema didn't match — skip this case branch
-        }
-        break
+    if (step.type === 'error') continue
+
+    try {
+      switch (step.type) {
+        case 'emit':
+          yield step.event(lastInvokeResult as Parameters<typeof step.event>[0])
+          break
+
+        case 'invoke':
+          lastAgent = step.agent
+          lastSkill = step.skill
+          lastInvokeResult = await dispatcher.invokeAndParse(
+            step.agent.name,
+            step.skill.name,
+            lastInvokeResult,
+          )
+          break
+
+        case 'case':
+          try {
+            const matched = step.schema.parse(lastInvokeResult)
+            yield* executePipeline([step.then], matched, dispatcher, triggerEvent)
+          } catch {
+            // Schema didn't match — skip this case branch
+          }
+          break
+
+        case 'map':
+          lastInvokeResult = step.transform(lastInvokeResult, buildContext())
+          break
+
+        case 'assert':
+          await step.validate(lastInvokeResult, buildContext())
+          break
+      }
+    } catch (error) {
+      const errorStep = steps.slice(i + 1).find(step => step.type === 'error')
+
+      if (errorStep) {
+        yield errorStep.transform(error, buildContext())
+      }
+
+      return
     }
   }
 }
-

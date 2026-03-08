@@ -10,34 +10,23 @@ interface SkillBuilderParams {
   outputSchema?: Schema
 }
 
-export class ImmutableSkillBuilder implements SkillBuilder {
-  private params: SkillBuilderParams
-
-  constructor() {
-    this.params = {}
+export class ImmutableSkillBuilder<T = any, U = any> implements SkillBuilder<T, U> {
+  constructor(private readonly params: SkillBuilderParams = {}) {
   }
 
-  name(name: string): this {
+  name(name: string) {
     return this.clone({ name })
   }
 
-  getName() {
-    if (!this.params.name) {
-      throw new Error('The agent does not have a name defined')
-    }
-
-    return this.params.name
-  }
-
-  input(schema: Schema, template?: string): this {
-    return this.clone({
+  input<I extends Schema>(schema: Schema, template?: string) {
+    return this.clone<I, U>({
       inputSchema: schema,
       inputTemplate: template,
     })
   }
 
-  output(schema: Schema): this {
-    return this.clone({ outputSchema: schema })
+  output<O extends Schema>(schema: Schema) {
+    return this.clone<T, O>({ outputSchema: schema })
   }
 
   [BUILD](): SkillEntity {
@@ -55,10 +44,9 @@ export class ImmutableSkillBuilder implements SkillBuilder {
     }
   }
 
-  private clone(params: Partial<SkillBuilderParams>): this {
-    const Constructor = this.constructor as new () => this
-    const clone = new Constructor()
-    clone.params = { ...this.params, ...params }
+  private clone<T, U>(params: Partial<SkillBuilderParams>): SkillBuilder<T, U> {
+    const Constructor = this.constructor as new (params?: SkillBuilderParams) => ImmutableSkillBuilder<T, U>
+    const clone = new Constructor({ ...this.params, ...params })
     return clone
   }
 }

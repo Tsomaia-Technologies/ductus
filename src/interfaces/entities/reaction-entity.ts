@@ -11,8 +11,8 @@ export interface PipelineContext {
 
 export interface InvokeStep {
   type: 'invoke'
-  agent: string
-  skill: string
+  agent: AgentEntity
+  skill: SkillEntity
 }
 
 export interface CaseStep {
@@ -33,12 +33,12 @@ export interface MapStep<T = any, U = any> {
 
 export interface AssertStep<T = any> {
   type: 'assert'
-  validate: (data: T, context: PipelineContext) => void
+  validate: (data: T, context: PipelineContext) => void | Promise<void>
 }
 
-export interface ErrorStep {
+export interface ErrorStep<U = any> {
   type: 'error'
-  transform: (error: unknown, context: PipelineContext) => void
+  transform: (error: unknown, context: PipelineContext) => U
 }
 
 export type PipelineAction =
