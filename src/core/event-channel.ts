@@ -1,9 +1,9 @@
-import { CommittedEvent } from '../../interfaces/event.js'
-import { LinkedList } from '../linked-list.js'
-import { Disposer } from '../../interfaces/cancellation-token.js'
-import { DefaultEventListener } from '../default-event-listener.js'
-import { DefaultDeferrer } from '../default-deferrer.js'
-import { EventSubscriber } from '../../interfaces/event-subscriber.js'
+import { CommittedEvent } from '../interfaces/event.js'
+import { LinkedList } from './linked-list.js'
+import { Disposer } from '../interfaces/cancellation-token.js'
+import { DefaultEventListener } from './default-event-listener.js'
+import { DefaultDeferrer } from './default-deferrer.js'
+import { EventSubscriber } from '../interfaces/event-subscriber.js'
 
 export interface BlockingSubscriberOptions {
   name?: string | null

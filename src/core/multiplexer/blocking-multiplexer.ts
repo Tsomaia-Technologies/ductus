@@ -2,7 +2,7 @@ import { BroadcastingContext, Multiplexer } from '../../interfaces/multiplexer.j
 import { EventSubscriber } from '../../interfaces/event-subscriber.js'
 import { BaseEvent, CommittedEvent } from '../../interfaces/event.js'
 import { EventSequencer } from '../../interfaces/event-sequencer.js'
-import { EventChannel } from '../subscriber/event-channel.js'
+import { EventChannel } from '../event-channel.js'
 import { Mutex } from '../mutex.js'
 
 export class BlockingMultiplexer implements Multiplexer {
