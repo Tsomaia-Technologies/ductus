@@ -3,8 +3,8 @@ import { BroadcastingContext, Multiplexer } from '../interfaces/multiplexer.js'
 import { CancellationToken, Disposer } from '../interfaces/cancellation-token.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { clearTimeout } from 'node:timers'
-import { HotEventSubscriber } from '../interfaces/hot-event-subscriber.js'
 import { EventSequencer } from '../interfaces/event-sequencer.js'
+import { EventSubscriber } from '../interfaces/event-subscriber.js'
 
 export class IntentProcessor {
   constructor(
@@ -14,16 +14,16 @@ export class IntentProcessor {
   }
 
   async process(params: {
+    sourceSubscriber?: EventSubscriber
     eventsIn: AsyncIterable<CommittedEvent>
     processor: (eventsIn: AsyncIterable<CommittedEvent>) => AsyncIterable<BaseEvent | undefined>
-    sourceSubscriber?: HotEventSubscriber
     canceller: CancellationToken
   }): Promise<void> {
     const {
       eventsIn,
       processor,
       canceller,
-      sourceSubscriber
+      sourceSubscriber,
     } = params
     let nextValue: unknown | undefined = undefined
     let trigger = {
@@ -52,9 +52,9 @@ export class IntentProcessor {
       if (!event) continue
 
       const context: BroadcastingContext = {
+        sourceSubscriber,
         causationId: trigger.current?.eventId,
         correlationId: trigger.current?.correlationId ?? trigger.current?.eventId,
-        sourceSubscriber,
       }
 
       if (event.volatility !== 'intent') {

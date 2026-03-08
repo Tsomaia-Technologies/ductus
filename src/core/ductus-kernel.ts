@@ -12,10 +12,12 @@ import { DeeplyReadonly } from '../interfaces/helpers.js'
 import { BootEvent } from './events.js'
 import { IntentProcessor } from './intent-processor.js'
 import { HotEventSubscriber } from '../interfaces/hot-event-subscriber.js'
+import { EventSequencer } from '../interfaces/event-sequencer.js'
 
 export interface KernelOptions<TState> {
   injector: Injector,
   multiplexer: Multiplexer
+  sequencer: EventSequencer
   processors: EventProcessor<TState>[]
   ledger: EventLedger
   store: StoreAdapter<TState>
@@ -25,6 +27,7 @@ export interface KernelOptions<TState> {
 
 export class DuctusKernel<TState> {
   private readonly multiplexer: Multiplexer
+  private readonly sequencer: EventSequencer
   private readonly processors: EventProcessor<TState>[] = []
   private readonly ledger: EventLedger
   private readonly store: StoreAdapter<TState>
@@ -47,6 +50,7 @@ export class DuctusKernel<TState> {
   constructor(options: KernelOptions<TState>) {
     const {
       multiplexer,
+      sequencer,
       processors,
       ledger,
       store,
@@ -55,6 +59,7 @@ export class DuctusKernel<TState> {
       shouldTakeSnapshot,
     } = options
     this.multiplexer = multiplexer
+    this.sequencer = sequencer
     this.processors = processors
     this.ledger = ledger
     this.store = store
@@ -62,7 +67,10 @@ export class DuctusKernel<TState> {
     this.use = injector
     this.canceller = new Canceller({ base: canceller })
     this.shouldTakeSnapshot = shouldTakeSnapshot
-    this.intentProcessor = new IntentProcessor(this.multiplexer)
+    this.intentProcessor = new IntentProcessor(
+      this.multiplexer,
+      this.sequencer,
+    )
   }
 
   async boot() {
@@ -137,7 +145,7 @@ export class DuctusKernel<TState> {
   }
 
   private mountStore() {
-    this.unsubscribeCommit = this.multiplexer.onCommit(commitedEvent => {
+    this.unsubscribeCommit = this.sequencer.onCommit(({ event: commitedEvent }) => {
       // Record Graph Node for Cycle Detection
       this.causationGraph.set(commitedEvent.eventId, {
         type: commitedEvent.type,

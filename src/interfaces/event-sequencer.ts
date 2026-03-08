@@ -8,10 +8,10 @@ export interface EventSequencer {
 }
 
 export interface CommitContext {
+  sourceSubscriber?: EventSubscriber
   causationId?: string,
   correlationId?: string,
   chainId?: string
-  sourceSubscriber?: EventSubscriber
 }
 
 export interface CommitEventData {
