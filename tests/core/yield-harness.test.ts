@@ -30,7 +30,6 @@ class TranslatorProcessor implements EventProcessor {
             if (incoming.type === "TICK") {
                 yield createAgentToken({
                     payload: { token: "beep" },
-                    authorId: "translator"
                 });
             }
         }
