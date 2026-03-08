@@ -11,9 +11,7 @@ import {
 import { isSchemaType } from './schema-utils.js'
 import { PipelineContext, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
 import { AgentDispatcher } from '../core/agent-dispatcher.js'
-import { EventGenerator } from '../interfaces/event-generator.js'
 import { EventProcessor } from '../interfaces/event-processor.js'
-import { ProcessorEntity } from '../interfaces/entities/processor-entity.js'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 
