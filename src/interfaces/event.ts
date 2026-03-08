@@ -46,6 +46,6 @@ export type CommittedEvent<T extends BaseEvent = BaseEvent> = T & {
   sequenceNumber: number
   prevHash: string
   isCommited: true
-  hash: string
   timestamp: number
+  hash: string
 }

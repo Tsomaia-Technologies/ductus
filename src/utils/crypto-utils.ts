@@ -18,14 +18,17 @@ export function getEventHash(event: Omit<CommittedEvent, 'hash'>) {
   const hashPayload = JSON.stringify({
     type: event.type,
     payload: event.payload,
-    timestamp: event.timestamp,
     volatility: event.volatility,
 
     eventId: event.eventId,
+    causationId: event.causationId,
+    correlationId: event.correlationId,
+    chainId: event.chainId,
     sequenceNumber: event.sequenceNumber,
     prevHash: event.prevHash,
     isCommited: event.isCommited,
-  })
+    timestamp: event.timestamp,
+  } as CommittedEvent)
 
   return sha256(hashPayload)
 }
