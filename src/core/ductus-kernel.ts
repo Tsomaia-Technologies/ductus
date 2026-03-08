@@ -44,6 +44,7 @@ export class DuctusKernel<TState> {
   private readonly shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
   private readonly causationGraph = new Map<string, { type: string, causationId?: string, sequence: number }>()
   private isShuttingDown = false
+  private isShutDownStarted = false
   private readonly intentProcessor: IntentProcessor
 
   constructor(options: KernelOptions<TState>) {
@@ -92,6 +93,14 @@ export class DuctusKernel<TState> {
 
   async shutdown(options?: { force?: boolean }) {
     const force = options?.force ?? false
+
+    if (this.isShutDownStarted) {
+      if (force) this.canceller.cancel({ force: true })
+      return
+    }
+
+    this.isShutDownStarted = true
+
     if (force) {
       this.canceller.cancel({ force })
     } else {
