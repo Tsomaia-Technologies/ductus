@@ -24,6 +24,10 @@ export class EventChannel implements EventSubscriber {
     this._name = options?.name ?? null
   }
 
+  get queueSize(): number {
+    return this.eventQueue.size
+  }
+
   name(): string | null {
     return this._name
   }
