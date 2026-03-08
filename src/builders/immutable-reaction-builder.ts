@@ -13,7 +13,7 @@ import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
 import { SkillBuilder } from '../interfaces/builders/skill-builder.js'
 
 interface ReactionBuilderParams {
-  name?: string
+  readonly name?: string
   readonly triggers: Array<EventDefinition>
   readonly pipeline: PipelineBuildStep[]
 }
