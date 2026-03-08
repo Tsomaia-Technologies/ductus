@@ -150,7 +150,7 @@ async function* executePipeline<TState>(
       const errorStep = steps.slice(i + 1).find(step => step.type === 'error')
 
       if (errorStep) {
-        yield errorStep.transform(error, buildContext())
+        lastInvokeResult = errorStep.transform(error, buildContext())
       }
 
       return
