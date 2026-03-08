@@ -1,6 +1,6 @@
 import { Buildable } from './__internal__.js'
 import { PipelineContext, ReactionEntity } from '../entities/reaction-entity.js'
-import { EventDefinition, EventPayloadShape } from '../event.js'
+import { BaseEventDefinition, EventDefinition, EventPayloadShape } from '../event.js'
 import { Schema } from '../schema.js'
 import { AgentBuilder } from './agent-builder.js'
 import { SkillBuilder } from './skill-builder.js'
@@ -59,7 +59,7 @@ export interface ReactionBuilder<T = any, U = any> extends Buildable<ReactionEnt
   ): InvokeCursorBuilder<TInput, TOutput>
 
   emit(
-    event: EventDefinition<string, U extends EventPayloadShape ? U : never>,
+    event: BaseEventDefinition<string, U extends EventPayloadShape ? U : never>,
   ): ReactionBuilder<T, U>
 
   map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<U, O>
