@@ -19,14 +19,14 @@ export class ImmutableSkillBuilder<T = any, U = any> implements SkillBuilder<T, 
     return this.clone({ name })
   }
 
-  input<I extends Schema>(schema: Schema, template?: string) {
+  input<I extends Schema>(schema: I, template?: string) {
     return this.clone<I, U>({
       inputSchema: schema,
       inputTemplate: template,
     })
   }
 
-  output<O extends Schema>(schema: Schema) {
+  output<O extends Schema>(schema: O) {
     return this.clone<T, Infer<O>>({ outputSchema: schema })
   }
 

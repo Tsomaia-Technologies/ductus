@@ -51,9 +51,7 @@ export class ImmutableReactionBuilder<T = any, U = any>
     })
   }
 
-  emit(
-    event: BaseEventDefinition<string, U extends EventPayloadShape ? U : never>,
-  ) {
+  emit(event: BaseEventDefinition<string, U>) {
     return this.clone<T, U>({
       pipeline: [...this.params.pipeline, { type: 'emit', event }],
     })
@@ -73,7 +71,7 @@ export class ImmutableReactionBuilder<T = any, U = any>
     })
   }
 
-  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, O> {
+  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, U | O> {
     return this.clone({
       pipeline: [...this.params.pipeline, { type: 'error', transform }],
     })
@@ -139,9 +137,7 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
     return this.with({ type: 'case', schema, then: action })
   }
 
-  emit(
-    event: BaseEventDefinition<string, U extends EventPayloadShape ? U : never>,
-  ) {
+  emit(event: BaseEventDefinition<string, U>) {
     return this.escape().emit(event)
   }
 
@@ -166,7 +162,7 @@ class ImmutableInvokeCursorBuilder<T = any, U = any>
     return this.escape().assert(validate)
   }
 
-  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, O> {
+  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, U | O> {
     return this.escape().error(transform)
   }
 

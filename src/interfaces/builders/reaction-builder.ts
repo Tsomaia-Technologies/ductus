@@ -58,9 +58,7 @@ export interface ReactionBuilder<T = any, U = any> extends Buildable<ReactionEnt
     skill: SkillBuilder<TInput, TOutput>,
   ): InvokeCursorBuilder<TInput, TOutput>
 
-  emit(
-    event: BaseEventDefinition<string, U extends EventPayloadShape ? U : never>,
-  ): ReactionBuilder<T, U>
+  emit(event: BaseEventDefinition<string, U>): ReactionBuilder<T, U>
 
   map<O>(transform: (input: U, context: PipelineContext) => O): ReactionBuilder<U, O>
 
@@ -68,7 +66,7 @@ export interface ReactionBuilder<T = any, U = any> extends Buildable<ReactionEnt
     validate: (data: U, context: PipelineContext) => void,
   ): ReactionBuilder<T, U>
 
-  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, O>
+  error<O>(transform: (error: unknown, context: PipelineContext) => O): ReactionBuilder<U, U | O>
 }
 
 /**
