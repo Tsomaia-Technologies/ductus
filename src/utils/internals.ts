@@ -13,6 +13,7 @@ import { PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-en
 import { AgentDispatcher } from '../core/agent-dispatcher.js'
 import { EventGenerator } from '../interfaces/event-generator.js'
 import { EventProcessor } from '../interfaces/event-processor.js'
+import { ProcessorEntity } from '../interfaces/entities/processor-entity.js'
 
 export function createEventFactory<TType extends string, TPayloadShape extends EventPayloadShape>(params: {
   type: TType
@@ -70,29 +71,24 @@ export function createIntentFactory<TType extends string, TPayload>(
   return createIntent as unknown as IntentDefinition<TType, TPayload>
 }
 
-export function createProcessorAdapter<TState>(
-  generator: EventGenerator<TState>,
-): EventProcessor<TState> {
-  return {
-    process: generator,
-  }
-}
-
 export function createReactionAdapter<TState>(
   reaction: ReactionEntity,
   dispatcher: AgentDispatcher<TState>,
 ): EventProcessor<TState> {
-  return createProcessorAdapter(async function* (events) {
-    for await (const event of events) {
-      if (!reaction.triggers.includes(event.type)) continue
+  return {
+    name: reaction.name,
+    process: async function* (events) {
+      for await (const event of events) {
+        if (!reaction.triggers.includes(event.type)) continue
 
-      yield* executePipeline(
-        reaction.pipeline,
-        event.payload,
-        dispatcher,
-      )
-    }
-  })
+        yield* executePipeline(
+          reaction.pipeline,
+          event.payload,
+          dispatcher,
+        )
+      }
+    },
+  }
 }
 
 async function* executePipeline<TState>(

@@ -50,8 +50,9 @@ export class DuctusMultiplexer implements Multiplexer {
     })
   }
 
-  subscribe(): BufferedSubscriber {
+  subscribe({ name }: { name?: string | null }): BufferedSubscriber {
     const bridge = new BufferedSubscriber({
+      name,
       bufferLimit: this.bufferLimit,
       bufferTimeoutMs: this.bufferTimeoutMs,
       overflowStrategy: this.overflowStrategy,
@@ -79,6 +80,10 @@ export class DuctusMultiplexer implements Multiplexer {
 
   private async commitEventUnderLock(event: BaseEvent, context?: BroadcastingContext) {
     return await this.lockMutex.lock(async () => {
+      if (this.overflowStrategy === 'block') {
+
+      }
+
       const commited = this.commitEvent(event, context)
       if (this.ledger) {
         await this.ledger.appendEvent(commited as unknown as CommittedEvent)
@@ -105,7 +110,7 @@ export class DuctusMultiplexer implements Multiplexer {
       // Deliver inline, fully await before returning to caller.
       // Producer is held here until every bridge has accepted the event.
       // No chain needed — sequential by nature since broadcast() itself is awaited.
-      await this.waitForSubscriberCapacity()
+      await this.waitForSubscriberCapacity(context?.sourceSubscriber)
       const commitedEvent = await this.commitEventUnderLock(event, context)
       await this.invokeBridges(commitedEvent, context?.sourceSubscriber)
       return
@@ -181,9 +186,9 @@ export class DuctusMultiplexer implements Multiplexer {
       others.forEach((b, i) => console.log(`[INVOKE] other[${i}] queueSize=${(b as any).eventQueue.size}`))
 
       await Promise.all(others.map(bridge => bridge.push(event)))
-
-      this.deliveryPromiseChain = this.deliveryPromiseChain
-        .then(() => sourceSubscriber.push(event))
+      //
+      // this.deliveryPromiseChain = this.deliveryPromiseChain
+      //   .then(() => sourceSubscriber.push(event))
       return
     }
 
@@ -191,11 +196,15 @@ export class DuctusMultiplexer implements Multiplexer {
   }
 
   private async waitForSubscriberCapacity(sourceSubscriber?: HotEventSubscriber): Promise<void> {
-    const fullSubscribers = this.bridges.filter(b => b.isFull() && b !== sourceSubscriber)
+    const fullSubscribers = this.bridges.filter(s => s.isFull() && s !== sourceSubscriber)
 
     if (fullSubscribers.length === 0) {
       return
     }
+
+    fullSubscribers.forEach((s, i) => {
+      console.log(`[WAIT] full subscriber[${i}] - ${s.name()} — is it sourceSubscriber (${sourceSubscriber?.name()})? ${s === sourceSubscriber}`)
+    })
 
     console.log(`<==================================== FULL: ${this.bridges.filter(b => b.isFull()).length}/${this.bridges.length}  ====================================>`)
 

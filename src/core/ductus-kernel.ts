@@ -201,7 +201,9 @@ export class DuctusKernel<TState> {
 
   private async mountProcessor(processor: EventProcessor<TState>) {
     try {
-      const subscriber = this.multiplexer.subscribe()
+      const subscriber = this.multiplexer.subscribe({
+        name: processor.name ? `${processor.name} Subscriber` : null,
+      })
       this.subscribers.push(subscriber)
 
       const process = (eventsIn: AsyncIterable<CommittedEvent>) => processor.process(
@@ -210,12 +212,12 @@ export class DuctusKernel<TState> {
         this.use,
       )
 
-      await this.intentProcessor.process(
-        subscriber.streamEvents(),
-        process,
-        this.canceller,
-        subscriber as HotEventSubscriber,
-      )
+      await this.intentProcessor.process({
+        eventsIn: subscriber.streamEvents(),
+        processor: process,
+        sourceSubscriber: subscriber as HotEventSubscriber,
+        canceller: this.canceller,
+      })
     } catch (e: any) {
       console.error(`Ductus Framework Error: Processor threw an unhandled exception. Initiating Kernel shutdown.`, e)
       this.shutdown({ force: true }).catch(err => console.error(`Ductus Framework Error during forced shutdown:`, err))

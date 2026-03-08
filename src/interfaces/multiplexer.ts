@@ -15,8 +15,10 @@ export interface BroadcastingContext {
 export interface Multiplexer {
   /**
    * Creates subscriber to the commited events and returns it
+   *
+   * @param params.name Optional name to identify subscriber (e.g. during debugging)
    */
-  subscribe(): EventSubscriber
+  subscribe(params?: { name?: string | null }): EventSubscriber
 
   /**
    * Registers synchronous listener that is invoked when event is commited and is about to be broadcasted,

@@ -28,7 +28,7 @@ export class ImmutableProcessorBuilder<TState> implements ProcessorBuilder<TStat
 
     return {
       name: this.params.name ?? null,
-      processor: this.params.generator,
+      process: this.params.generator,
     }
   }
 

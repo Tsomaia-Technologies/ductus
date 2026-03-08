@@ -2,6 +2,11 @@ import { CommittedEvent } from './event.js'
 
 export interface EventSubscriber {
   /**
+   * Returns the name of the subscriber
+   */
+  name(): string | null
+
+  /**
    * Returns asynchronous stream of events
    */
   streamEvents(): AsyncIterable<CommittedEvent>

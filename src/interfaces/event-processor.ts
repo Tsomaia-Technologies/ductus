@@ -1,11 +1,3 @@
-import { CommittedEvent } from './event.js'
-import { OutputEventStream } from './output-event-stream.js'
-import { Injector } from './event-generator.js'
+import { ProcessorEntity } from './entities/processor-entity.js'
 
-export interface EventProcessor<TState> {
-  process(
-    events: AsyncIterable<CommittedEvent>,
-    getState: () => TState,
-    injector: Injector,
-  ): OutputEventStream;
-}
+export type EventProcessor<TState> = ProcessorEntity<TState>

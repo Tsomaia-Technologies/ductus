@@ -36,7 +36,7 @@ const FastDone = Ductus.event('FastDone', {
 })
 
 // A: emits 20 events, records time between emissions to show backpressure effect
-const ProducerProcessor = Ductus.processor(async function* (events) {
+const ProducerProcessor = Ductus.processor('ProducerProcessor', async function* (events) {
   for await (const event of events) {
     if (Ductus.BootEvent.is(event)) {
       console.log('[A] Starting emission...')
@@ -54,13 +54,13 @@ const ProducerProcessor = Ductus.processor(async function* (events) {
       }
 
       console.log('[A] Done emitting')
-      // break
+      break
     }
   }
 })
 
 // B: fast consumer — instantly drains its own buffer, unaffected by C's backpressure
-const FastConsumer = Ductus.processor(async function* (events) {
+const FastConsumer = Ductus.processor('FastConsumer', async function* (events) {
   let count = 0
   for await (const event of events) {
     if (WorkItem.is(event)) {
@@ -72,7 +72,7 @@ const FastConsumer = Ductus.processor(async function* (events) {
 })
 
 // C: slow consumer — 100ms per event, causes backpressure on producer
-const SlowConsumer = Ductus.processor(async function* (events) {
+const SlowConsumer = Ductus.processor('SlowConsumer', async function* (events) {
   let count = 0
   for await (const event of events) {
     if (WorkItem.is(event)) {
@@ -85,7 +85,7 @@ const SlowConsumer = Ductus.processor(async function* (events) {
 })
 
 // D: auditor — verifies all events processed, nothing dropped
-const AuditorProcessor = Ductus.processor(async function* (events) {
+const AuditorProcessor = Ductus.processor('AuditorProcessor', async function* (events) {
   const fastDone = new Set<number>()
   const slowDone = new Set<number>()
   const startTime = Date.now()

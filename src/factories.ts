@@ -14,7 +14,7 @@ import { DuctusKernel } from './core/ductus-kernel.js'
 import { ImmutableRulesetBuilder } from './builders/immutable-ruleset-builder.js'
 import { AgentDispatcher, TemplateRenderer } from './core/agent-dispatcher.js'
 import { DuctusStore } from './core/ductus-store.js'
-import { createProcessorAdapter, createReactionAdapter } from './utils/internals.js'
+import { createReactionAdapter } from './utils/internals.js'
 import { AgentBuilder } from './interfaces/builders/agent-builder.js'
 import { FlowBuilder } from './interfaces/builders/flow-builder.js'
 import { ModelBuilder } from './interfaces/builders/model-builder.js'
@@ -176,24 +176,18 @@ export function kernel<TState>(
     fileAdapter,
   })
 
-  const processors = flow.processors.map(entity => {
-    return createProcessorAdapter(entity.processor)
-  })
-
   const reactionProcessors = flow.reactions.map(entity => {
     return createReactionAdapter(entity, dispatcher)
   })
 
-  const kernel = new DuctusKernel({
+  return new DuctusKernel({
     multiplexer,
-    processors: [...processors, ...reactionProcessors],
+    processors: [...flow.processors, ...reactionProcessors],
     ledger,
     store,
     injector: use,
     canceller,
   })
-
-  return kernel
 }
 
 export default {

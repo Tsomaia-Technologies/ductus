@@ -9,12 +9,18 @@ export class IntentProcessor {
   constructor(private readonly multiplexer: Multiplexer) {
   }
 
-  async process(
-    eventsIn: AsyncIterable<CommittedEvent>,
-    processor: (eventsIn: AsyncIterable<CommittedEvent>) => AsyncIterable<BaseEvent | undefined>,
-    canceller: CancellationToken,
-    sourceSubscriber?: HotEventSubscriber,
-  ): Promise<void> {
+  async process(params: {
+    eventsIn: AsyncIterable<CommittedEvent>
+    processor: (eventsIn: AsyncIterable<CommittedEvent>) => AsyncIterable<BaseEvent | undefined>
+    sourceSubscriber?: HotEventSubscriber
+    canceller: CancellationToken
+  }): Promise<void> {
+    const {
+      eventsIn,
+      processor,
+      canceller,
+      sourceSubscriber
+    } = params
     let nextValue: unknown | undefined = undefined
     let trigger = {
       current: undefined as CommittedEvent | undefined,
@@ -34,7 +40,11 @@ export class IntentProcessor {
 
       const { value: event, done } = await eventsOut.next(nextValue)
 
-      if (done) break
+      if (done) {
+        console.log(`[INTENT] generator done, unsubscribing ${sourceSubscriber?.name()}`)
+        sourceSubscriber?.unsubscribe({ drain: false })
+        break
+      }
       if (!event) continue
 
       const context: BroadcastingContext = {

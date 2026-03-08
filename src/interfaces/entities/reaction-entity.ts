@@ -27,6 +27,7 @@ export type PipelineStep =
   | CaseStep
 
 export interface ReactionEntity {
+  name?: string | null
   triggers: string[]
   pipeline: PipelineStep[]
 }

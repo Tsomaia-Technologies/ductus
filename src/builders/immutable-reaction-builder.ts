@@ -47,6 +47,7 @@ export class ImmutableReactionBuilder implements ReactionBuilder {
     }
 
     return {
+      name: this.params.name ?? null,
       triggers: this.params.triggers.map(event => event.type),
       pipeline: [...this.params.pipeline],
     }
