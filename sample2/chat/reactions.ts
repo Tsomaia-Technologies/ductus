@@ -10,3 +10,6 @@ export const ExploreReaction = Ductus.reaction('ExploreReaction')
   .map(input => ({
     hello: 'string'
   }))
+  .emit(Ductus.event('ev', {
+    hello: Ductus.string(),
+  }))

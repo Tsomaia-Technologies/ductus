@@ -68,7 +68,7 @@ export class ImmutableReactionBuilder<T = unknown> implements ReactionBuilder<T>
   }
 
   error<U>(transform: (error: unknown, context: PipelineContext) => U): ReactionBuilder<T | U> {
-    return this.clone({
+    return this.clone<T | U>({
       pipeline: [...this.params.pipeline, { type: 'error', transform }],
     })
   }
@@ -125,7 +125,7 @@ class ImmutableInvokeCursorBuilder<T = unknown>
   ) {
   }
 
-  name(name: string): ReactionBuilder {
+  name(name: string): ReactionBuilder<T> {
     return this.escape().name(name)
   }
 
@@ -137,7 +137,7 @@ class ImmutableInvokeCursorBuilder<T = unknown>
     return this.escape().emit(event)
   }
 
-  when(...events: EventDefinition[]): ReactionBuilder {
+  when(...events: EventDefinition[]): ReactionBuilder<T> {
     return this.escape().when(...events)
   }
 
