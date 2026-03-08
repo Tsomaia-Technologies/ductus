@@ -3,6 +3,7 @@ import { CommittedEvent } from '../../interfaces/event.js'
 import { LinkedList } from '../linked-list.js'
 import { Disposer } from '../../interfaces/cancellation-token.js'
 import { DefaultEventListener } from '../default-event-listener.js'
+import { DefaultDeferrer } from '../default-deferrer.js'
 
 export interface BlockingSubscriberOptions {
   name?: string | null
@@ -10,10 +11,12 @@ export interface BlockingSubscriberOptions {
 
 export class BlockingSubscriber implements HotEventSubscriber {
   private eventQueue = new LinkedList<CommittedEvent>()
-  private streamWakeUpQueue = new LinkedList<() => void>()
+  private readonly streamDeferrer = new DefaultDeferrer()
+  private readonly drainDeferrer = new DefaultDeferrer()
   private readonly drainListener = new DefaultEventListener()
   private readonly terminationListener = new DefaultEventListener()
   private readonly _name: string | null
+  private isTerminationRequested = false
   private isTerminated = false
 
   constructor(options?: BlockingSubscriberOptions) {
@@ -25,26 +28,37 @@ export class BlockingSubscriber implements HotEventSubscriber {
   }
 
   async push(event: CommittedEvent): Promise<void> {
-    if (this.isTerminated) return
+    if (this.isTerminated || this.isTerminationRequested) return
 
-    await this.drainListener.wait()
+    if (this.eventQueue.size > 0 || this.drainDeferrer.isWaiting()) {
+      await this.drainDeferrer.sleep()
+    }
+
+    if (this.isTerminated || this.isTerminationRequested) return
+
     this.eventQueue.insertLast(event)
-    this.streamWakeUpQueue.removeFirst()?.()
+    this.streamDeferrer.wakeUpNext()
   }
 
   async* streamEvents() {
     while (true) {
+      if (this.isTerminated) return
+
       const event = this.eventQueue.removeFirst()
 
       if (event) {
         yield event
+
+        if (this.isTerminationRequested && this.eventQueue.size === 0) {
+          this.close()
+          return
+        }
+
+        this.drainDeferrer.wakeUpNext()
         this.drainListener.trigger()
       } else {
-        if (this.isTerminated) return
-
-        await new Promise<void>(resolve => {
-          this.streamWakeUpQueue.insertLast(resolve)
-        })
+        if (this.isTerminationRequested) return
+        await this.streamDeferrer.sleep()
       }
     }
   }
@@ -54,24 +68,17 @@ export class BlockingSubscriber implements HotEventSubscriber {
   }
 
   unsubscribe({ drain = true }: { drain?: boolean } = {}): CommittedEvent[] {
-    let wakeUp: (() => void) | null = null
+    this.isTerminationRequested = true
 
-    this.isTerminated = true
-
-    while (wakeUp = this.streamWakeUpQueue.removeFirst()) {
-      wakeUp()
+    if (drain && this.eventQueue.size > 0) {
+      this.streamDeferrer.wakeUpNext()
+      return []
     }
 
-    let discardedEvents: CommittedEvent[] = []
+    const events = Array.from(this.eventQueue)
+    this.close()
 
-    if (!drain) {
-      discardedEvents = this.eventQueue.toArray()
-      this.eventQueue.clear()
-    }
-
-    this.terminationListener.trigger()
-
-    return discardedEvents
+    return events
   }
 
   onDrain(callback: () => void): Disposer {
@@ -80,5 +87,13 @@ export class BlockingSubscriber implements HotEventSubscriber {
 
   onUnsubscribe(callback: () => void) {
     this.terminationListener.on(callback)
+  }
+
+  private close() {
+    this.isTerminated = true
+    this.streamDeferrer.wakeUpAll()
+    this.drainDeferrer.wakeUpAll()
+    this.terminationListener.trigger()
+    this.eventQueue.clear()
   }
 }
