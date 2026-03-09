@@ -51,6 +51,10 @@ import { BootEvent } from './core/events.js'
 import { EventSequencer } from './interfaces/event-sequencer.js'
 import { ImmutableFixedClusterBuilder } from './builders/immutable-fixed-cluster-builder.js'
 import { ImmutableDynamicClusterBuilder } from './builders/immutable-dynamic-cluster-builder.js'
+import { DynamicClusterBuilder } from './interfaces/builders/dynamic-cluster-builder.js'
+import { FixedClusterBuilder } from './interfaces/builders/fixed-cluster-builder.js'
+import { ConcurrentProcessorBuilder } from './interfaces/builders/concurrent-processor-builder.js'
+import { ImmutableConcurrentProcessorBuilder } from './builders/immutable-concurrent-processor-builder.js'
 
 export interface CreateKernelOptions<TState> {
   flow: FlowBuilder<TState>
@@ -143,13 +147,18 @@ function container(): ContainerBuilder {
   return new ImmutableContainerBuilder()
 }
 
-function fixedCluster<TState>(name?: string | null): ProcessorBuilder<TState> {
+function fixedCluster<TState>(name?: string | null): FixedClusterBuilder<TState> {
   return new ImmutableFixedClusterBuilder<TState>()
     .name(name ?? null)
 }
 
-function dynamicCluster<TState>(name?: string | null): ProcessorBuilder<TState> {
+function dynamicCluster<TState>(name?: string | null): DynamicClusterBuilder<TState> {
   return new ImmutableDynamicClusterBuilder<TState>()
+    .name(name ?? null)
+}
+
+function concurrent<TState>(name?: string | null): ConcurrentProcessorBuilder<TState> {
+  return new ImmutableConcurrentProcessorBuilder<TState>()
     .name(name ?? null)
 }
 
@@ -229,6 +238,7 @@ export default {
 
   fixedCluster,
   dynamicCluster,
+  concurrent,
 
   kernel,
 

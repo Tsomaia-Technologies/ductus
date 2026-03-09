@@ -1,27 +1,27 @@
-// src/core/coordination/createConcurrentProcessor.ts
-
 import { EventGenerator } from '../../interfaces/event-generator.js'
 import { BaseEvent, CommittedEvent } from '../../interfaces/event.js'
 import { WorkerChannel } from './worker-channel.js'
 import { Semaphore } from '../semaphore.js'
 
-export interface ConcurrentHandlerContext<TState> {
-  event: CommittedEvent,
+export interface ConcurrentHandlerContext<TState, TEvent extends CommittedEvent = CommittedEvent> {
+  event: TEvent,
   emit: (event: BaseEvent) => void
   getState: () => TState
   use: <T>(token: string) => T
 }
 
-export interface ConcurrentProcessorOptions<TState> {
+export type ConcurrentHandler<TState, TEvent extends CommittedEvent = CommittedEvent> = (
+  context: ConcurrentHandlerContext<TState, TEvent>,
+) => Promise<void>
+
+export interface ConcurrentProcessorOptions<TState, TEvent extends CommittedEvent = CommittedEvent> {
   filter?: (event: CommittedEvent) => boolean
-  handle: (
-    context: ConcurrentHandlerContext<TState>,
-  ) => Promise<void>
   maxConcurrency: number
+  handle: ConcurrentHandler<TState, TEvent>
 }
 
-export function createConcurrentProcessor<TState>(
-  options: ConcurrentProcessorOptions<TState>,
+export function createConcurrentProcessor<TState, TEvent extends CommittedEvent = CommittedEvent>(
+  options: ConcurrentProcessorOptions<TState, TEvent>,
 ): EventGenerator<TState> {
   const { filter, handle, maxConcurrency } = options
 
@@ -56,7 +56,7 @@ export function createConcurrentProcessor<TState>(
             const emit = (e: BaseEvent) => {
               if (!output.isClosed()) output.push(e)
             }
-            await handle({ event, emit, getState, use })
+            await handle({ event: event as TEvent, emit, getState, use })
           } catch (err) {
             if (!firstError) firstError = err
             output.close()

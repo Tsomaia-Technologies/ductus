@@ -36,13 +36,9 @@ export interface IntentDefinition<TType extends string = string, TPayload = any>
   readonly payloadSchema: TPayload
 }
 
-export type EventDefinition<T extends BaseEvent = BaseEvent> =
+export type EventDefinition<TType extends string = string, TPayload = any> =
   | (TPayload extends EventPayloadShape ? BroadcastableEventDefinition<TType, TPayload> : never)
   | IntentDefinition<TType>
-
-export type InferredEvent<T> = T extends EventDefinition<infer TType, infer TPayload>
-  ? BaseEvent<TType, TPayload>
-  : never
 
 export type CommittedEvent<T extends BaseEvent = BaseEvent> = T & {
   eventId: string

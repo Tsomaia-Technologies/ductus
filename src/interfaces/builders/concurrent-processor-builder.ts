@@ -1,14 +1,25 @@
-import { EventGenerator } from '../event-generator.js'
-import { DistributionStrategy } from '../coordination/distribution-strategy.js'
 import { ProcessorBuilder } from './processor-builder.js'
-import { BaseEvent, EventDefinition, InferredEvent } from '../event.js'
+import { BaseEvent, CommittedEvent, EventDefinition } from '../event.js'
+import { ConcurrentHandler } from '../../core/coordination/createConcurrentProcessor.js'
 
-export interface ConcurrentProcessorBuilder<TState, TEvent = BaseEvent>
-  extends ProcessorBuilder<TState> {
-  name(name: string | null): this
-  when<TType, TPayload>(event: EventDefinition<TType, TPayload>): ConcurrentProcessorBuilder<TState, BaseEvent<>>
-  when<TType, TPayload>(eventOrFilter: EventDefinition | ((event: EventDefinition) => boolean)): ConcurrentProcessorBuilder<TState, BaseEvent<>>
-  maxConcurrency(maxConcurrency: number): this
-  strategy(strategy: DistributionStrategy): this
-  processor(generator: EventGenerator<TState> | ProcessorBuilder<TState>): this
+export interface ConcurrentProcessorBuilder<TState, TEvent extends CommittedEvent = CommittedEvent> {
+  name(name: string | null): ConcurrentProcessorBuilder<TState, TEvent>
+
+  when<TType extends string, TPayload>(
+    event: EventDefinition<TType, TPayload>,
+  ): ConcurrentProcessorBuilder<TState, CommittedEvent<BaseEvent<TType, TPayload>>>
+
+  when<TType extends string, TPayload>(
+    filter: (input: CommittedEvent) => input is CommittedEvent<BaseEvent<TType, TPayload>>,
+  ): ConcurrentProcessorBuilder<TState, CommittedEvent<BaseEvent<TType, TPayload>>>
+
+  when(
+    filter: (input: CommittedEvent) => boolean,
+  ): ConcurrentProcessorBuilder<TState>
+
+  maxConcurrency(maxConcurrency: number): ConcurrentProcessorBuilder<TState, TEvent>
+
+  handler(
+    handler: ConcurrentHandler<TState, TEvent>,
+  ): ConcurrentProcessorBuilder<TState, TEvent>
 }
