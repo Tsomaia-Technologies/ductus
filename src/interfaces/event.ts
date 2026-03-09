@@ -2,6 +2,7 @@ import * as zod from 'zod/v3'
 import { Schema } from './schema.js'
 
 export type Volatility = 'durable' | 'volatile' | 'intent'
+export const EVENT_DEFINITION = Symbol()
 
 export interface BaseEvent<T extends string = string, P = unknown> {
   type: T
@@ -17,6 +18,7 @@ export type Infer<T extends Schema> = zod.input<T>
 export interface BaseEventDefinition<TType extends string = string, TPayload = any> {
   (payload: TPayload): BaseEvent<TType, typeof payload>
 
+  readonly [EVENT_DEFINITION]: true
   readonly is: (event: BaseEventDefinition | BaseEvent) => event is BaseEvent<TType, TPayload>
   readonly type: TType
   readonly volatility: Volatility

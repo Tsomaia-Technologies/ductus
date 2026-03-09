@@ -3,6 +3,7 @@ import { ProcessorEntity } from '../interfaces/entities/processor-entity.js'
 import { ConcurrentProcessorBuilder } from '../interfaces/builders/concurrent-processor-builder.js'
 import { BaseEvent, CommittedEvent, EventDefinition } from '../interfaces/event.js'
 import { ConcurrentHandler, createConcurrentProcessor } from '../core/coordination/createConcurrentProcessor.js'
+import { isEventDefinition } from '../utils/guards.js'
 
 interface ImmutableConcurrentProcessorBuilderParams<TState, TEvent extends CommittedEvent = CommittedEvent> {
   name?: string | null
@@ -39,14 +40,14 @@ export class ImmutableConcurrentProcessorBuilder<TState, TEvent extends Committe
   when(
     eventOrFilter: EventDefinition | ((event: CommittedEvent) => boolean),
   ): ConcurrentProcessorBuilder<TState> {
-    if (typeof eventOrFilter === 'function') {
+    if (isEventDefinition(eventOrFilter)) {
       return this.clone({
-        filter: eventOrFilter as (event: CommittedEvent) => boolean,
+        filter: (eventOrFilter as EventDefinition).is,
       })
     }
 
     return this.clone({
-      filter: (eventOrFilter as EventDefinition).is,
+      filter: eventOrFilter,
     })
   }
 
@@ -55,7 +56,7 @@ export class ImmutableConcurrentProcessorBuilder<TState, TEvent extends Committe
   }
 
   [BUILD](): ProcessorEntity<TState> {
-    if (!this.params.maxConcurrency) throw new Error('Processor requires a maxConcurrency value.')
+    if (!this.params.maxConcurrency) throw new Error('Processor requires a maxConcurrency >= 1.')
     if (!this.params.handler) throw new Error('Processor requires a handler function.')
 
     return {

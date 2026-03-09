@@ -1,7 +1,7 @@
 import * as zod from 'zod/v3'
 import { OutputEventStream } from '../interfaces/output-event-stream.js'
 import {
-  BaseEvent, CommittedEvent,
+  BaseEvent, CommittedEvent, EVENT_DEFINITION,
   EventDefinition,
   EventPayloadShape,
   IntentDefinition,
@@ -39,6 +39,7 @@ export function createEventFactory<TType extends string, TPayloadShape extends E
   }
 
   Object.assign(createEvent, {
+    [EVENT_DEFINITION]: true,
     type,
     volatility,
     payloadSchema,
@@ -63,6 +64,7 @@ export function createIntentFactory<TType extends string, TPayload>(
   }
 
   Object.assign(createIntent, {
+    [EVENT_DEFINITION]: true,
     type,
     volatility: 'intent',
     is: (event: EventDefinition | BaseEvent): event is TEvent => event.type === type,

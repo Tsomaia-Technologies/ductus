@@ -1,4 +1,4 @@
-import { CommittedEvent } from '../interfaces/event.js'
+import { CommittedEvent, EVENT_DEFINITION, EventDefinition } from '../interfaces/event.js'
 import { getEventHash } from './crypto-utils.js'
 
 export function isObject(input: unknown): input is object {
@@ -16,3 +16,6 @@ export function isCommitedEvent(input: unknown): input is CommittedEvent {
   return event.hash === hash
 }
 
+export function isEventDefinition(input: unknown): input is EventDefinition {
+  return typeof input === 'function' && input.hasOwnProperty(EVENT_DEFINITION)
+}

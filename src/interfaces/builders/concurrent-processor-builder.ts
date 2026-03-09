@@ -1,8 +1,10 @@
-import { ProcessorBuilder } from './processor-builder.js'
 import { BaseEvent, CommittedEvent, EventDefinition } from '../event.js'
 import { ConcurrentHandler } from '../../core/coordination/createConcurrentProcessor.js'
+import { Buildable } from './__internal__.js'
+import { ProcessorEntity } from '../entities/processor-entity.js'
 
-export interface ConcurrentProcessorBuilder<TState, TEvent extends CommittedEvent = CommittedEvent> {
+export interface ConcurrentProcessorBuilder<TState, TEvent extends CommittedEvent = CommittedEvent>
+  extends Buildable<ProcessorEntity<TState>> {
   name(name: string | null): ConcurrentProcessorBuilder<TState, TEvent>
 
   when<TType extends string, TPayload>(
