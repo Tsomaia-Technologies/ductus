@@ -9,5 +9,5 @@ export interface DynamicClusterBuilder<TState> extends ProcessorBuilder<TState> 
   max(value: number): this
   strategy(strategy: DistributionStrategy): this
   scaling(policy: ScalingPolicy): this
-  processor(generator: EventGenerator<TState>): this
+  processor(generator: EventGenerator<TState> | ProcessorBuilder<TState>): this
 }

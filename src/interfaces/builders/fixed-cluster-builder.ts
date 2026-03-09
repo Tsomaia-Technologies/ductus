@@ -6,5 +6,5 @@ export interface FixedClusterBuilder<TState> extends ProcessorBuilder<TState> {
   name(name: string): this
   size(size: number): this
   strategy(strategy: DistributionStrategy): this
-  processor(generator: EventGenerator<TState>): this
+  processor(generator: EventGenerator<TState> | ProcessorBuilder<TState>): this
 }

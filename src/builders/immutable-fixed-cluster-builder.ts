@@ -1,16 +1,17 @@
-import { BUILD } from '../interfaces/builders/__internal__.js'
+import { build, BUILD, isBuildable } from '../interfaces/builders/__internal__.js'
 import { ProcessorEntity } from '../interfaces/entities/processor-entity.js'
 import { EventGenerator } from '../interfaces/event-generator.js'
 import { FixedClusterBuilder } from '../interfaces/builders/fixed-cluster-builder.js'
 import { DistributionStrategy } from '../interfaces/coordination/distribution-strategy.js'
 import { createFixedCluster } from '../core/coordination/createFixedCluster.js'
 import { RoundRobinStrategy } from '../core/coordination/distribution/round-robin-strategy.js'
+import { ProcessorBuilder } from '../interfaces/builders/processor-builder.js'
 
 interface ImmutableFixedClusterBuilderParams<TState> {
   name?: string | null
   size?: number
   strategy?: DistributionStrategy
-  processor?: EventGenerator<TState>
+  processor?: EventGenerator<TState> | ProcessorBuilder<TState>
 }
 
 export class ImmutableFixedClusterBuilder<TState> implements FixedClusterBuilder<TState> {
@@ -45,7 +46,9 @@ export class ImmutableFixedClusterBuilder<TState> implements FixedClusterBuilder
       process: createFixedCluster({
         size: this.params.size,
         strategy: this.params.strategy ?? new RoundRobinStrategy(),
-        processor: this.params.processor,
+        processor: isBuildable(this.params.processor)
+          ? build(this.params.processor).process
+          : this.params.processor,
       }),
     }
   }

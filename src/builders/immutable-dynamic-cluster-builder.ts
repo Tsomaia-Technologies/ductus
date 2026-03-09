@@ -1,4 +1,4 @@
-import { BUILD } from '../interfaces/builders/__internal__.js'
+import { build, BUILD, isBuildable } from '../interfaces/builders/__internal__.js'
 import { ProcessorEntity } from '../interfaces/entities/processor-entity.js'
 import { EventGenerator } from '../interfaces/event-generator.js'
 import { DistributionStrategy } from '../interfaces/coordination/distribution-strategy.js'
@@ -7,6 +7,7 @@ import { RoundRobinStrategy } from '../core/coordination/distribution/round-robi
 import { ScalingPolicy } from '../interfaces/coordination/scaling-policy.js'
 import { DynamicClusterBuilder } from '../interfaces/builders/dynamic-cluster-builder.js'
 import { QueueDepthScalingPolicy } from '../core/coordination/scaling/queue-depth-scaling-policy.js'
+import { ProcessorBuilder } from '../interfaces/builders/processor-builder.js'
 
 interface ImmutableDynamicClusterBuilderParams<TState> {
   name?: string | null
@@ -14,7 +15,7 @@ interface ImmutableDynamicClusterBuilderParams<TState> {
   max?: number
   strategy?: DistributionStrategy
   scaling?: ScalingPolicy
-  processor?: EventGenerator<TState>
+  processor?: EventGenerator<TState> | ProcessorBuilder<TState>
 }
 
 export class ImmutableDynamicClusterBuilder<TState> implements DynamicClusterBuilder<TState> {
@@ -49,18 +50,18 @@ export class ImmutableDynamicClusterBuilder<TState> implements DynamicClusterBui
   }
 
   [BUILD](): ProcessorEntity<TState> {
-    if (!this.params.min) throw new Error('Processor requires a min value.')
-    if (!this.params.max) throw new Error('Processor requires a max value.')
     if (!this.params.processor) throw new Error('Processor requires a processor function.')
 
     return {
       name: this.params.name ?? null,
       process: createDynamicCluster({
-        min: this.params.min,
-        max: this.params.max,
+        min: this.params.min ?? 0,
+        max: this.params.max ?? Infinity,
         strategy: this.params.strategy ?? new RoundRobinStrategy(),
         scaling: this.params.scaling ?? new QueueDepthScalingPolicy(),
-        processor: this.params.processor,
+        processor: isBuildable(this.params.processor)
+          ? build(this.params.processor).process
+          : this.params.processor,
       }),
     }
   }
