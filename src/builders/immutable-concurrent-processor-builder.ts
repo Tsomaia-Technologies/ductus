@@ -56,7 +56,9 @@ export class ImmutableConcurrentProcessorBuilder<TState, TEvent extends Committe
   }
 
   [BUILD](): ProcessorEntity<TState> {
-    if (!this.params.maxConcurrency) throw new Error('Processor requires a maxConcurrency >= 1.')
+    if (this.params.maxConcurrency == null || this.params.maxConcurrency < 1)
+      throw new Error('Processor requires a maxConcurrency >= 1.')
+
     if (!this.params.handler) throw new Error('Processor requires a handler function.')
 
     return {
