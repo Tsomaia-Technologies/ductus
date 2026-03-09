@@ -4,7 +4,7 @@ import { ScalingPolicy } from '../coordination/scaling-policy.js'
 import { ProcessorBuilder } from './processor-builder.js'
 
 export interface DynamicClusterBuilder<TState> extends ProcessorBuilder<TState> {
-  name(name: string): this
+  name(name: string | null): this
   min(value: number): this
   max(value: number): this
   strategy(strategy: DistributionStrategy): this

@@ -13,7 +13,7 @@ export interface ConcurrentHandlerContext<TState> {
 }
 
 export interface ConcurrentProcessorOptions<TState> {
-  filter: (event: CommittedEvent) => boolean
+  filter?: (event: CommittedEvent) => boolean
   handle: (
     context: ConcurrentHandlerContext<TState>,
   ) => Promise<void>
@@ -41,7 +41,7 @@ export function createConcurrentProcessor<TState>(
     const dispatcher = (async () => {
       for await (const event of events) {
         if (output.isClosed()) break
-        if (!filter(event)) continue
+        if (filter && !filter(event)) continue
 
         await semaphore.acquire()
         if (output.isClosed()) {

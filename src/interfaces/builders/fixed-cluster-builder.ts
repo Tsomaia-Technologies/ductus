@@ -3,7 +3,7 @@ import { DistributionStrategy } from '../coordination/distribution-strategy.js'
 import { ProcessorBuilder } from './processor-builder.js'
 
 export interface FixedClusterBuilder<TState> extends ProcessorBuilder<TState> {
-  name(name: string): this
+  name(name: string | null): this
   size(size: number): this
   strategy(strategy: DistributionStrategy): this
   processor(generator: EventGenerator<TState> | ProcessorBuilder<TState>): this
