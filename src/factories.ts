@@ -228,6 +228,9 @@ export default {
 
   container,
 
+  fixedCluster,
+  dynamicCluster,
+
   kernel,
 
   literal,
