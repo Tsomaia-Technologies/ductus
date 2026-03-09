@@ -50,13 +50,14 @@ export class ImmutableDynamicClusterBuilder<TState> implements DynamicClusterBui
   }
 
   [BUILD](): ProcessorEntity<TState> {
+    if (!this.params.max) throw new Error('Processor requires a max value.')
     if (!this.params.processor) throw new Error('Processor requires a processor function.')
 
     return {
       name: this.params.name ?? null,
       process: createDynamicCluster({
-        min: this.params.min ?? 0,
-        max: this.params.max ?? Infinity,
+        min: this.params.min ?? 1,
+        max: this.params.max,
         strategy: this.params.strategy ?? new RoundRobinStrategy(),
         scaling: this.params.scaling ?? new QueueDepthScalingPolicy(),
         processor: isBuildable(this.params.processor)
