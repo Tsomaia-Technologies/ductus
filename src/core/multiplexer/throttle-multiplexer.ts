@@ -13,6 +13,10 @@ export interface ThrottleMultiplexerOptions {
   stallTimeoutMs?: number
 }
 
+// When the system should absorb bursts gracefully and slow down under sustained load
+// rather than crash or serialize. Good for production workloads with variable-latency
+// consumers (LLM calls, network I/O, external APIs) where transient slowness is normal
+// but permanent stalls should still be detectable (via stallTimeoutMs).
 export class ThrottleMultiplexer implements Multiplexer {
   private readonly sequencer: EventSequencer
   private readonly highWaterMark: number

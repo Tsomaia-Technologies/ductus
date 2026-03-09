@@ -5,6 +5,9 @@ import { EventSequencer } from '../../interfaces/event-sequencer.js'
 import { EventChannel } from '../event-channel.js'
 import { Mutex } from '../mutex.js'
 
+// When you need deterministic ordering between producers and consumers:
+// e.g. debugging, tests, pipelines where "event N+1 must not be produced until event N is fully processed by everyone".
+// Also when memory is constrained — zero buffering by design.
 export class BlockingMultiplexer implements Multiplexer {
   private readonly subscribers: EventChannel[] = []
   private readonly lockMutex = new Mutex()

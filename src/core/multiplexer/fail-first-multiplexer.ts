@@ -11,6 +11,10 @@ export interface FailFirstMultiplexerOptions {
   maxQueueSize: number
 }
 
+// When a slow consumer is a bug, not a feature.
+// You want immediate detection, not graceful degradation.
+// Good for CI pipelines, health monitoring, or critical paths
+// where delayed processing is worse than no processing. "Crash loud, don't limp."
 export class FailFirstMultiplexer implements Multiplexer {
   private readonly sequencer: EventSequencer
   private readonly subscribers: EventChannel[] = []
