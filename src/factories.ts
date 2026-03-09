@@ -50,6 +50,8 @@ import {
 } from './utils/schema-utils.js'
 import { BootEvent } from './core/events.js'
 import { EventSequencer } from './interfaces/event-sequencer.js'
+import { ImmutableFixedClusterBuilder } from './builders/immutable-fixed-cluster-builder.js'
+import { ImmutableDynamicClusterBuilder } from './builders/immutable-dynamic-cluster-builder.js'
 
 export interface CreateKernelOptions<TState> {
   flow: FlowBuilder<TState>
@@ -140,6 +142,16 @@ function invoke(agent: AgentBuilder, skill: SkillBuilder): InvokeBuildStep {
 
 function container(): ContainerBuilder {
   return new ImmutableContainerBuilder()
+}
+
+function fixedCluster<TState>(name?: string | null): ProcessorBuilder<TState> {
+  return new ImmutableFixedClusterBuilder<TState>()
+    .name(name ?? null)
+}
+
+function dynamicCluster<TState>(name?: string | null): ProcessorBuilder<TState> {
+  return new ImmutableDynamicClusterBuilder<TState>()
+    .name(name ?? null)
 }
 
 export function kernel<TState>(
