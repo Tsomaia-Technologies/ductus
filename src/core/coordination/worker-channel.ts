@@ -17,6 +17,7 @@ export class WorkerChannel<T> implements AsyncChannel<T> {
   }
 
   close(): void {
+    if (this.closed) return
     this.closed = true
     this.deferrer.wakeUpAll()
   }
