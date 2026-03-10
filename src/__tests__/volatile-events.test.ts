@@ -1,6 +1,7 @@
 import { DefaultEventSequencer } from '../core/default-event-sequencer.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
+import { StoreAdapter } from '../interfaces/store-adapter.js'
 
 jest.mock('../utils/crypto-utils.js', () => ({
   getInitialEventHash: jest.fn().mockReturnValue('GENESIS_HASH'),
@@ -178,5 +179,25 @@ describe('Volatile Event Support in Sequencer', () => {
     expect(e1.sequenceNumber).toBe(1)
     expect(e2.sequenceNumber).toBe(2)
     expect(e2.prevHash).toBe(e1.hash)
+  })
+
+  it('volatile events do not reach store.dispatch (kernel-level guard)', async () => {
+    const mockStore: jest.Mocked<Pick<StoreAdapter<unknown>, 'dispatch'>> = {
+      dispatch: jest.fn(),
+    }
+
+    sequencer.onCommit(({ event }) => {
+      if (event.volatility === 'volatile') return
+      mockStore.dispatch(event)
+    })
+
+    await sequencer.commit(volatileEvent('V1'))
+    expect(mockStore.dispatch).not.toHaveBeenCalled()
+
+    await sequencer.commit(durableEvent('D1'))
+    expect(mockStore.dispatch).toHaveBeenCalledTimes(1)
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'D1' }),
+    )
   })
 })

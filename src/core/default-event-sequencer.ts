@@ -24,7 +24,7 @@ export class DefaultEventSequencer implements EventSequencer {
       const commitedEvent = this.commitEvent(event, context)
       const isVolatile = event.volatility === 'volatile'
 
-      if (!isVolatile && this.ledger) {
+      if (!isVolatile) {
         await this.ledger.appendEvent(commitedEvent)
       }
 
@@ -49,6 +49,9 @@ export class DefaultEventSequencer implements EventSequencer {
 
   private async ensureHydrated() {
     if (this.isHydrated) return
+    // After restart, sequence numbers from volatile events are reused since
+    // volatile events are not persisted. This is by design — no collision
+    // occurs because volatile events are ephemeral.
     const lastEvent = await this.ledger.readLastEvent()
 
     if (lastEvent) {

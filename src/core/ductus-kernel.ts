@@ -173,6 +173,8 @@ export class DuctusKernel<TState> {
         }
       }
 
+      // Volatile events participate in cycle detection because they are broadcast
+      // to processors which may yield events in response.
       if (commitedEvent.volatility === 'volatile') return
 
       const eventsOut = this.store.dispatch(commitedEvent)
