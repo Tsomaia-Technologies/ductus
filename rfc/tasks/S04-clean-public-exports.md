@@ -1,7 +1,7 @@
 # S04 — Clean Up Public Exports
 
 **Phase:** 3 (Integration)
-**Depends on:** S00, S01, S02, S03
+**Depends on:** S00, S01, S02, S02b, S03
 **Blocks:** S05
 
 ---
@@ -92,6 +92,24 @@ Cross-check against the RFC. Every user-facing type introduced by RFC 0001 must 
 
 Verify the `Ductus.*` namespace object no longer includes `adapter`. After S00, this should already be gone, but verify.
 
+### 2.6 Acknowledge `Ductus.transport` namespace gap
+
+RFC Section 8.4 shows `Ductus.transport.anthropic()` and `Ductus.transport.cli()`. RFC Section 17 (Open Question 8) acknowledges "Built-in API transport" as future work. Implementing real API transports (HTTP clients, streaming response parsers, authentication) is out of scope for this structural cleanup batch.
+
+However, the `Ductus.transport` namespace should be established as an empty extension point so the DSL shape exists even before built-in transports are implemented:
+
+```typescript
+// In factories.ts
+const transport = {} as Record<string, unknown>
+
+export default {
+  // ... existing entries ...
+  transport,
+}
+```
+
+This gives users a clear location for future built-in transports and allows documentation to reference `Ductus.transport.*` without it being `undefined`. Add a JSDoc comment explaining that built-in transports are future work and that users should implement `AgentTransport` directly for now.
+
 ---
 
 ## 3. Checks
@@ -127,4 +145,5 @@ Verify the `Ductus.*` namespace object no longer includes `adapter`. After S00, 
 - [ ] `TemplateRenderer` has its own interface file
 - [ ] All RFC 0001 types are importable from the package
 - [ ] Internal implementation details are not publicly exported
+- [ ] `Ductus.transport` namespace exists (empty, with JSDoc explaining future work)
 - [ ] All tests pass

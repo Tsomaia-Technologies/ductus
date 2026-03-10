@@ -2,7 +2,7 @@
 
 **Phase:** 1 (Demolition)
 **Depends on:** Nothing — this is the first task
-**Blocks:** S01, S02, S03
+**Blocks:** S01, S02, S02b, S03
 
 ---
 

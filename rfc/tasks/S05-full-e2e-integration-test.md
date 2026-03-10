@@ -1,7 +1,7 @@
 # S05 — Full Kernel-Booted End-to-End Integration Test
 
 **Phase:** 4 (Verification)
-**Depends on:** S02, S03, S04
+**Depends on:** S02, S02b, S03, S04
 **Blocks:** Nothing
 
 ---
@@ -92,6 +92,13 @@ Add at least these additional scenarios:
 - Define two reactions triggered by different events
 - Verify both agents are invoked through their respective transports
 
+**Test: "Handoff rendering when lifecycle limit is exceeded"**
+- Configure agent with `.maxFailures(1)` and `.handoff({ reason: 'failure', template: ... })`
+- First invocation succeeds
+- Second invocation fails (mock transport returns error)
+- Third invocation should receive handoff context in the system message (template was rendered with event windows)
+- Verify the transport's `send()` call on the third invocation contains the handoff-enriched system message
+
 ### 2.3 Test utilities
 
 Create minimal test utilities if needed:
@@ -106,7 +113,7 @@ Create minimal test utilities if needed:
 - `npx jest` — ALL tests pass, including the new E2E tests
 - The new E2E tests boot a real `DuctusKernel` — NOT just a dispatcher or reaction adapter
 - The tests use `Ductus.kernel()` factory — NOT manual construction of internal classes
-- At least 3 test scenarios cover: happy path with tools, skill retry, and multi-agent flow
+- At least 4 test scenarios cover: happy path with tools, skill retry, multi-agent flow, and handoff rendering
 
 ---
 
@@ -139,5 +146,5 @@ Create minimal test utilities if needed:
 - [ ] Tests verify observation events flow through the multiplexer
 - [ ] Tests verify domain events are committed and state is reduced
 - [ ] Tests verify kernel shutdown closes transports
-- [ ] Tests cover at least: tool loop, skill retry, and multi-agent scenarios
+- [ ] Tests cover at least: tool loop, skill retry, multi-agent, and handoff rendering scenarios
 - [ ] All existing tests still pass

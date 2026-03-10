@@ -1,7 +1,7 @@
 # S03 — Clean Up Flow Registration and Pipeline Integration
 
 **Phase:** 3 (Integration)
-**Depends on:** S01, S02
+**Depends on:** S01, S02, S02b
 **Blocks:** S04
 
 ---
@@ -105,6 +105,10 @@ const agentTuples = flow.agents
 
 No more `adapter`, no more `flowTransport`, no more `model!` non-null assertion. The tuple is now `AgentTuple` (the clean version from S01).
 
+**Important:** S02 changed `AgentDispatcherOptions` — it may now require different constructor arguments since the dispatcher delegates to `AgentPromptComposer` and `AgentLifecycleManager`. Verify that `kernel()` passes the correct options to the `AgentDispatcher` constructor. If S02 made the dispatcher construct its internal components from the same options (which it should — the facade pattern means the constructor takes the same or similar inputs), then `kernel()` needs no additional changes beyond tuple cleanup. If S02 changed the options shape, update `kernel()` accordingly.
+
+Read the post-S02 `AgentDispatcherOptions` before implementing this section. Do not assume it is unchanged.
+
 ### 2.5 Remove dead V1 branch from `executePipeline` in `src/utils/internals.ts`
 
 The `invoke` case currently branches:
@@ -178,6 +182,7 @@ After all changes, verify no file imports deleted types (`AdapterBuilder`, `Adap
 - [ ] `FlowAgentRegistration` has only `agent`, `model?`, `transport?`
 - [ ] `FlowBuilder.agent()` has one clean signature
 - [ ] `kernel()` builds clean tuples matching the new `AgentTuple`
+- [ ] `kernel()` passes correct options to `AgentDispatcher` constructor (accounting for S02's changes)
 - [ ] `executePipeline` has no V1 branch
 - [ ] No dead imports
 - [ ] All tests pass

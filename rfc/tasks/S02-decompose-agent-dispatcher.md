@@ -2,7 +2,7 @@
 
 **Phase:** 2 (Architecture)
 **Depends on:** S00, S01
-**Blocks:** S03, S04, S05
+**Blocks:** S02b, S03, S04, S05
 
 ---
 

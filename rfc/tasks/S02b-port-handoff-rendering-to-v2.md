@@ -52,7 +52,7 @@ Key differences from V1 to V2:
 import { AgentEntity, HandoffReason } from '../interfaces/entities/agent-entity.js'
 import { CommittedEvent } from '../interfaces/event.js'
 import { TurnRecord } from '../interfaces/agent-lifecycle.js'
-import { TemplateRenderer } from '../interfaces/template-renderer.js'
+import { TemplateRenderer } from './agent-dispatcher.js' // S04 will move this to '../interfaces/template-renderer.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
 import { SystemAdapter } from '../interfaces/system-adapter.js'
 
