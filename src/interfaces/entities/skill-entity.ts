@@ -1,9 +1,8 @@
 import { Schema } from '../schema.js'
-import { Injector } from '../event-generator.js'
 import { ToolEntity } from './tool-entity.js'
 
 export interface SkillAssertContext<TState = unknown> {
-  use: Injector
+  use: <T>(token: string) => T
   getState: () => TState
 }
 

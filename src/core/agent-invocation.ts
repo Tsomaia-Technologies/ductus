@@ -340,7 +340,7 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
 
     if (skill.assert) {
       try {
-        await skill.assert(output, { use, getState })
+        await skill.assert(output, { use: <T>(token: string): T => use({ symbol: Symbol.for(token) }) as T, getState })
       } catch (err) {
         assertionFailures++
         const errorMsg = err instanceof Error ? err.message : String(err)
