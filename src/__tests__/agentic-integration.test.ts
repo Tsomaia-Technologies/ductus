@@ -36,20 +36,18 @@ function createMockTransport(responses: AgentChunk[][]): {
 
 const testModel: ModelEntity = { model: 'test-model', temperature: null }
 
-const mockUse = (() => {
-  throw new Error('not implemented')
-}) as unknown as Injector
+const mockUse = (() => undefined) as unknown as Injector
 
 function buildAgent(overrides?: Partial<AgentEntity>): AgentEntity {
-  return {
+  const base: AgentEntity = {
     name: 'integration-agent',
     role: 'integration-tester',
     persona: 'You are an integration test agent.',
     skill: [],
     rules: [],
     rulesets: [],
-    ...overrides,
-  } as AgentEntity
+  }
+  return { ...base, ...overrides } as AgentEntity
 }
 
 function buildSkill(overrides?: Partial<SkillEntity>): SkillEntity {
