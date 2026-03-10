@@ -24,7 +24,7 @@ export interface InvocationOptions<TState = unknown> {
   input: unknown
   conversation: Conversation
   transport: AgentTransport
-  model: ModelEntity
+  model?: ModelEntity
   getState: () => TState
   use: Injector
   onEvent?: (event: BaseEvent) => void
@@ -278,7 +278,10 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
   }
   let conv = options.conversation.append(userMsg)
 
-  const resolvedModel = skillConfig?.model ?? agent.defaultModel ?? options.model
+  const resolvedModel = skillConfig?.model ?? options.model ?? agent.defaultModel
+  if (!resolvedModel) {
+    throw new Error(`No model configured for agent '${agent.name}'. Set defaultModel on the agent or provide a model in the flow registration.`)
+  }
   const resolvedTransport = skillConfig?.transport ?? options.transport ?? agent.defaultTransport
 
   const maxRetries = skill.maxRetries ?? 0

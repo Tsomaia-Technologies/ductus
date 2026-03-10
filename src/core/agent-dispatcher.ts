@@ -541,7 +541,7 @@ export class AgentDispatcher<TState> {
         input,
         conversation: stateV2.conversation,
         transport: stateV2.transport,
-        model: tuple.model,
+        model: tuple.model ?? tuple.agent.defaultModel,
         getState: () => this.store.getState(),
         use: this.injector,
         onEvent: (event) => observationEvents.push(event),

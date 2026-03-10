@@ -317,6 +317,59 @@ describe('invokeAgent', () => {
     expect((msgs[3] as AssistantMessage).toolCall).toBeUndefined()
   })
 
+  describe('model resolution', () => {
+    it('agent.defaultModel is used when options.model is omitted', async () => {
+      const agentModel: ModelEntity = { model: 'agent-default', temperature: 0.5 }
+      const transport = mockTransport([
+        [text('{"answer":"ok"}'), complete()],
+      ])
+      const sendSpy = jest.spyOn(transport, 'send')
+
+      await invokeAgent(makeOptions({
+        agent: mockAgent({ defaultModel: agentModel }),
+        transport,
+        model: undefined,
+      }))
+
+      expect(sendSpy).toHaveBeenCalled()
+      expect(sendSpy.mock.calls[0][0].model).toBe('agent-default')
+      expect(sendSpy.mock.calls[0][0].temperature).toBe(0.5)
+    })
+
+    it('options.model overrides agent.defaultModel', async () => {
+      const agentModel: ModelEntity = { model: 'agent-default', temperature: 0.5 }
+      const optionsModel: ModelEntity = { model: 'options-override', temperature: 0.9 }
+      const transport = mockTransport([
+        [text('{"answer":"ok"}'), complete()],
+      ])
+      const sendSpy = jest.spyOn(transport, 'send')
+
+      await invokeAgent(makeOptions({
+        agent: mockAgent({ defaultModel: agentModel }),
+        transport,
+        model: optionsModel,
+      }))
+
+      expect(sendSpy).toHaveBeenCalled()
+      expect(sendSpy.mock.calls[0][0].model).toBe('options-override')
+      expect(sendSpy.mock.calls[0][0].temperature).toBe(0.9)
+    })
+
+    it('throws when no model is available', async () => {
+      const transport = mockTransport([
+        [text('{"answer":"ok"}'), complete()],
+      ])
+
+      await expect(
+        invokeAgent(makeOptions({
+          agent: mockAgent(),
+          transport,
+          model: undefined,
+        })),
+      ).rejects.toThrow(/No model configured for agent/)
+    })
+  })
+
   describe('observation events', () => {
     const observeAll: ObservationConfig = { observeAll: true, events: [], skillEvents: [] }
 
