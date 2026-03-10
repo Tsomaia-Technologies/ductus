@@ -173,6 +173,8 @@ export class DuctusKernel<TState> {
         }
       }
 
+      if (commitedEvent.volatility === 'volatile') return
+
       const eventsOut = this.store.dispatch(commitedEvent)
 
       if (this.store.saveSnapshot && this.shouldTakeSnapshot?.(this.store.getState() as DeeplyReadonly<TState>, commitedEvent)) {

@@ -10,7 +10,7 @@ import { DefaultEventListener } from './default-event-listener.js'
 export class DefaultEventSequencer implements EventSequencer {
   private readonly lockMutex = new Mutex()
   private readonly commitListener = new DefaultEventListener<CommitEventData>()
-  private lastHash: string = getInitialEventHash()
+  private lastDurableHash: string = getInitialEventHash()
   private lastSequenceNumber = 0
   private isHydrated = false
 
@@ -22,13 +22,18 @@ export class DefaultEventSequencer implements EventSequencer {
       await this.ensureHydrated()
 
       const commitedEvent = this.commitEvent(event, context)
+      const isVolatile = event.volatility === 'volatile'
 
-      if (this.ledger) {
+      if (!isVolatile && this.ledger) {
         await this.ledger.appendEvent(commitedEvent)
       }
 
       this.lastSequenceNumber = commitedEvent.sequenceNumber
-      this.lastHash = commitedEvent.hash
+
+      if (!isVolatile) {
+        this.lastDurableHash = commitedEvent.hash
+      }
+
       this.commitListener.trigger({
         event: commitedEvent,
         sourceSubscriber: context?.sourceSubscriber,
@@ -47,7 +52,7 @@ export class DefaultEventSequencer implements EventSequencer {
     const lastEvent = await this.ledger.readLastEvent()
 
     if (lastEvent) {
-      this.lastHash = lastEvent.hash
+      this.lastDurableHash = lastEvent.hash
       this.lastSequenceNumber = lastEvent.sequenceNumber
     }
 
@@ -65,7 +70,7 @@ export class DefaultEventSequencer implements EventSequencer {
       ...(context?.causationId ? { causationId: context.causationId } : {}),
       ...(context?.correlationId ? { correlationId: context.correlationId } : {}),
       sequenceNumber: nextSequenceNumber,
-      prevHash: this.lastHash,
+      prevHash: this.lastDurableHash,
       isCommited: true,
       timestamp,
     } as Omit<CommittedEvent, 'hash'>
