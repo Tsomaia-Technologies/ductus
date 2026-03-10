@@ -1,6 +1,6 @@
 # RFC 0001 Implementation Tasks
 
-Implementation plan for [RFC 0001: Agentic Layer Redesign](../0001-agentic-layer-redesign.md).
+Implementation plan for [RFC 0001: Agentic Layer Redesign](../../0001-agentic-layer-redesign.md).
 
 ---
 
@@ -74,21 +74,21 @@ The longest path: **00 → 03 → 10 → 11 → 12 → 13 → 14** (7 tasks sequ
 
 | Task | Title | Status |
 |---|---|---|
-| 00 | [Transport, Conversation, Chunk Interfaces](./00-transport-conversation-chunk-interfaces.md) | Not started |
-| 01 | [Tool Entity Interfaces](./01-tool-entity-interfaces.md) | Not started |
-| 02 | [Skill, Agent, ContextPolicy Interfaces](./02-skill-agent-contextpolicy-interfaces.md) | Not started |
-| 03 | [Conversation Class](./03-conversation-class.md) | Not started |
-| 04 | [Observation Event Definitions](./04-observation-event-definitions.md) | Not started |
-| 05 | [Context Policy Implementations](./05-context-policy-implementations.md) | Not started |
-| 06 | [Tool Builder](./06-tool-builder.md) | Not started |
-| 07 | [Skill Builder Modifications](./07-skill-builder-modifications.md) | Not started |
-| 08 | [Agent Builder Modifications](./08-agent-builder-modifications.md) | Not started |
-| 09 | [Framework Output Parsing](./09-framework-output-parsing.md) | Not started |
-| 10 | [Tool Loop + Skill Retry](./10-tool-loop-and-skill-retry.md) | Not started |
-| 11 | [Dispatcher Decomposition](./11-dispatcher-decomposition.md) | Not started |
-| 12 | [Pipeline + Flow Integration](./12-pipeline-and-flow-integration.md) | Not started |
-| 13 | [Migration + Exports](./13-migration-and-exports.md) | Not started |
-| 14 | [Integration Tests](./14-integration-tests.md) | Not started |
+| 00 | [Transport, Conversation, Chunk Interfaces](00-transport-conversation-chunk-interfaces.md) | Not started |
+| 01 | [Tool Entity Interfaces](01-tool-entity-interfaces.md) | Not started |
+| 02 | [Skill, Agent, ContextPolicy Interfaces](02-skill-agent-contextpolicy-interfaces.md) | Not started |
+| 03 | [Conversation Class](03-conversation-class.md) | Not started |
+| 04 | [Observation Event Definitions](04-observation-event-definitions.md) | Not started |
+| 05 | [Context Policy Implementations](05-context-policy-implementations.md) | Not started |
+| 06 | [Tool Builder](06-tool-builder.md) | Not started |
+| 07 | [Skill Builder Modifications](07-skill-builder-modifications.md) | Not started |
+| 08 | [Agent Builder Modifications](08-agent-builder-modifications.md) | Not started |
+| 09 | [Framework Output Parsing](09-framework-output-parsing.md) | Not started |
+| 10 | [Tool Loop + Skill Retry](10-tool-loop-and-skill-retry.md) | Not started |
+| 11 | [Dispatcher Decomposition](11-dispatcher-decomposition.md) | Not started |
+| 12 | [Pipeline + Flow Integration](12-pipeline-and-flow-integration.md) | Not started |
+| 13 | [Migration + Exports](13-migration-and-exports.md) | Not started |
+| 14 | [Integration Tests](14-integration-tests.md) | Not started |
 
 ## Rules for Task Execution
 
