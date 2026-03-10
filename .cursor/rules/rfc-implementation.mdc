@@ -1,0 +1,38 @@
+---
+description: Context for the RFC 0001 agentic layer redesign implementation. Apply when working on agent, skill, tool, transport, conversation, observation, or context policy code.
+alwaysApply: false
+---
+
+# RFC 0001: Agentic Layer Redesign
+
+An active implementation is in progress to make agents first-class citizens of Ductus.
+
+## Key Resources
+
+- Specification: `rfc/0001-agentic-layer-redesign.md`
+- Task plan and status: `rfc/tasks/README.md`
+- Task briefs: `rfc/tasks/00-*.md` through `rfc/tasks/14-*.md`
+- Engineer prompt: `rfc/prompts/engineer.md`
+- Reviewer prompt: `rfc/prompts/reviewer.md`
+
+## Implementation Roles
+
+- **Engineer agent**: executes tasks using `/implement-task` skill
+- **Reviewer agent**: verifies task output using `/review-task` skill
+- **Auditor (human)**: approves or rejects, makes design decisions
+
+## What Is Changing
+
+- `AgentAdapter` is being replaced by `AgentTransport` (thin pipe: messages in, chunks out)
+- Framework now owns: conversation management, tool execution loop, output parsing, observation events
+- Skills gain `.assert()` and `.maxRetries()` for semantic validation with retry
+- Agents gain `.tool()`, `.defaultModel()`, `.defaultTransport()`, `.contextPolicy()`, `.observe()`
+- New `Conversation` class: immutable with structural sharing
+- New context policies: replace, truncate, summarize, sliding-window
+- New framework events: `Ductus.events.AgentCompleted`, `ToolRequested`, `SkillRetry`, etc.
+
+## Do Not
+
+- Modify the event sourcing core (kernel, multiplexers, sequencer, ledger, processors, clusters) — it is production-grade and not part of this RFC
+- Change interface definitions that were locked in Phase 0 tasks without auditor approval
+- Skip `npx tsc --noEmit` checks
