@@ -634,18 +634,22 @@ export class AgentDispatcher<TState> {
   }
 
   private async enforceContextPolicy(
-    _agentName: string,
+    agentName: string,
     agentConfig: AgentEntity,
     state: AgentLifecycleStateV2,
   ): Promise<void> {
     if (agentConfig.maxContextTokens === undefined) return
     if (state.conversation.tokenEstimate < agentConfig.maxContextTokens) return
 
+    const tuple = this.agents.get(agentName)
+    const model = tuple?.model?.model ?? agentConfig.defaultModel?.model
+
     const policy = this.resolveContextPolicy(agentConfig)
     state.conversation = await policy.apply(
       state.conversation,
       agentConfig.maxContextTokens,
       state.transport,
+      model,
     )
   }
 

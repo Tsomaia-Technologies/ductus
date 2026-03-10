@@ -19,6 +19,7 @@ export class TruncateContextPolicy implements ContextPolicy {
     conversation: Conversation,
     limit: number,
     _transport: AgentTransport,
+    _model?: string,
   ): Promise<Conversation> {
     const messages = conversation.messages
     const retained = selectFromEnd(messages, limit, this.preserveLastN)

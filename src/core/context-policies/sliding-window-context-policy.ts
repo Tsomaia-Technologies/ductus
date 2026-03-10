@@ -17,11 +17,13 @@ export class SlidingWindowContextPolicy implements ContextPolicy {
 
   async apply(
     conversation: Conversation,
-    _limit: number,
+    limit: number,
     _transport: AgentTransport,
+    _model?: string,
   ): Promise<Conversation> {
     const messages = conversation.messages
-    const retained = selectFromEnd(messages, this.windowTokens, 0)
+    const effectiveWindow = Math.min(this.windowTokens, limit)
+    const retained = selectFromEnd(messages, effectiveWindow, 0)
 
     let result: Conversation = ConversationImpl.create(conversation.systemMessage)
     for (const msg of retained) {

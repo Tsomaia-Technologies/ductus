@@ -8,5 +8,6 @@ export interface ContextPolicy {
     conversation: Conversation,
     limit: number,
     transport: AgentTransport,
+    model?: string,
   ): Promise<Conversation>
 }

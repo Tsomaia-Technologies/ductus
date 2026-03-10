@@ -8,24 +8,30 @@ import { selectFromEnd } from './truncate-context-policy.js'
 export interface SummarizeOptions {
   targetTokens?: number
   preserveLastN?: number
+  preserveSystem?: boolean
 }
 
 export class SummarizeContextPolicy implements ContextPolicy {
   private readonly targetTokens: number | undefined
   private readonly preserveLastN: number
+  private readonly preserveSystem: boolean
 
   constructor(options: SummarizeOptions = {}) {
     this.targetTokens = options.targetTokens
     this.preserveLastN = options.preserveLastN ?? 0
+    this.preserveSystem = options.preserveSystem ?? true
   }
 
   async apply(
     conversation: Conversation,
     limit: number,
     transport: AgentTransport,
+    model?: string,
   ): Promise<Conversation> {
+    const systemMessage = this.preserveSystem ? conversation.systemMessage : ''
+
     if (conversation.length === 0) {
-      return ConversationImpl.create(conversation.systemMessage)
+      return ConversationImpl.create(systemMessage)
     }
 
     const effectiveTargetTokens = this.targetTokens ?? Math.floor(limit / 2)
@@ -40,7 +46,7 @@ export class SummarizeContextPolicy implements ContextPolicy {
     const request: TransportRequest = {
       conversation: summarizeConv,
       newFromIndex: conversation.length,
-      model: 'default',
+      model: model ?? 'default',
       temperature: 0,
     }
 
@@ -52,7 +58,7 @@ export class SummarizeContextPolicy implements ContextPolicy {
       }
     } catch {
       const retained = selectFromEnd(conversation.messages, limit, this.preserveLastN)
-      let fallback: Conversation = ConversationImpl.create(conversation.systemMessage)
+      let fallback: Conversation = ConversationImpl.create(systemMessage)
       for (const msg of retained) {
         fallback = fallback.append(msg)
       }
@@ -66,7 +72,7 @@ export class SummarizeContextPolicy implements ContextPolicy {
       timestamp: Date.now(),
     }
 
-    let result: Conversation = ConversationImpl.create(conversation.systemMessage)
+    let result: Conversation = ConversationImpl.create(systemMessage)
     result = result.append(summaryMessage)
 
     const messages = conversation.messages

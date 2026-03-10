@@ -93,15 +93,26 @@ describe('SlidingWindowContextPolicy', () => {
     expect(result.systemMessage).toBe('sys')
   })
 
-  it('ignores the limit parameter and uses windowTokens instead', async () => {
+  it('respects the limit parameter when it is smaller than windowTokens', async () => {
+    const messages = Array.from({ length: 10 }, () => 'x'.repeat(100))
+    const conv = buildConversation('sys', messages)
+
+    const policy = new SlidingWindowContextPolicy({ windowTokens: 9999 })
+    const resultSmallLimit = await policy.apply(conv, 50, dummyTransport)
+    const resultBigLimit = await policy.apply(conv, 100000, dummyTransport)
+
+    expect(resultSmallLimit.length).toBeLessThan(resultBigLimit.length)
+    expect(resultSmallLimit.tokenEstimate).toBeLessThanOrEqual(50)
+  })
+
+  it('uses windowTokens when it is smaller than limit', async () => {
     const messages = Array.from({ length: 10 }, () => 'x'.repeat(100))
     const conv = buildConversation('sys', messages)
 
     const policy = new SlidingWindowContextPolicy({ windowTokens: 75 })
-    const resultSmallLimit = await policy.apply(conv, 10, dummyTransport)
-    const resultBigLimit = await policy.apply(conv, 100000, dummyTransport)
+    const result = await policy.apply(conv, 100000, dummyTransport)
 
-    expect(resultSmallLimit.length).toBe(resultBigLimit.length)
+    expect(result.tokenEstimate).toBeLessThanOrEqual(75)
   })
 })
 
@@ -216,5 +227,90 @@ describe('SummarizeContextPolicy', () => {
     await policy.apply(conv, 800, capturingTransport)
 
     expect(capturedPrompt).toContain('400 tokens')
+  })
+
+  it('passes model to transport request instead of hardcoded default', async () => {
+    let capturedModel = ''
+    const capturingTransport: AgentTransport = {
+      async *send(request) {
+        capturedModel = request.model
+        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
+        yield { type: 'complete' as const, timestamp: Date.now() }
+      },
+      async close() {},
+    }
+
+    const conv = buildConversation('sys', ['hello'])
+    const policy = new SummarizeContextPolicy()
+    await policy.apply(conv, 1000, capturingTransport, 'gpt-4o')
+
+    expect(capturedModel).toBe('gpt-4o')
+  })
+
+  it('falls back to "default" model when none is provided', async () => {
+    let capturedModel = ''
+    const capturingTransport: AgentTransport = {
+      async *send(request) {
+        capturedModel = request.model
+        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
+        yield { type: 'complete' as const, timestamp: Date.now() }
+      },
+      async close() {},
+    }
+
+    const conv = buildConversation('sys', ['hello'])
+    const policy = new SummarizeContextPolicy()
+    await policy.apply(conv, 1000, capturingTransport)
+
+    expect(capturedModel).toBe('default')
+  })
+
+  it('uses empty system message when preserveSystem is false', async () => {
+    const mockTransport: AgentTransport = {
+      async *send() {
+        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
+        yield { type: 'complete' as const, timestamp: Date.now() }
+      },
+      async close() {},
+    }
+
+    const conv = buildConversation('You are helpful.', ['msg1', 'msg2'])
+    const policy = new SummarizeContextPolicy({ preserveSystem: false })
+    const result = await policy.apply(conv, 1000, mockTransport)
+
+    expect(result.systemMessage).toBe('')
+    expect(result.messages[0].content).toBe('Summary')
+  })
+
+  it('preserves system message by default', async () => {
+    const mockTransport: AgentTransport = {
+      async *send() {
+        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
+        yield { type: 'complete' as const, timestamp: Date.now() }
+      },
+      async close() {},
+    }
+
+    const conv = buildConversation('You are helpful.', ['msg1', 'msg2'])
+    const policy = new SummarizeContextPolicy()
+    const result = await policy.apply(conv, 1000, mockTransport)
+
+    expect(result.systemMessage).toBe('You are helpful.')
+  })
+
+  it('uses empty system message in fallback path when preserveSystem is false', async () => {
+    const errorTransport: AgentTransport = {
+      async *send() {
+        throw new Error('transport failure')
+      },
+      async close() {},
+    }
+
+    const conv = buildConversation('You are helpful.', ['a', 'b', 'c'])
+    const policy = new SummarizeContextPolicy({ preserveSystem: false })
+    const result = await policy.apply(conv, 1000, errorTransport)
+
+    expect(result.systemMessage).toBe('')
+    expect(result.length).toBeGreaterThan(0)
   })
 })
