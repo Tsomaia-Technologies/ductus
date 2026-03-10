@@ -18,6 +18,16 @@ import {
 } from '../events/observation-events.js'
 import { parseAgentOutput } from './output-parser.js'
 
+export class AssertionExhaustedError extends Error {
+  constructor(
+    message: string,
+    public readonly assertionFailures: number,
+  ) {
+    super(message)
+    this.name = 'AssertionExhaustedError'
+  }
+}
+
 export interface InvocationOptions<TState = unknown> {
   agent: AgentEntity
   skill: SkillEntity
@@ -36,6 +46,7 @@ export interface InvocationResult {
   conversation: Conversation
   chunks: AgentChunk[]
   tokenUsage: { input: number; output: number; total: number }
+  assertionFailures: number
 }
 
 function shouldEmit(
@@ -286,6 +297,7 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
 
   const maxRetries = skill.maxRetries ?? 0
   let attempt = 0
+  let assertionFailures = 0
   const allChunks: AgentChunk[] = []
   const tokenUsage = { input: 0, output: 0 }
   let newFromIndex = conv.length - 1
@@ -330,6 +342,7 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
       try {
         await skill.assert(output, { use, getState })
       } catch (err) {
+        assertionFailures++
         const errorMsg = err instanceof Error ? err.message : String(err)
 
         if (attempt >= maxRetries) {
@@ -343,7 +356,10 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
               onEvent({ ...evt, volatility: resolveVolatility(AgentFailed, observation) })
             }
           }
-          throw err
+          throw new AssertionExhaustedError(
+            `Skill assertion failed after ${maxRetries + 1} attempts: ${errorMsg}`,
+            assertionFailures,
+          )
         }
 
         attempt++
@@ -383,6 +399,6 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
     }
 
     const totalTokens = tokenUsage.input + tokenUsage.output
-    return { output, conversation: conv, chunks: allChunks, tokenUsage: { ...tokenUsage, total: totalTokens } }
+    return { output, conversation: conv, chunks: allChunks, tokenUsage: { ...tokenUsage, total: totalTokens }, assertionFailures }
   }
 }

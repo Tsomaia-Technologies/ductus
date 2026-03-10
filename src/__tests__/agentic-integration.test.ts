@@ -222,6 +222,29 @@ describe('agentic integration', () => {
   // Test C: Retry exhaustion
   // ---------------------------------------------------------------------------
 
+  it('Test B2: assertionFailures count is returned on successful retry', async () => {
+    let assertCallCount = 0
+    const skill = buildSkill({
+      maxRetries: 3,
+      assert: async (output) => {
+        assertCallCount++
+        const parsed = output as { files: string[] }
+        if (assertCallCount <= 2 && parsed.files.length > 0) {
+          throw new Error('simulated hallucination')
+        }
+      },
+    })
+
+    const { transport } = createMockTransport([
+      [usage(10, 10), text('{"code":"x","files":["a.ts"],"testsRun":true}'), complete()],
+      [usage(10, 10), text('{"code":"x","files":["a.ts"],"testsRun":true}'), complete()],
+      [usage(10, 10), text('{"code":"x","files":["a.ts"],"testsRun":true}'), complete()],
+    ])
+
+    const result = await invokeAgent(makeOptions({ skill, transport }))
+    expect(result.assertionFailures).toBe(2)
+  })
+
   it('Test C: retry exhaustion throws after maxRetries+1 attempts', async () => {
     const skill = buildSkill({
       maxRetries: 1,
@@ -642,6 +665,61 @@ describe('V2 lifecycle limits', () => {
     // After reset, conversation is fresh — transport sees only the new user message
     await dispatcher.invokeAndParseV2('scope-agent', 'integration-skill', { task: 'c' })
     expect(requests[2].conversation.length).toBe(1)
+  })
+
+  it('resets conversation when hallucinations reach maxRecognizedHallucinations', async () => {
+    const requests: TransportRequest[] = []
+    let assertCallCount = 0
+
+    const flowTransport: AgentTransport = {
+      async *send(req: TransportRequest) {
+        requests.push(req)
+        yield text('{"code":"ok","files":["a.ts"],"testsRun":true}')
+        yield complete()
+      },
+      async close() {},
+    }
+
+    const skill = buildSkill({
+      maxRetries: 1,
+      assert: async () => {
+        assertCallCount++
+        if (assertCallCount === 1 || assertCallCount === 3) {
+          throw new Error('hallucinated output')
+        }
+      },
+    })
+
+    const agent = buildAgent({
+      name: 'hallucination-agent',
+      skill: [skill],
+      maxRecognizedHallucinations: 2,
+    })
+
+    const dispatcher = new AgentDispatcher({
+      agents: [{ agent, model: testModel, flowTransport }],
+      ledger: stubLedger(),
+      store: stubStore(),
+      templateRenderer: noopRenderer,
+      injector: mockUse,
+      systemAdapter: stubSystemAdapter(),
+      fileAdapter: stubFileAdapter(),
+      interceptors: [],
+    })
+
+    // Invocation 1: assertion fails once (assertCallCount 1), then passes (assertCallCount 2)
+    // assertionFailures=1, stateV2.hallucinations becomes 1
+    await dispatcher.invokeAndParseV2('hallucination-agent', 'integration-skill', { task: 'a' })
+
+    // Invocation 2: assertion fails once (assertCallCount 3), then passes (assertCallCount 4)
+    // assertionFailures=1, stateV2.hallucinations becomes 2
+    await dispatcher.invokeAndParseV2('hallucination-agent', 'integration-skill', { task: 'b' })
+
+    // Invocation 3: enforceLifecycleLimitsV2 fires (hallucinations=2 >= maxRecognizedHallucinations=2)
+    // Conversation is reset — transport should see only 1 message (the new user msg)
+    await dispatcher.invokeAndParseV2('hallucination-agent', 'integration-skill', { task: 'c' })
+    const lastRequest = requests[requests.length - 1]
+    expect(lastRequest.conversation.length).toBe(1)
   })
 
   it('does not reset when under limits', async () => {

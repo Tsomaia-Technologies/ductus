@@ -13,7 +13,7 @@ import { AgentLifecycleState, AgentLifecycleStateV2, AgentTuple } from '../inter
 import { AgentInterceptor, InvocationContext } from './pipeline/agent-interceptor.js'
 import { TemplateInterceptor } from './pipeline/interceptors/template-interceptor.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
-import { invokeAgent } from './agent-invocation.js'
+import { invokeAgent, AssertionExhaustedError } from './agent-invocation.js'
 import { ConversationImpl } from './conversation.js'
 import { AgentTransport } from '../interfaces/agent-transport.js'
 import { ContextPolicy } from '../interfaces/context-policy.js'
@@ -550,6 +550,7 @@ export class AgentDispatcher<TState> {
 
       stateV2.conversation = result.conversation
       stateV2.tokensUsed += result.tokenUsage.input + result.tokenUsage.output
+      stateV2.hallucinations += result.assertionFailures
 
       stateV2.turnRecords.push({
         turnNumber: stateV2.turns,
@@ -562,6 +563,9 @@ export class AgentDispatcher<TState> {
     } catch (err) {
       turnFailed = true
       stateV2.failures++
+      if (err instanceof AssertionExhaustedError) {
+        stateV2.hallucinations += err.assertionFailures
+      }
 
       stateV2.turnRecords.push({
         turnNumber: stateV2.turns,
