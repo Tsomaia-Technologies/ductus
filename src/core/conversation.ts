@@ -29,13 +29,12 @@ export class ConversationImpl implements Conversation {
   get messages(): readonly AgenticMessage[] {
     if (this.head === null) return EMPTY_MESSAGES
 
-    const result: AgenticMessage[] = []
+    const result: AgenticMessage[] = new Array(this.length)
     let node: ConversationNode | null = this.head
-    while (node !== null) {
-      result.push(node.message)
-      node = node.prev
+    for (let i = this.length - 1; i >= 0; i--) {
+      result[i] = node!.message
+      node = node!.prev
     }
-    result.reverse()
     return Object.freeze(result)
   }
 
