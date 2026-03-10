@@ -1,3 +1,4 @@
+import { zodToJsonSchema } from 'zod-to-json-schema'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 import { ToolEntity, ToolContext } from '../interfaces/entities/tool-entity.js'
@@ -30,11 +31,11 @@ export interface InvocationResult {
   tokenUsage: { input: number; output: number }
 }
 
-function toToolSchema(tool: ToolEntity): ToolSchema {
+export function toToolSchema(tool: ToolEntity): ToolSchema {
   return {
     name: tool.name,
     description: tool.description,
-    parameters: {},
+    parameters: zodToJsonSchema(tool.inputSchema, { $refStrategy: 'none' }) as Record<string, unknown>,
   }
 }
 
