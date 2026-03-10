@@ -488,3 +488,199 @@ describe('dispatcher transport resolution', () => {
     expect(output).toEqual({ code: 'v2-only', files: ['b.ts'], testsRun: false })
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 lifecycle limits (enforceLifecycleLimitsV2)
+// ---------------------------------------------------------------------------
+
+describe('V2 lifecycle limits', () => {
+  function stubLedger(): EventLedger {
+    return {
+      async *readEvents() {},
+      async readLastEvent() { return null },
+      async appendEvent() {},
+      async dispose() {},
+    }
+  }
+
+  function stubStore(): StoreAdapter<Record<string, never>> {
+    const state: Record<string, never> = {}
+    return {
+      getState: () => state,
+      getReducer: () => (s: Record<string, never>) => [s, []] as [Record<string, never>, BaseEvent[]],
+      dispatch: () => [],
+    }
+  }
+
+  const noopRenderer: TemplateRenderer = (t) => t
+
+  function stubSystemAdapter(): SystemAdapter {
+    return {
+      getDefaultEnv: () => ({}),
+      getDefaultCwd: () => '/tmp',
+      getDefaultMaxBuffer: () => 1024,
+      resolveAbsolutePath: (...segs: string[]) => segs.join('/'),
+      execute: async () => ({ stdout: '', stderr: '', exitCode: 0, timedOut: false, cancelled: false }),
+      spawn: () => { throw new Error('not implemented') },
+      terminate: async () => {},
+      prompt: async () => '',
+    }
+  }
+
+  function stubFileAdapter(): FileAdapter {
+    return {
+      exists: async () => false,
+      read: async (_p: string, fallback?: string | null) => fallback ?? null,
+      readJson: async () => null,
+      readLines: async function* () {},
+      readLinesJsonl: async function* () {},
+      readLastLineJsonl: async () => null,
+      write: async () => true,
+      writeJson: async () => true,
+      append: async () => {},
+      appendLine: async () => {},
+      appendLineJsonl: async () => {},
+      createDirectory: async () => true,
+      createDirectoryRecursive: async () => {},
+      delete: async () => true,
+      open: async () => { throw new Error('not implemented') },
+    } as FileAdapter
+  }
+
+  it('resets conversation and counters when failures reach maxFailures', async () => {
+    const requests: TransportRequest[] = []
+    let callIndex = 0
+
+    const flowTransport: AgentTransport = {
+      async *send(req: TransportRequest) {
+        requests.push(req)
+        callIndex++
+        if (callIndex === 2 || callIndex === 3) {
+          throw new Error('simulated failure')
+        }
+        yield text('{"code":"ok","files":["a.ts"],"testsRun":true}')
+        yield complete()
+      },
+      async close() {},
+    }
+
+    const agent = buildAgent({
+      name: 'failure-agent',
+      skill: [buildSkill()],
+      maxFailures: 2,
+    })
+
+    const dispatcher = new AgentDispatcher({
+      agents: [{ agent, model: testModel, flowTransport }],
+      ledger: stubLedger(),
+      store: stubStore(),
+      templateRenderer: noopRenderer,
+      injector: mockUse,
+      systemAdapter: stubSystemAdapter(),
+      fileAdapter: stubFileAdapter(),
+      interceptors: [],
+    })
+
+    // Call 1: success — conversation grows to 2 messages (user + assistant)
+    await dispatcher.invokeAndParseV2('failure-agent', 'integration-skill', { task: 'a' })
+    expect(requests[0].conversation.length).toBe(1)
+
+    // Calls 2 & 3: failures accumulate (failures becomes 2)
+    await expect(
+      dispatcher.invokeAndParseV2('failure-agent', 'integration-skill', { task: 'b' }),
+    ).rejects.toThrow('simulated failure')
+    await expect(
+      dispatcher.invokeAndParseV2('failure-agent', 'integration-skill', { task: 'c' }),
+    ).rejects.toThrow('simulated failure')
+
+    // Call 4: enforceLifecycleLimitsV2 resets (failures=2 >= maxFailures=2)
+    // After reset, conversation is fresh — transport should see only the new user message
+    await dispatcher.invokeAndParseV2('failure-agent', 'integration-skill', { task: 'd' })
+
+    const lastRequest = requests[requests.length - 1]
+    expect(lastRequest.conversation.length).toBe(1)
+  })
+
+  it('resets conversation and counters when turns reach scope limit', async () => {
+    const requests: TransportRequest[] = []
+
+    const flowTransport: AgentTransport = {
+      async *send(req: TransportRequest) {
+        requests.push(req)
+        yield text('{"code":"ok","files":["a.ts"],"testsRun":true}')
+        yield complete()
+      },
+      async close() {},
+    }
+
+    const agent = buildAgent({
+      name: 'scope-agent',
+      skill: [buildSkill()],
+      scope: { type: 'turn', amount: 2 },
+    })
+
+    const dispatcher = new AgentDispatcher({
+      agents: [{ agent, model: testModel, flowTransport }],
+      ledger: stubLedger(),
+      store: stubStore(),
+      templateRenderer: noopRenderer,
+      injector: mockUse,
+      systemAdapter: stubSystemAdapter(),
+      fileAdapter: stubFileAdapter(),
+      interceptors: [],
+    })
+
+    // Turn 1: fresh conversation, transport sees 1 message (user only)
+    await dispatcher.invokeAndParseV2('scope-agent', 'integration-skill', { task: 'a' })
+    expect(requests[0].conversation.length).toBe(1)
+
+    // Turn 2: conversation has history, transport sees 3 messages (prior user+assistant + new user)
+    await dispatcher.invokeAndParseV2('scope-agent', 'integration-skill', { task: 'b' })
+    expect(requests[1].conversation.length).toBe(3)
+
+    // Turn 3: enforceLifecycleLimitsV2 resets (turns=2 >= amount=2)
+    // After reset, conversation is fresh — transport sees only the new user message
+    await dispatcher.invokeAndParseV2('scope-agent', 'integration-skill', { task: 'c' })
+    expect(requests[2].conversation.length).toBe(1)
+  })
+
+  it('does not reset when under limits', async () => {
+    const requests: TransportRequest[] = []
+
+    const flowTransport: AgentTransport = {
+      async *send(req: TransportRequest) {
+        requests.push(req)
+        yield text('{"code":"ok","files":["a.ts"],"testsRun":true}')
+        yield complete()
+      },
+      async close() {},
+    }
+
+    const agent = buildAgent({
+      name: 'safe-agent',
+      skill: [buildSkill()],
+      maxFailures: 10,
+      scope: { type: 'turn', amount: 100 },
+    })
+
+    const dispatcher = new AgentDispatcher({
+      agents: [{ agent, model: testModel, flowTransport }],
+      ledger: stubLedger(),
+      store: stubStore(),
+      templateRenderer: noopRenderer,
+      injector: mockUse,
+      systemAdapter: stubSystemAdapter(),
+      fileAdapter: stubFileAdapter(),
+      interceptors: [],
+    })
+
+    await dispatcher.invokeAndParseV2('safe-agent', 'integration-skill', { task: 'a' })
+    await dispatcher.invokeAndParseV2('safe-agent', 'integration-skill', { task: 'b' })
+    await dispatcher.invokeAndParseV2('safe-agent', 'integration-skill', { task: 'c' })
+
+    // Conversation should accumulate across all 3 turns — no reset
+    expect(requests[0].conversation.length).toBe(1)
+    expect(requests[1].conversation.length).toBe(3)
+    expect(requests[2].conversation.length).toBe(5)
+  })
+})

@@ -526,6 +526,7 @@ export class AgentDispatcher<TState> {
 
     const stateV2 = await this.getOrCreateLifecycleStateV2(agentName)
 
+    await this.enforceLifecycleLimitsV2(agentName, stateV2, tuple.agent)
     await this.enforceContextPolicy(agentName, tuple.agent, stateV2)
 
     stateV2.turns++
@@ -599,6 +600,33 @@ export class AgentDispatcher<TState> {
       this.lifecycleV2.set(agentName, state)
     }
     return state
+  }
+
+  private async enforceLifecycleLimitsV2(
+    agentName: string,
+    state: AgentLifecycleStateV2,
+    agentConfig: AgentEntity,
+  ): Promise<void> {
+    const maxFailures = agentConfig.maxFailures ?? Infinity
+    const maxHallucinations = agentConfig.maxRecognizedHallucinations ?? Infinity
+
+    let needsReset = state.failures >= maxFailures || state.hallucinations >= maxHallucinations
+
+    if (!needsReset && agentConfig.scope) {
+      const { type, amount } = agentConfig.scope as { type: string; amount?: number }
+      if ((type === 'turn' || type === 'task') && amount !== undefined && state.turns >= amount) {
+        needsReset = true
+      }
+    }
+
+    if (needsReset) {
+      const systemMessage = await this.composeSystemMessage(agentConfig)
+      state.conversation = ConversationImpl.create(systemMessage)
+      state.failures = 0
+      state.hallucinations = 0
+      state.turns = 0
+      state.turnRecords = []
+    }
   }
 
   private async enforceContextPolicy(
