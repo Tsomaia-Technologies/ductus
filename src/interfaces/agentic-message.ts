@@ -20,6 +20,7 @@ export interface AssistantMessage extends BaseMessage {
   role: 'assistant'
   agentId: string
   toolCall?: AgentToolCall
+  toolCalls?: AgentToolCall[]
 }
 
 export interface ToolMessage extends BaseMessage {

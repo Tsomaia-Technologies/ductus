@@ -119,7 +119,7 @@ async function runToolLoop(
     }
 
     const currentChunks: AgentChunk[] = []
-    let pendingToolCall: AgentToolCall | null = null
+    const pendingToolCalls: AgentToolCall[] = []
 
     for await (const chunk of resolvedTransport.send(request)) {
       currentChunks.push(chunk)
@@ -131,11 +131,11 @@ async function runToolLoop(
       }
 
       if (chunk.type === 'tool-call') {
-        pendingToolCall = chunk.toolCall
+        pendingToolCalls.push(chunk.toolCall)
       }
     }
 
-    if (!pendingToolCall) {
+    if (pendingToolCalls.length === 0) {
       return { conv: currentConv, finalChunks: currentChunks }
     }
 
@@ -144,40 +144,46 @@ async function runToolLoop(
       .map((c) => c.content)
       .join('')
 
+    const newMsgStart = currentConv.length
+
     const assistantMsg: AssistantMessage = {
       role: 'assistant',
       content: textContent,
       agentId: agentName,
-      toolCall: pendingToolCall,
+      toolCall: pendingToolCalls[0],
+      toolCalls: pendingToolCalls,
       timestamp: Date.now(),
     }
     currentConv = currentConv.append(assistantMsg)
 
-    const { result: toolResult, error: toolError } = await executeTool(
-      toolMap.get(pendingToolCall.name),
-      pendingToolCall,
-      getState,
-      use,
-      onEvent,
-    )
+    for (const tc of pendingToolCalls) {
+      const { result: toolResult, error: toolError } = await executeTool(
+        toolMap.get(tc.name),
+        tc,
+        getState,
+        use,
+        onEvent,
+      )
 
-    const toolMsg: ToolMessage = {
-      role: 'tool',
-      content: serializeToolResult(toolResult),
-      toolCallId: pendingToolCall.id,
-      name: pendingToolCall.name,
-      error: toolError || undefined,
-      timestamp: Date.now(),
+      const toolMsg: ToolMessage = {
+        role: 'tool',
+        content: serializeToolResult(toolResult),
+        toolCallId: tc.id,
+        name: tc.name,
+        error: toolError || undefined,
+        timestamp: Date.now(),
+      }
+      currentConv = currentConv.append(toolMsg)
+
+      allChunks.push({
+        type: 'tool-result',
+        toolCallId: tc.id,
+        result: toolResult,
+        timestamp: Date.now(),
+      })
     }
-    currentConv = currentConv.append(toolMsg)
-    currentNewFromIndex = currentConv.length - 2
 
-    allChunks.push({
-      type: 'tool-result',
-      toolCallId: pendingToolCall.id,
-      result: toolResult,
-      timestamp: Date.now(),
-    })
+    currentNewFromIndex = newMsgStart
   }
 }
 

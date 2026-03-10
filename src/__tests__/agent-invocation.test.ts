@@ -217,6 +217,68 @@ describe('invokeAgent', () => {
     expect(result.tokenUsage).toEqual({ input: 180, output: 80 })
   })
 
+  it('parallel tool calls — all tool calls in one response are executed', async () => {
+    const searchTool: ToolEntity = {
+      name: 'search',
+      description: 'search tool',
+      inputSchema: z.object({ q: z.string() }),
+      execute: async (input) => `found: ${(input as { q: string }).q}`,
+    }
+
+    const calcTool: ToolEntity = {
+      name: 'calc',
+      description: 'calc tool',
+      inputSchema: z.object({ expr: z.string() }),
+      execute: async (input) => `result: ${(input as { expr: string }).expr}`,
+    }
+
+    const transport = mockTransport([
+      [
+        text('thinking...'),
+        toolCall('tc1', 'search', '{"q":"hello"}'),
+        toolCall('tc2', 'calc', '{"expr":"1+1"}'),
+      ],
+      [text('{"answer":"combined"}'), complete()],
+    ])
+
+    const sendSpy = jest.spyOn(transport, 'send')
+
+    const result = await invokeAgent(
+      makeOptions({
+        agent: mockAgent({ tools: [searchTool, calcTool] }),
+        transport,
+      }),
+    )
+
+    expect(result.output).toEqual({ answer: 'combined' })
+
+    const msgs = result.conversation.messages
+    expect(msgs[0].role).toBe('user')
+
+    const assistantMsg = msgs[1] as AssistantMessage
+    expect(assistantMsg.role).toBe('assistant')
+    expect(assistantMsg.content).toBe('thinking...')
+    expect(assistantMsg.toolCalls).toHaveLength(2)
+    expect(assistantMsg.toolCalls![0].name).toBe('search')
+    expect(assistantMsg.toolCalls![1].name).toBe('calc')
+    expect(assistantMsg.toolCall?.name).toBe('search')
+
+    expect(msgs[2].role).toBe('tool')
+    expect((msgs[2] as ToolMessage).toolCallId).toBe('tc1')
+    expect((msgs[2] as ToolMessage).content).toBe('found: hello')
+
+    expect(msgs[3].role).toBe('tool')
+    expect((msgs[3] as ToolMessage).toolCallId).toBe('tc2')
+    expect((msgs[3] as ToolMessage).content).toBe('result: 1+1')
+
+    expect(msgs[4].role).toBe('assistant')
+
+    const secondCallConv = sendSpy.mock.calls[1][0].conversation
+    const secondCallMsgs = secondCallConv.messages
+    expect(secondCallMsgs[secondCallMsgs.length - 2].role).toBe('tool')
+    expect(secondCallMsgs[secondCallMsgs.length - 1].role).toBe('tool')
+  })
+
   it('conversation growth — correct message order after tool loop', async () => {
     const echoTool: ToolEntity = {
       name: 'echo',
