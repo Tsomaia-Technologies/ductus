@@ -78,10 +78,12 @@ function resolveVolatility(
 }
 
 export function toToolSchema(tool: ToolEntity): ToolSchema {
+  const jsonSchema = zodToJsonSchema(tool.inputSchema, { $refStrategy: 'none' }) as Record<string, unknown>
+  const { $schema, ...parameters } = jsonSchema
   return {
     name: tool.name,
     description: tool.description,
-    parameters: zodToJsonSchema(tool.inputSchema, { $refStrategy: 'none' }) as Record<string, unknown>,
+    parameters,
   }
 }
 

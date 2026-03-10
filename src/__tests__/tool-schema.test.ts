@@ -77,6 +77,13 @@ describe('toToolSchema', () => {
     expect((params['properties'] as Record<string, unknown>)['tag']).toBeDefined()
   })
 
+  it('does not include $schema in output', () => {
+    const schema = z.object({ x: z.number() })
+    const result = toToolSchema(makeTool(schema))
+
+    expect(result.parameters).not.toHaveProperty('$schema')
+  })
+
   it('preserves tool name and description from entity', () => {
     const schema = z.object({})
     const result = toToolSchema(
