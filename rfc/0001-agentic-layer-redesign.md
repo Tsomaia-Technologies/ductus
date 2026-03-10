@@ -145,7 +145,7 @@ interface ToolEntity {
 
 interface ToolContext<TState = unknown> {
   getState: () => TState
-  use: <T>(token: string) => T
+  use: <T extends Injectable>(token: T) => InferInjectable<T>
   emit: (event: BaseEvent) => void
 }
 ```
@@ -232,7 +232,7 @@ interface SkillEntity {
 }
 
 interface SkillAssertContext<TState = unknown> {
-  use: <T>(token: string) => T
+  use: <T extends Injectable>(token: T) => InferInjectable<T>
   getState: () => TState
 }
 ```

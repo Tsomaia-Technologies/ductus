@@ -1,8 +1,9 @@
 import { Schema } from '../schema.js'
+import { Injectable, InferInjectable } from '../event-generator.js'
 import { ToolEntity } from './tool-entity.js'
 
 export interface SkillAssertContext<TState = unknown> {
-  use: <T>(token: string) => T
+  use: <T extends Injectable>(token: T) => InferInjectable<T>
   getState: () => TState
 }
 
