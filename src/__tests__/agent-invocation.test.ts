@@ -8,7 +8,13 @@ import { ModelEntity } from '../interfaces/entities/model-entity.js'
 import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 import { ToolEntity } from '../interfaces/entities/tool-entity.js'
 import { Injector } from '../interfaces/event-generator.js'
+import { BaseEvent } from '../interfaces/event.js'
+import { ObservationConfig } from '../interfaces/observation-config.js'
 import { AssistantMessage, ToolMessage } from '../interfaces/agentic-message.js'
+import {
+  ToolRequested, ToolCompleted,
+  SkillInvoked, SkillCompleted,
+} from '../events/observation-events.js'
 
 function mockTransport(responses: AgentChunk[][]): AgentTransport {
   let callIndex = 0
@@ -309,5 +315,248 @@ describe('invokeAgent', () => {
     expect((msgs[2] as ToolMessage).content).toBe('ping')
     expect(msgs[3].role).toBe('assistant')
     expect((msgs[3] as AssistantMessage).toolCall).toBeUndefined()
+  })
+
+  describe('observation events', () => {
+    const observeAll: ObservationConfig = { observeAll: true, events: [], skillEvents: [] }
+
+    it('emits AgentInvoked, SkillInvoked, SkillCompleted, AgentCompleted with observeAll', async () => {
+      const events: BaseEvent[] = []
+      const transport = mockTransport([
+        [text('{"answer":"hello"}'), usage(10, 5), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        transport,
+        onEvent: (e) => events.push(e),
+        observation: observeAll,
+      }))
+
+      const types = events.map(e => e.type)
+      expect(types).toContain('Ductus/AgentInvoked')
+      expect(types).toContain('Ductus/SkillInvoked')
+      expect(types).toContain('Ductus/SkillCompleted')
+      expect(types).toContain('Ductus/AgentCompleted')
+
+      const completed = events.find(e => e.type === 'Ductus/AgentCompleted')!
+      expect(completed.payload).toMatchObject({
+        agent: 'test-agent',
+        skill: 'test-skill',
+        tokenUsage: { input: 10, output: 5 },
+      })
+      expect(typeof (completed.payload as { durationMs: number }).durationMs).toBe('number')
+    })
+
+    it('emits ToolRequested and ToolCompleted during tool loop', async () => {
+      const events: BaseEvent[] = []
+      const searchTool: ToolEntity = {
+        name: 'search',
+        description: 'search tool',
+        inputSchema: z.object({ q: z.string() }),
+        execute: async (input) => `found: ${(input as { q: string }).q}`,
+      }
+
+      const transport = mockTransport([
+        [toolCall('tc1', 'search', '{"q":"hello"}')],
+        [text('{"answer":"done"}'), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        agent: mockAgent({ tools: [searchTool] }),
+        transport,
+        onEvent: (e) => events.push(e),
+        observation: observeAll,
+      }))
+
+      const types = events.map(e => e.type)
+      expect(types).toContain('Ductus/ToolRequested')
+      expect(types).toContain('Ductus/ToolCompleted')
+
+      const requested = events.find(e => e.type === 'Ductus/ToolRequested')!
+      expect(requested.payload).toMatchObject({ agent: 'test-agent', tool: 'search' })
+
+      const completed = events.find(e => e.type === 'Ductus/ToolCompleted')!
+      expect(completed.payload).toMatchObject({ agent: 'test-agent', tool: 'search' })
+      expect(typeof (completed.payload as { durationMs: number }).durationMs).toBe('number')
+    })
+
+    it('emits AgentStreamChunk for text chunks with observeAll', async () => {
+      const events: BaseEvent[] = []
+      const transport = mockTransport([
+        [text('{"answer":'), text('"hello"}'), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        transport,
+        onEvent: (e) => events.push(e),
+        observation: observeAll,
+      }))
+
+      const streamChunks = events.filter(e => e.type === 'Ductus/AgentStreamChunk')
+      expect(streamChunks).toHaveLength(2)
+      expect(streamChunks[0].payload).toMatchObject({ agent: 'test-agent', skill: 'test-skill', chunkType: 'text', content: '{"answer":' })
+      expect(streamChunks[1].payload).toMatchObject({ content: '"hello"}' })
+    })
+
+    it('emits SkillRetry on assertion failure with retries remaining', async () => {
+      const events: BaseEvent[] = []
+      let assertCount = 0
+      const skill = mockSkill({
+        maxRetries: 1,
+        assert: async () => {
+          assertCount++
+          if (assertCount === 1) throw new Error('bad output')
+        },
+      })
+
+      const transport = mockTransport([
+        [text('{"answer":"wrong"}'), complete()],
+        [text('{"answer":"correct"}'), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        skill,
+        transport,
+        onEvent: (e) => events.push(e),
+        observation: observeAll,
+      }))
+
+      const retryEvent = events.find(e => e.type === 'Ductus/SkillRetry')!
+      expect(retryEvent).toBeDefined()
+      expect(retryEvent.payload).toMatchObject({
+        agent: 'test-agent',
+        skill: 'test-skill',
+        attempt: 1,
+        maxRetries: 1,
+        error: 'bad output',
+      })
+    })
+
+    it('emits SkillFailed and AgentFailed when retries exhausted', async () => {
+      const events: BaseEvent[] = []
+      const skill = mockSkill({
+        maxRetries: 0,
+        assert: async () => { throw new Error('always fails') },
+      })
+
+      const transport = mockTransport([
+        [text('{"answer":"a"}'), complete()],
+      ])
+
+      await expect(
+        invokeAgent(makeOptions({
+          skill,
+          transport,
+          onEvent: (e) => events.push(e),
+          observation: observeAll,
+        })),
+      ).rejects.toThrow('always fails')
+
+      const types = events.map(e => e.type)
+      expect(types).toContain('Ductus/SkillFailed')
+      expect(types).toContain('Ductus/AgentFailed')
+
+      const failed = events.find(e => e.type === 'Ductus/SkillFailed')!
+      expect(failed.payload).toMatchObject({
+        agent: 'test-agent',
+        skill: 'test-skill',
+        error: 'always fails',
+        retriesExhausted: true,
+      })
+    })
+
+    it('emits no observation events when observation config is absent', async () => {
+      const events: BaseEvent[] = []
+      const transport = mockTransport([
+        [text('{"answer":"hello"}'), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        transport,
+        onEvent: (e) => events.push(e),
+      }))
+
+      const observationTypes = events.filter(e => e.type.startsWith('Ductus/'))
+      expect(observationTypes).toHaveLength(0)
+    })
+
+    it('reads observation from agent.observation when options.observation is absent', async () => {
+      const events: BaseEvent[] = []
+      const transport = mockTransport([
+        [text('{"answer":"hello"}'), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        agent: mockAgent({ observation: observeAll }),
+        transport,
+        onEvent: (e) => events.push(e),
+      }))
+
+      const types = events.map(e => e.type)
+      expect(types).toContain('Ductus/AgentInvoked')
+      expect(types).toContain('Ductus/AgentCompleted')
+    })
+
+    it('per-event filtering — only emits events listed in observation.events', async () => {
+      const events: BaseEvent[] = []
+      const searchTool: ToolEntity = {
+        name: 'search',
+        description: 'search tool',
+        inputSchema: z.object({ q: z.string() }),
+        execute: async (input) => `found: ${(input as { q: string }).q}`,
+      }
+
+      const perEventObs: ObservationConfig = {
+        events: [{ event: ToolRequested }],
+        skillEvents: [],
+      }
+
+      const transport = mockTransport([
+        [toolCall('tc1', 'search', '{"q":"hello"}')],
+        [text('{"answer":"done"}'), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        agent: mockAgent({ tools: [searchTool] }),
+        transport,
+        onEvent: (e) => events.push(e),
+        observation: perEventObs,
+      }))
+
+      const types = events.map(e => e.type)
+      expect(types).toContain('Ductus/ToolRequested')
+      expect(types).not.toContain('Ductus/AgentInvoked')
+      expect(types).not.toContain('Ductus/SkillInvoked')
+      expect(types).not.toContain('Ductus/ToolCompleted')
+      expect(types).not.toContain('Ductus/SkillCompleted')
+      expect(types).not.toContain('Ductus/AgentCompleted')
+    })
+
+    it('per-skill filtering — emits skill-scoped events for matching skill', async () => {
+      const events: BaseEvent[] = []
+      const skill = mockSkill()
+
+      const perSkillObs: ObservationConfig = {
+        events: [],
+        skillEvents: [{ skill }],
+      }
+
+      const transport = mockTransport([
+        [text('{"answer":"hello"}'), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        skill,
+        transport,
+        onEvent: (e) => events.push(e),
+        observation: perSkillObs,
+      }))
+
+      const types = events.map(e => e.type)
+      expect(types).toContain('Ductus/SkillInvoked')
+      expect(types).toContain('Ductus/SkillCompleted')
+      expect(types).not.toContain('Ductus/AgentInvoked')
+      expect(types).not.toContain('Ductus/AgentCompleted')
+    })
   })
 })

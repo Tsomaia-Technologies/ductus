@@ -8,8 +8,14 @@ import { AgentChunk } from '../interfaces/agent-chunk.js'
 import { AgentToolCall } from '../interfaces/agent-tool-call.js'
 import { ModelEntity } from '../interfaces/entities/model-entity.js'
 import { Injector } from '../interfaces/event-generator.js'
-import { BaseEvent } from '../interfaces/event.js'
+import { BaseEvent, Volatility } from '../interfaces/event.js'
 import { AssistantMessage, ToolMessage, UserMessage } from '../interfaces/agentic-message.js'
+import { ObservationConfig } from '../interfaces/observation-config.js'
+import {
+  AgentInvoked, AgentCompleted, AgentFailed,
+  SkillInvoked, SkillCompleted, SkillFailed, SkillRetry,
+  ToolRequested, ToolCompleted, AgentStreamChunk,
+} from '../events/observation-events.js'
 import { parseAgentOutput } from './output-parser.js'
 
 export interface InvocationOptions<TState = unknown> {
@@ -22,6 +28,7 @@ export interface InvocationOptions<TState = unknown> {
   getState: () => TState
   use: Injector
   onEvent?: (event: BaseEvent) => void
+  observation?: ObservationConfig
 }
 
 export interface InvocationResult {
@@ -29,6 +36,44 @@ export interface InvocationResult {
   conversation: Conversation
   chunks: AgentChunk[]
   tokenUsage: { input: number; output: number }
+}
+
+function shouldEmit(
+  eventDef: { type: string },
+  observation: ObservationConfig | undefined,
+  skillName?: string,
+): boolean {
+  if (!observation) return false
+  if (observation.observeAll) return true
+  if (observation.events?.some(entry => entry.event.type === eventDef.type)) return true
+  if (skillName && observation.skillEvents) {
+    const skillObs = observation.skillEvents.find(se => se.skill.name === skillName)
+    if (skillObs && (!skillObs.events || skillObs.events.length === 0)) return true
+    if (skillObs?.events?.some(e => e.type === eventDef.type)) return true
+  }
+  return false
+}
+
+function resolveVolatility(
+  eventDef: { type: string },
+  observation: ObservationConfig | undefined,
+  skillName?: string,
+): Volatility {
+  if (!observation) return 'volatile'
+
+  if (skillName && observation.skillEvents) {
+    const skillObs = observation.skillEvents.find(se => se.skill.name === skillName)
+    if (skillObs?.volatility) return skillObs.volatility
+  }
+
+  if (observation.events) {
+    const entry = observation.events.find(e => e.event.type === eventDef.type)
+    if (entry?.volatility) return entry.volatility
+  }
+
+  if (observation.observeAllVolatility) return observation.observeAllVolatility
+
+  return 'volatile'
 }
 
 export function toToolSchema(tool: ToolEntity): ToolSchema {
@@ -105,6 +150,8 @@ async function runToolLoop(
   getState: () => unknown,
   use: Injector,
   onEvent?: (event: BaseEvent) => void,
+  observation?: ObservationConfig,
+  skillName?: string,
 ): Promise<{ conv: Conversation; finalChunks: AgentChunk[] }> {
   let currentConv = conv
   let currentNewFromIndex = newFromIndex
@@ -133,6 +180,11 @@ async function runToolLoop(
       if (chunk.type === 'tool-call') {
         pendingToolCalls.push(chunk.toolCall)
       }
+
+      if (chunk.type === 'text' && onEvent && shouldEmit(AgentStreamChunk, observation, skillName)) {
+        const evt = AgentStreamChunk({ agent: agentName, skill: skillName ?? '', chunkType: 'text', content: chunk.content })
+        onEvent({ ...evt, volatility: resolveVolatility(AgentStreamChunk, observation, skillName) })
+      }
     }
 
     if (pendingToolCalls.length === 0) {
@@ -157,6 +209,12 @@ async function runToolLoop(
     currentConv = currentConv.append(assistantMsg)
 
     for (const tc of pendingToolCalls) {
+      if (onEvent && shouldEmit(ToolRequested, observation, skillName)) {
+        const evt = ToolRequested({ agent: agentName, tool: tc.name, arguments: tc.arguments })
+        onEvent({ ...evt, volatility: resolveVolatility(ToolRequested, observation, skillName) })
+      }
+
+      const toolStart = Date.now()
       const { result: toolResult, error: toolError } = await executeTool(
         toolMap.get(tc.name),
         tc,
@@ -164,6 +222,12 @@ async function runToolLoop(
         use,
         onEvent,
       )
+      const toolDurationMs = Date.now() - toolStart
+
+      if (onEvent && shouldEmit(ToolCompleted, observation, skillName)) {
+        const evt = ToolCompleted({ agent: agentName, tool: tc.name, durationMs: toolDurationMs })
+        onEvent({ ...evt, volatility: resolveVolatility(ToolCompleted, observation, skillName) })
+      }
 
       const toolMsg: ToolMessage = {
         role: 'tool',
@@ -189,9 +253,19 @@ async function runToolLoop(
 
 export async function invokeAgent(options: InvocationOptions): Promise<InvocationResult> {
   const { agent, skill, input, getState, use, onEvent } = options
+  const observation = options.observation ?? agent.observation
 
   const skillConfig = agent.skillConfigs?.get(skill.name)
   const { toolMap, toolSchemas } = gatherTools(agent, skill)
+
+  if (onEvent && shouldEmit(AgentInvoked, observation)) {
+    const evt = AgentInvoked({ agent: agent.name, skill: skill.name, inputHash: '' })
+    onEvent({ ...evt, volatility: resolveVolatility(AgentInvoked, observation) })
+  }
+  if (onEvent && shouldEmit(SkillInvoked, observation, skill.name)) {
+    const evt = SkillInvoked({ agent: agent.name, skill: skill.name })
+    onEvent({ ...evt, volatility: resolveVolatility(SkillInvoked, observation, skill.name) })
+  }
 
   const userMsg: UserMessage = {
     role: 'user',
@@ -208,6 +282,7 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
   const allChunks: AgentChunk[] = []
   const tokenUsage = { input: 0, output: 0 }
   let newFromIndex = conv.length - 1
+  const skillStart = Date.now()
 
   while (true) {
     const loopResult = await runToolLoop(
@@ -223,6 +298,8 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
       getState,
       use,
       onEvent,
+      observation,
+      skill.name,
     )
 
     conv = loopResult.conv
@@ -246,17 +323,55 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
       try {
         await skill.assert(output, { use, getState })
       } catch (err) {
-        if (attempt >= maxRetries) throw err
+        const errorMsg = err instanceof Error ? err.message : String(err)
+
+        if (attempt >= maxRetries) {
+          if (onEvent) {
+            if (shouldEmit(SkillFailed, observation, skill.name)) {
+              const evt = SkillFailed({ agent: agent.name, skill: skill.name, error: errorMsg, retriesExhausted: true })
+              onEvent({ ...evt, volatility: resolveVolatility(SkillFailed, observation, skill.name) })
+            }
+            if (shouldEmit(AgentFailed, observation)) {
+              const evt = AgentFailed({ agent: agent.name, skill: skill.name, error: errorMsg })
+              onEvent({ ...evt, volatility: resolveVolatility(AgentFailed, observation) })
+            }
+          }
+          throw err
+        }
+
         attempt++
+
+        if (onEvent && shouldEmit(SkillRetry, observation, skill.name)) {
+          const evt = SkillRetry({ agent: agent.name, skill: skill.name, attempt, maxRetries, error: errorMsg })
+          onEvent({ ...evt, volatility: resolveVolatility(SkillRetry, observation, skill.name) })
+        }
 
         const feedbackMsg: UserMessage = {
           role: 'user',
-          content: `Your output failed validation: ${err instanceof Error ? err.message : String(err)}. Please try again.`,
+          content: `Your output failed validation: ${errorMsg}. Please try again.`,
           timestamp: Date.now(),
         }
         conv = conv.append(feedbackMsg)
         newFromIndex = conv.length - 1
         continue
+      }
+    }
+
+    const skillDurationMs = Date.now() - skillStart
+
+    if (onEvent) {
+      if (shouldEmit(SkillCompleted, observation, skill.name)) {
+        const evt = SkillCompleted({ agent: agent.name, skill: skill.name, durationMs: skillDurationMs })
+        onEvent({ ...evt, volatility: resolveVolatility(SkillCompleted, observation, skill.name) })
+      }
+      if (shouldEmit(AgentCompleted, observation)) {
+        const evt = AgentCompleted({
+          agent: agent.name,
+          skill: skill.name,
+          durationMs: skillDurationMs,
+          tokenUsage: { input: tokenUsage.input, output: tokenUsage.output },
+        })
+        onEvent({ ...evt, volatility: resolveVolatility(AgentCompleted, observation) })
       }
     }
 

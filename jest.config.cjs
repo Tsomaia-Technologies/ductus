@@ -32,5 +32,6 @@ module.exports = {
   },
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
+    "^uuid$": "<rootDir>/src/__mocks__/uuid.ts",
   },
 };
