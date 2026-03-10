@@ -1104,3 +1104,51 @@ The current `AgentDispatcher` (520 lines, 8+ concerns) will be decomposed into f
 7. **Hallucination tracking wiring** — connect skill `.assert()` failures to `agent.hallucinations` counter. Define which assertion failures count as hallucinations vs. simple errors.
 
 8. **Built-in API transport** — the framework should ship at least one direct API transport (Anthropic or OpenAI) that demonstrates the full agent lifecycle natively.
+
+---
+
+## Appendix B: Implementation Deviations
+
+Deviations from the original RFC that were accepted during implementation. Each is documented with the RFC reference, actual implementation, and rationale.
+
+### B.1 `duration` → `durationMs` (Section 11.1)
+
+**RFC:** `duration` on `AgentCompleted`, `SkillCompleted`, `ToolCompleted`.
+**Implementation:** `durationMs` on all three events.
+**Rationale:** Explicit unit in field name eliminates ambiguity (seconds vs. milliseconds vs. nanoseconds). Self-documenting without requiring consumers to check documentation.
+
+### B.2 `AgentCompleted.tokenUsage.total` (Section 11.1)
+
+**RFC:** `tokenUsage: { input, output }` in the table; example code at line 839 already references `.total`.
+**Implementation:** `tokenUsage: { input: number, output: number, total: number }`.
+**Rationale:** Formalizes what the RFC example already assumed. Avoids repeated `input + output` at every consumer.
+
+### B.3 `outputFormat` removed from `TransportRequest` (Section 7)
+
+**RFC:** Not explicitly specified; pre-RFC artifact included `outputFormat?: 'text' | 'json'`.
+**Implementation:** Field removed entirely.
+**Rationale:** The framework owns output parsing via skill schema validation. Transport format hints couple two layers that should be independent.
+
+### B.4 `AgentChunkData.data` typed as `unknown` (Section 6)
+
+**RFC:** Pre-RFC artifact typed `data: any`.
+**Implementation:** `data: unknown`.
+**Rationale:** `unknown` forces explicit narrowing at consumer sites. Standard TypeScript safety practice — no `any` in public interfaces.
+
+### B.5 `Schema = ZodSchema` direct coupling (Section 3)
+
+**RFC:** References abstract `Schema` type throughout.
+**Implementation:** `export type Schema = ZodSchema` with JSDoc documenting the coupling.
+**Status:** Accepted for now. A runtime abstraction layer (parse, validate, infer) is significant effort with low current value. Consumers import `Schema` (not `ZodSchema`) to future-proof.
+
+### B.6 `AssertionExhaustedError` (not in RFC)
+
+**RFC:** Does not specify error propagation for exhausted skill retries.
+**Implementation:** Custom error class carrying `assertionFailures: number`.
+**Rationale:** When retries exhaust, the assertion failure count must reach the dispatcher for hallucination tracking and lifecycle reset. A plain `Error` cannot carry structured data; `instanceof` checks enable typed access.
+
+### B.7 `PipelineContext` enriched with `getState` and `use` (Section 9)
+
+**RFC:** Pipeline context has `agentName`, `skillName`, `triggerEvent`.
+**Implementation:** Also includes `getState?: () => unknown` and `use?: Injector`.
+**Rationale:** Reactions run inside processors which receive `getState` and `use`. Without forwarding them, pipeline steps (`map`, `assert`, `error`) cannot access application state or DI — making real-world reactions (e.g., assert that checks database state, map that uses a service) impossible.
