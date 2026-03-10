@@ -39,7 +39,7 @@ export interface AgentChunkUsage extends AgentChunkBase {
 
 export interface AgentChunkData extends AgentChunkBase {
   type: 'data'
-  data: any
+  data: unknown
 }
 
 export interface AgentChunkComplete extends AgentChunkBase {
