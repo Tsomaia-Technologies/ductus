@@ -24,6 +24,7 @@ export interface TurnRecord {
   failed: boolean
 }
 
+/** @deprecated Use {@link AgentLifecycleStateV2} instead. */
 export interface AgentLifecycleState {
   tokensUsed: number
   failures: number
