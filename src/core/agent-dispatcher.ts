@@ -1,7 +1,7 @@
 import { AgentEntity, HandoffReason } from '../interfaces/entities/agent-entity.js'
 import { AgentChunk } from '../interfaces/agent-chunk.js'
 import { AgentContext } from '../interfaces/agent-context.js'
-import { CommittedEvent } from '../interfaces/event.js'
+import { BaseEvent, CommittedEvent } from '../interfaces/event.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { PromptTemplate } from '../interfaces/prompt-template.js'
@@ -9,10 +9,18 @@ import { SystemAdapter } from '../interfaces/system-adapter.js'
 import { identity } from '../utils/common-utils.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
 
-import { AgentLifecycleState, AgentTuple } from '../interfaces/agent-lifecycle.js'
+import { AgentLifecycleState, AgentLifecycleStateV2, AgentTuple } from '../interfaces/agent-lifecycle.js'
 import { AgentInterceptor, InvocationContext } from './pipeline/agent-interceptor.js'
 import { TemplateInterceptor } from './pipeline/interceptors/template-interceptor.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
+import { invokeAgent } from './agent-invocation.js'
+import { ConversationImpl } from './conversation.js'
+import { AgentTransport } from '../interfaces/agent-transport.js'
+import { ContextPolicy } from '../interfaces/context-policy.js'
+import { ReplaceContextPolicy } from './context-policies/replace-context-policy.js'
+import { TruncateContextPolicy } from './context-policies/truncate-context-policy.js'
+import { SummarizeContextPolicy } from './context-policies/summarize-context-policy.js'
+import { SlidingWindowContextPolicy } from './context-policies/sliding-window-context-policy.js'
 
 /**
  * Generic template renderer. Engine-agnostic — user wraps their preferred
@@ -55,6 +63,7 @@ const AGENT_SUMMARY_PROMPT = 'Provide a concise summary of our conversation so f
 export class AgentDispatcher<TState> {
   private readonly agents: Map<string, AgentTuple> = new Map()
   private readonly lifecycle: Map<string, AgentLifecycleState> = new Map()
+  private readonly lifecycleV2: Map<string, AgentLifecycleStateV2> = new Map()
   private readonly templateRenderer: TemplateRenderer
   private readonly ledger: EventLedger
   private readonly store: StoreAdapter<TState>
@@ -176,6 +185,11 @@ export class AgentDispatcher<TState> {
       await state.adapter.terminate()
     }
     this.lifecycle.clear()
+
+    for (const [, state] of this.lifecycleV2) {
+      await state.transport.close()
+    }
+    this.lifecycleV2.clear()
   }
 
   // ── Prompt Composition ────────────────────────────────────────────────
@@ -487,6 +501,126 @@ export class AgentDispatcher<TState> {
       turnRecords: [],
       currentTurnStartSequence: 0,
     })
+  }
+
+  // ── V2 Invocation Path ────────────────────────────────────────────────
+
+  async invokeAndParseV2(agentName: string, skillName: string, input: unknown): Promise<{
+    output: unknown
+    observationEvents: BaseEvent[]
+  }> {
+    const tuple = this.agents.get(agentName)
+    if (!tuple) throw new Error(`Agent '${agentName}' not found.`)
+    const skill = tuple.agent.skill.find(s => s.name === skillName)
+    if (!skill) throw new Error(`Skill '${skillName}' not found on agent '${agentName}'.`)
+
+    const stateV2 = await this.getOrCreateLifecycleStateV2(agentName)
+
+    await this.enforceContextPolicy(agentName, tuple.agent, stateV2)
+
+    stateV2.turns++
+    stateV2.currentTurnStartSequence = this.lastKnownSequence + 1
+
+    const observationEvents: BaseEvent[] = []
+    let turnFailed = false
+
+    try {
+      const result = await invokeAgent({
+        agent: tuple.agent,
+        skill,
+        input,
+        conversation: stateV2.conversation,
+        transport: stateV2.transport,
+        model: tuple.model,
+        getState: () => this.store.getState(),
+        use: this.injector,
+        onEvent: (event) => observationEvents.push(event),
+      })
+
+      stateV2.conversation = result.conversation
+      stateV2.tokensUsed += result.tokenUsage.input + result.tokenUsage.output
+
+      stateV2.turnRecords.push({
+        turnNumber: stateV2.turns,
+        startSequence: stateV2.currentTurnStartSequence,
+        endSequence: this.lastKnownSequence,
+        failed: false,
+      })
+
+      return { output: result.output, observationEvents }
+    } catch (err) {
+      turnFailed = true
+      stateV2.failures++
+
+      stateV2.turnRecords.push({
+        turnNumber: stateV2.turns,
+        startSequence: stateV2.currentTurnStartSequence,
+        endSequence: this.lastKnownSequence,
+        failed: turnFailed,
+      })
+
+      throw err
+    }
+  }
+
+  private async getOrCreateLifecycleStateV2(agentName: string): Promise<AgentLifecycleStateV2> {
+    let state = this.lifecycleV2.get(agentName)
+    if (!state) {
+      const tuple = this.agents.get(agentName)!
+      const systemMessage = await this.composeSystemMessage(tuple.agent)
+
+      let transport: AgentTransport
+      if (tuple.agent.defaultTransport) {
+        transport = tuple.agent.defaultTransport
+      } else {
+        throw new Error(`Agent '${agentName}' has no transport configured. Set defaultTransport on the agent.`)
+      }
+
+      const conversation = ConversationImpl.create(systemMessage)
+
+      state = {
+        tokensUsed: 0,
+        failures: 0,
+        hallucinations: 0,
+        turns: 0,
+        transport,
+        conversation,
+        turnRecords: [],
+        currentTurnStartSequence: 0,
+      }
+      this.lifecycleV2.set(agentName, state)
+    }
+    return state
+  }
+
+  private async enforceContextPolicy(
+    _agentName: string,
+    agentConfig: AgentEntity,
+    state: AgentLifecycleStateV2,
+  ): Promise<void> {
+    if (agentConfig.maxContextTokens === undefined) return
+    if (state.conversation.tokenEstimate < agentConfig.maxContextTokens) return
+
+    const policy = this.resolveContextPolicy(agentConfig)
+    state.conversation = await policy.apply(
+      state.conversation,
+      agentConfig.maxContextTokens,
+      state.transport,
+    )
+  }
+
+  private resolveContextPolicy(agentConfig: AgentEntity): ContextPolicy {
+    const { contextPolicy } = agentConfig
+    if (!contextPolicy || typeof contextPolicy === 'string') {
+      switch (contextPolicy) {
+        case 'replace': return new ReplaceContextPolicy()
+        case 'truncate': return new TruncateContextPolicy()
+        case 'summarize': return new SummarizeContextPolicy()
+        case 'sliding-window': return new SlidingWindowContextPolicy({ windowTokens: agentConfig.maxContextTokens ?? Infinity })
+        default: return new TruncateContextPolicy()
+      }
+    }
+    return contextPolicy
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────
