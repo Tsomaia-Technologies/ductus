@@ -144,4 +144,77 @@ describe('SummarizeContextPolicy', () => {
     expect(result.messages[0].role).toBe('assistant')
     expect(result.messages[0].content).toBe('A summary')
   })
+
+  it('returns empty conversation immediately when input has no messages', async () => {
+    const failTransport: AgentTransport = {
+      async *send() {
+        throw new Error('should not be called')
+      },
+      async close() {},
+    }
+
+    const conv = ConversationImpl.create('sys')
+    const policy = new SummarizeContextPolicy()
+    const result = await policy.apply(conv, 1000, failTransport)
+
+    expect(result.length).toBe(0)
+    expect(result.systemMessage).toBe('sys')
+  })
+
+  it('falls back to truncation when transport throws', async () => {
+    const errorTransport: AgentTransport = {
+      async *send() {
+        throw new Error('transport failure')
+      },
+      async close() {},
+    }
+
+    const conv = buildConversation('sys', ['a', 'b', 'c', 'd', 'e'])
+    const policy = new SummarizeContextPolicy({ preserveLastN: 2 })
+    const result = await policy.apply(conv, 1000, errorTransport)
+
+    expect(result.systemMessage).toBe('sys')
+    expect(result.length).toBeGreaterThanOrEqual(2)
+    const contents = result.messages.map((m) => m.content)
+    expect(contents).toContain('d')
+    expect(contents).toContain('e')
+  })
+
+  it('includes targetTokens in the prompt sent to transport', async () => {
+    let capturedPrompt = ''
+    const capturingTransport: AgentTransport = {
+      async *send(request) {
+        const msgs = request.conversation.messages
+        capturedPrompt = msgs[msgs.length - 1].content
+        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
+        yield { type: 'complete' as const, timestamp: Date.now() }
+      },
+      async close() {},
+    }
+
+    const conv = buildConversation('sys', ['hello'])
+    const policy = new SummarizeContextPolicy({ targetTokens: 200 })
+    await policy.apply(conv, 1000, capturingTransport)
+
+    expect(capturedPrompt).toContain('200 tokens')
+  })
+
+  it('defaults targetTokens to half the limit when not provided', async () => {
+    let capturedPrompt = ''
+    const capturingTransport: AgentTransport = {
+      async *send(request) {
+        const msgs = request.conversation.messages
+        capturedPrompt = msgs[msgs.length - 1].content
+        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
+        yield { type: 'complete' as const, timestamp: Date.now() }
+      },
+      async close() {},
+    }
+
+    const conv = buildConversation('sys', ['hello'])
+    const policy = new SummarizeContextPolicy()
+    await policy.apply(conv, 800, capturingTransport)
+
+    expect(capturedPrompt).toContain('400 tokens')
+  })
 })

@@ -3,6 +3,7 @@ import { Conversation } from '../../interfaces/conversation.js'
 import { AgentTransport, TransportRequest } from '../../interfaces/agent-transport.js'
 import { AssistantMessage } from '../../interfaces/agentic-message.js'
 import { ConversationImpl } from '../conversation.js'
+import { selectFromEnd } from './truncate-context-policy.js'
 
 export interface SummarizeOptions {
   targetTokens?: number
@@ -23,10 +24,16 @@ export class SummarizeContextPolicy implements ContextPolicy {
     limit: number,
     transport: AgentTransport,
   ): Promise<Conversation> {
+    if (conversation.length === 0) {
+      return ConversationImpl.create(conversation.systemMessage)
+    }
+
+    const effectiveTargetTokens = this.targetTokens ?? Math.floor(limit / 2)
+
     const summarizeConv = conversation.append({
       role: 'user',
       content:
-        'Summarize the conversation so far concisely, preserving key decisions, context, and outputs.',
+        `Summarize the conversation so far concisely, preserving key decisions, context, and outputs. Target approximately ${effectiveTargetTokens} tokens.`,
       timestamp: Date.now(),
     })
 
@@ -37,9 +44,19 @@ export class SummarizeContextPolicy implements ContextPolicy {
       temperature: 0,
     }
 
-    let summary = ''
-    for await (const chunk of transport.send(request)) {
-      if (chunk.type === 'text') summary += chunk.content
+    let summary: string
+    try {
+      summary = ''
+      for await (const chunk of transport.send(request)) {
+        if (chunk.type === 'text') summary += chunk.content
+      }
+    } catch {
+      const retained = selectFromEnd(conversation.messages, limit, this.preserveLastN)
+      let fallback: Conversation = ConversationImpl.create(conversation.systemMessage)
+      for (const msg of retained) {
+        fallback = fallback.append(msg)
+      }
+      return fallback
     }
 
     const summaryMessage: AssistantMessage = {
