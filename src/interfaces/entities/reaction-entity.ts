@@ -1,4 +1,5 @@
 import { BaseEventDefinition, CommittedEvent, EventDefinition } from '../event.js'
+import { Injector } from '../event-generator.js'
 import { Schema } from '../schema.js'
 import { AgentEntity } from './agent-entity.js'
 import { SkillEntity } from './skill-entity.js'
@@ -7,6 +8,8 @@ export interface PipelineContext {
   agent?: AgentEntity
   skill?: SkillEntity
   triggerEvent: CommittedEvent
+  getState?: () => unknown
+  use?: Injector
 }
 
 export interface InvokeStep {

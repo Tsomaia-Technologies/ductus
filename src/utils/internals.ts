@@ -12,6 +12,7 @@ import { isSchemaType } from './schema-utils.js'
 import { ErrorStep, PipelineContext, PipelineStep, ReactionEntity } from '../interfaces/entities/reaction-entity.js'
 import { AgentDispatcher } from '../core/agent-dispatcher.js'
 import { EventProcessor } from '../interfaces/event-processor.js'
+import { Injector } from '../interfaces/event-generator.js'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 
@@ -79,7 +80,7 @@ export function createReactionAdapter<TState>(
 ): EventProcessor<TState> {
   return {
     name: reaction.name,
-    process: async function* (events) {
+    process: async function* (events, getState, use) {
       for await (const event of events) {
         if (!reaction.triggers.includes(event.type)) continue
 
@@ -88,6 +89,8 @@ export function createReactionAdapter<TState>(
           event.payload,
           dispatcher,
           event,
+          getState,
+          use,
         )
       }
     },
@@ -99,6 +102,8 @@ async function* executePipeline<TState>(
   input: unknown,
   dispatcher: AgentDispatcher<TState>,
   triggerEvent: CommittedEvent,
+  getState?: () => unknown,
+  use?: Injector,
 ): OutputEventStream {
   let lastInvokeResult: unknown = input
   let lastAgent: AgentEntity | undefined
@@ -108,6 +113,8 @@ async function* executePipeline<TState>(
     agent: lastAgent,
     skill: lastSkill,
     triggerEvent,
+    getState,
+    use,
   })
 
   for (let i = 0; i < steps.length; i++) {
@@ -146,7 +153,7 @@ async function* executePipeline<TState>(
         case 'case':
           try {
             const matched = step.schema.parse(lastInvokeResult)
-            yield* executePipeline([step.then], matched, dispatcher, triggerEvent)
+            yield* executePipeline([step.then], matched, dispatcher, triggerEvent, getState, use)
           } catch (error) {
             if (!(error instanceof zod.ZodError)) throw error
           }
