@@ -186,8 +186,12 @@ export class AgentDispatcher<TState> {
     }
     this.lifecycle.clear()
 
-    for (const [, state] of this.lifecycleV2) {
-      await state.transport.close()
+    for (const [name, state] of this.lifecycleV2) {
+      try {
+        await state.transport.close()
+      } catch (err) {
+        console.warn(`Failed to close transport for agent ${name}:`, err)
+      }
     }
     this.lifecycleV2.clear()
   }
