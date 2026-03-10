@@ -458,8 +458,8 @@ describe('invokeAgent', () => {
 
       const streamChunks = events.filter(e => e.type === 'Ductus/AgentStreamChunk')
       expect(streamChunks).toHaveLength(2)
-      expect(streamChunks[0].payload).toMatchObject({ agent: 'test-agent', skill: 'test-skill', chunkType: 'text', content: '{"answer":' })
-      expect(streamChunks[1].payload).toMatchObject({ content: '"hello"}' })
+      expect(streamChunks[0].payload).toMatchObject({ agent: 'test-agent', skill: 'test-skill', chunk: { type: 'text', content: '{"answer":' } })
+      expect(streamChunks[1].payload).toMatchObject({ chunk: { type: 'text', content: '"hello"}' } })
     })
 
     it('emits SkillRetry on assertion failure with retries remaining', async () => {

@@ -133,7 +133,7 @@ async function executeTool(
     const validatedArgs = tool.inputSchema.parse(parsedArgs)
     const ctx: ToolContext = {
       getState,
-      use,
+      use: <T>(token: string): T => use({ symbol: Symbol.for(token) }) as T,
       emit: onEvent ?? (() => {}),
     }
     const result = await tool.execute(validatedArgs, ctx)
@@ -196,7 +196,7 @@ async function runToolLoop(
       }
 
       if (chunk.type === 'text' && onEvent && shouldEmit(AgentStreamChunk, observation, skillName)) {
-        const evt = AgentStreamChunk({ agent: agentName, skill: skillName ?? '', chunkType: 'text', content: chunk.content })
+        const evt = AgentStreamChunk({ agent: agentName, skill: skillName ?? '', chunk: { type: 'text', content: chunk.content } })
         onEvent({ ...evt, volatility: resolveVolatility(AgentStreamChunk, observation, skillName) })
       }
     }

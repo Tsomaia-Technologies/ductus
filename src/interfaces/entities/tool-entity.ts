@@ -1,10 +1,9 @@
 import { Schema } from '../schema.js'
 import { BaseEvent } from '../event.js'
-import { Injector } from '../event-generator.js'
 
 export interface ToolContext<TState = unknown> {
   getState: () => TState
-  use: Injector
+  use: <T>(token: string) => T
   emit: (event: BaseEvent) => void
 }
 

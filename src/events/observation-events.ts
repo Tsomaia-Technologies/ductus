@@ -29,8 +29,7 @@ export const AgentReplaced = signal('Ductus/AgentReplaced', {
 export const AgentStreamChunk = signal('Ductus/AgentStreamChunk', {
   agent: string(),
   skill: string(),
-  chunkType: string(),
-  content: string(),
+  chunk: object({ type: string(), content: string() }),
 })
 
 export const SkillInvoked = signal('Ductus/SkillInvoked', {
