@@ -3,6 +3,7 @@ import { ModelEntity } from '../entities/model-entity.js'
 
 export type DynamicCommand = (model: ModelEntity) => string
 
+/** @deprecated Use {@link AgentTransport} with a custom implementation instead. */
 export interface CliAdapterBuilder extends AdapterBuilder {
   apiKey(apiKey: string): this
 

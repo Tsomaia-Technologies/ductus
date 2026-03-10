@@ -14,6 +14,7 @@ interface CliAdapterBuilderParams {
   readonly args: string[]
 }
 
+/** @deprecated Use {@link AgentTransport} with a custom implementation instead. */
 export class ImmutableCliAdapterBuilder implements CliAdapterBuilder {
   private params: CliAdapterBuilderParams
 

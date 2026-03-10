@@ -7,6 +7,7 @@ import { InvocationContext } from '../../core/pipeline/agent-interceptor.js'
 /**
  * Runtime interface for communicating with an AI backend.
  * Created by AdapterEntity.create() — the kernel manages the lifecycle.
+ * @deprecated Use {@link AgentTransport} from `agent-transport.js` instead.
  */
 export interface AgentAdapter {
   initialize(context?: AgentContext): Promise<void>
@@ -21,6 +22,7 @@ export interface AgentAdapter {
 /**
  * Entity produced by adapter builders.
  * Holds a factory closure that captures config and creates runtime adapters on demand.
+ * @deprecated Use {@link AgentTransport} from `agent-transport.js` instead.
  */
 export interface AdapterEntity {
   create(agent: AgentEntity, model: ModelEntity): AgentAdapter

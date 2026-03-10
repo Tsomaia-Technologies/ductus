@@ -4,10 +4,17 @@ import { ModelEntity } from './entities/model-entity.js'
 import { Conversation } from './conversation.js'
 import { AgentTransport } from './agent-transport.js'
 
+/** @deprecated Use {@link AgentTupleV2} instead. */
 export interface AgentTuple {
   agent: AgentEntity
   model: ModelEntity
   adapter: AdapterEntity
+}
+
+export interface AgentTupleV2 {
+  agent: AgentEntity
+  model?: ModelEntity
+  transport?: AgentTransport
 }
 
 export interface TurnRecord {
