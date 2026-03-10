@@ -8,7 +8,7 @@ import { ModelEntity } from '../interfaces/entities/model-entity.js'
 import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 import { ToolEntity } from '../interfaces/entities/tool-entity.js'
 import { Injector } from '../interfaces/event-generator.js'
-import { BaseEvent } from '../interfaces/event.js'
+import { BaseEvent, Volatility } from '../interfaces/event.js'
 import { ObservationConfig } from '../interfaces/observation-config.js'
 import { AssistantMessage, ToolMessage } from '../interfaces/agentic-message.js'
 import {
@@ -557,6 +557,40 @@ describe('invokeAgent', () => {
       expect(types).toContain('Ductus/SkillCompleted')
       expect(types).not.toContain('Ductus/AgentInvoked')
       expect(types).not.toContain('Ductus/AgentCompleted')
+    })
+
+    it('observeAllVolatility — all emitted observation events use the configured volatility', async () => {
+      const events: BaseEvent[] = []
+      const searchTool: ToolEntity = {
+        name: 'search',
+        description: 'search tool',
+        inputSchema: z.object({ q: z.string() }),
+        execute: async (input) => `found: ${(input as { q: string }).q}`,
+      }
+
+      const durableObs: ObservationConfig = {
+        observeAll: true,
+        observeAllVolatility: 'durable',
+        events: [],
+        skillEvents: [],
+      }
+
+      const transport = mockTransport([
+        [toolCall('tc1', 'search', '{"q":"hello"}')],
+        [text('{"answer":"done"}'), complete()],
+      ])
+
+      await invokeAgent(makeOptions({
+        agent: mockAgent({ tools: [searchTool] }),
+        transport,
+        onEvent: (e) => events.push(e),
+        observation: durableObs,
+      }))
+
+      expect(events.length).toBeGreaterThan(0)
+      for (const evt of events) {
+        expect(evt.volatility).toBe('durable' as Volatility)
+      }
     })
   })
 })

@@ -8,7 +8,7 @@ import { AgentChunk } from '../interfaces/agent-chunk.js'
 import { AgentToolCall } from '../interfaces/agent-tool-call.js'
 import { ModelEntity } from '../interfaces/entities/model-entity.js'
 import { Injector } from '../interfaces/event-generator.js'
-import { BaseEvent, Volatility } from '../interfaces/event.js'
+import { BaseEvent, BaseEventDefinition, Volatility } from '../interfaces/event.js'
 import { AssistantMessage, ToolMessage, UserMessage } from '../interfaces/agentic-message.js'
 import { ObservationConfig } from '../interfaces/observation-config.js'
 import {
@@ -39,7 +39,7 @@ export interface InvocationResult {
 }
 
 function shouldEmit(
-  eventDef: { type: string },
+  eventDef: BaseEventDefinition,
   observation: ObservationConfig | undefined,
   skillName?: string,
 ): boolean {
@@ -54,8 +54,9 @@ function shouldEmit(
   return false
 }
 
+// Resolution priority: per-skill > per-event > observeAllVolatility > default ('volatile')
 function resolveVolatility(
-  eventDef: { type: string },
+  eventDef: BaseEventDefinition,
   observation: ObservationConfig | undefined,
   skillName?: string,
 ): Volatility {
