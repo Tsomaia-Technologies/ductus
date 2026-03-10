@@ -7,6 +7,7 @@ import { ImmutableReducerBuilder } from './builders/immutable-reducer-builder.js
 import { ImmutableFlowBuilder } from './builders/immutable-flow-builder.js'
 import { ImmutableModelBuilder } from './builders/immutable-model-builder.js'
 import { ImmutableCliAdapterBuilder } from './builders/immutable-cli-adapter-builder.js'
+import { ImmutableToolBuilder } from './builders/immutable-tool-builder.js'
 import { FlowEntity } from './interfaces/entities/flow-entity.js'
 import { EventDefinition } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
@@ -22,6 +23,7 @@ import { ReducerBuilder } from './interfaces/builders/reducer-builder.js'
 import { RulesetBuilder } from './interfaces/builders/ruleset-builder.js'
 import { SkillBuilder } from './interfaces/builders/skill-builder.js'
 import { ProcessorBuilder } from './interfaces/builders/processor-builder.js'
+import { ToolBuilder } from './interfaces/builders/tool-builder.js'
 import { Multiplexer } from './interfaces/multiplexer.js'
 import { EventLedger } from './interfaces/event-ledger.js'
 import { CancellationToken } from './interfaces/cancellation-token.js'
@@ -48,6 +50,7 @@ import {
   union,
 } from './utils/schema-utils.js'
 import { BootEvent } from './core/events.js'
+import { observationEvents } from './events/observation-events.js'
 import { EventSequencer } from './interfaces/event-sequencer.js'
 import { ImmutableFixedClusterBuilder } from './builders/immutable-fixed-cluster-builder.js'
 import { ImmutableDynamicClusterBuilder } from './builders/immutable-dynamic-cluster-builder.js'
@@ -120,6 +123,10 @@ function adapter(type: 'cli'): CliAdapterBuilder {
   return new ImmutableCliAdapterBuilder()
 }
 
+function tool(name: string): ToolBuilder {
+  return new ImmutableToolBuilder().name(name)
+}
+
 function async<TState>(
   factory: (use: Injector) => Promise<FlowEntity<TState>>,
 ): AsyncEntity<TState> {
@@ -189,8 +196,17 @@ export function kernel<TState>(
     .token(FileAdapter, fileAdapter)
 
   const { use } = build(coreContainer)
+
+  const agentTuples = flow.agents
+    .filter(a => a.adapter !== undefined)
+    .map(a => ({
+      agent: a.agent,
+      model: a.model!,
+      adapter: a.adapter!,
+    }))
+
   const dispatcher = new AgentDispatcher({
-    agents: flow.agents,
+    agents: agentTuples,
     ledger,
     store,
     templateRenderer,
@@ -229,6 +245,7 @@ export default {
   skill,
   processor,
   adapter,
+  tool,
   async,
 
   emit,
@@ -241,6 +258,8 @@ export default {
   concurrent,
 
   kernel,
+
+  events: observationEvents,
 
   literal,
   boolean,
