@@ -220,7 +220,7 @@ describe('invokeAgent', () => {
       }),
     )
 
-    expect(result.tokenUsage).toEqual({ input: 180, output: 80 })
+    expect(result.tokenUsage).toEqual({ input: 180, output: 80, total: 260 })
   })
 
   it('parallel tool calls — all tool calls in one response are executed', async () => {
@@ -338,11 +338,22 @@ describe('invokeAgent', () => {
       expect(types).toContain('Ductus/SkillCompleted')
       expect(types).toContain('Ductus/AgentCompleted')
 
+      const skillInvokedEvents = events.filter(e => e.type === 'Ductus/SkillInvoked')
+      expect(skillInvokedEvents.length).toBeGreaterThan(0)
+      expect(skillInvokedEvents[0]).toMatchObject({
+        type: 'Ductus/SkillInvoked',
+        payload: expect.objectContaining({
+          agent: expect.any(String),
+          skill: expect.any(String),
+          inputHash: expect.any(String),
+        }),
+      })
+
       const completed = events.find(e => e.type === 'Ductus/AgentCompleted')!
       expect(completed.payload).toMatchObject({
         agent: 'test-agent',
         skill: 'test-skill',
-        tokenUsage: { input: 10, output: 5 },
+        tokenUsage: { input: 10, output: 5, total: 15 },
       })
       expect(typeof (completed.payload as { durationMs: number }).durationMs).toBe('number')
     })
@@ -376,7 +387,7 @@ describe('invokeAgent', () => {
       expect(requested.payload).toMatchObject({ agent: 'test-agent', tool: 'search' })
 
       const completed = events.find(e => e.type === 'Ductus/ToolCompleted')!
-      expect(completed.payload).toMatchObject({ agent: 'test-agent', tool: 'search' })
+      expect(completed.payload).toMatchObject({ agent: 'test-agent', tool: 'search', resultSummary: 'found: hello' })
       expect(typeof (completed.payload as { durationMs: number }).durationMs).toBe('number')
     })
 

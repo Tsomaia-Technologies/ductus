@@ -35,7 +35,7 @@ export interface InvocationResult {
   output: unknown
   conversation: Conversation
   chunks: AgentChunk[]
-  tokenUsage: { input: number; output: number }
+  tokenUsage: { input: number; output: number; total: number }
 }
 
 function shouldEmit(
@@ -228,7 +228,8 @@ async function runToolLoop(
       const toolDurationMs = Date.now() - toolStart
 
       if (onEvent && shouldEmit(ToolCompleted, observation, skillName)) {
-        const evt = ToolCompleted({ agent: agentName, tool: tc.name, durationMs: toolDurationMs })
+        const summary = typeof toolResult === 'string' ? toolResult.slice(0, 200) : JSON.stringify(toolResult).slice(0, 200)
+        const evt = ToolCompleted({ agent: agentName, tool: tc.name, durationMs: toolDurationMs, resultSummary: summary })
         onEvent({ ...evt, volatility: resolveVolatility(ToolCompleted, observation, skillName) })
       }
 
@@ -266,7 +267,7 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
     onEvent({ ...evt, volatility: resolveVolatility(AgentInvoked, observation) })
   }
   if (onEvent && shouldEmit(SkillInvoked, observation, skill.name)) {
-    const evt = SkillInvoked({ agent: agent.name, skill: skill.name })
+    const evt = SkillInvoked({ agent: agent.name, skill: skill.name, inputHash: '' })
     onEvent({ ...evt, volatility: resolveVolatility(SkillInvoked, observation, skill.name) })
   }
 
@@ -372,12 +373,13 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
           agent: agent.name,
           skill: skill.name,
           durationMs: skillDurationMs,
-          tokenUsage: { input: tokenUsage.input, output: tokenUsage.output },
+          tokenUsage: { input: tokenUsage.input, output: tokenUsage.output, total: tokenUsage.input + tokenUsage.output },
         })
         onEvent({ ...evt, volatility: resolveVolatility(AgentCompleted, observation) })
       }
     }
 
-    return { output, conversation: conv, chunks: allChunks, tokenUsage }
+    const totalTokens = tokenUsage.input + tokenUsage.output
+    return { output, conversation: conv, chunks: allChunks, tokenUsage: { ...tokenUsage, total: totalTokens } }
   }
 }

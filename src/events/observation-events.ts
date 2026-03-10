@@ -11,7 +11,7 @@ export const AgentCompleted = signal('Ductus/AgentCompleted', {
   agent: string(),
   skill: string(),
   durationMs: number(),
-  tokenUsage: object({ input: number(), output: number() }),
+  tokenUsage: object({ input: number(), output: number(), total: number() }),
 })
 
 export const AgentFailed = signal('Ductus/AgentFailed', {
@@ -23,6 +23,7 @@ export const AgentFailed = signal('Ductus/AgentFailed', {
 export const AgentReplaced = signal('Ductus/AgentReplaced', {
   agent: string(),
   reason: string(),
+  newAgent: string(),
 })
 
 export const AgentStreamChunk = signal('Ductus/AgentStreamChunk', {
@@ -35,6 +36,7 @@ export const AgentStreamChunk = signal('Ductus/AgentStreamChunk', {
 export const SkillInvoked = signal('Ductus/SkillInvoked', {
   agent: string(),
   skill: string(),
+  inputHash: string(),
 })
 
 export const SkillCompleted = signal('Ductus/SkillCompleted', {
@@ -68,6 +70,7 @@ export const ToolCompleted = signal('Ductus/ToolCompleted', {
   agent: string(),
   tool: string(),
   durationMs: number(),
+  resultSummary: string(),
 })
 
 export const observationEvents = {
