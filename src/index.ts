@@ -42,6 +42,7 @@ export * from './core/event-channel.js'
 export * from './core/events.js'
 export * from './core/intent-processor.js'
 export * from './core/intents.js'
+export * from './core/conversation.js'
 export * from './core/linked-list.js'
 export * from './core/mutex.js'
 
