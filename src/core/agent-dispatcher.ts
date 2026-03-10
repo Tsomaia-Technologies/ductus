@@ -503,6 +503,11 @@ export class AgentDispatcher<TState> {
     })
   }
 
+  hasV2Transport(agentName: string): boolean {
+    const tuple = this.agents.get(agentName)
+    return !!tuple?.agent.defaultTransport
+  }
+
   // ── V2 Invocation Path ────────────────────────────────────────────────
 
   async invokeAndParseV2(agentName: string, skillName: string, input: unknown): Promise<{
