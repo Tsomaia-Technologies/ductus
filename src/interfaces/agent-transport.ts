@@ -13,7 +13,6 @@ export interface TransportRequest {
   tools?: ToolSchema[]
   model: string
   temperature?: number
-  outputFormat?: 'text' | 'json'
 }
 
 export interface AgentTransport {
