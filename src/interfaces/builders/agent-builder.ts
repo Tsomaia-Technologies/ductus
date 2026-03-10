@@ -89,7 +89,7 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
   /**
    * Equivalent of calling: .scope('turn', 1)
    */
-  ephemeral(): void // same as .scope('turn', 1)
+  ephemeral(): this
 
   /**
    * Maximum number of tokens after which an agent gets replaced.
