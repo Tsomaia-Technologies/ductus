@@ -54,6 +54,8 @@ Extract these methods into a standalone class or set of functions:
 
 The constructor takes `TemplateRenderer`, `FileAdapter`, `SystemAdapter`, and `Injector` — the same dependencies the dispatcher currently passes to these methods.
 
+**Important design constraint:** The current `resolveSystemPrompt()` renders templates with `state: this.store.getState()` — pulling live application state. If we give the composer a `StoreAdapter` reference, it becomes coupled to the runtime store, violating the RFC's separation-of-concerns principle. Instead, `compose()` should accept `state` as a parameter. The caller (dispatcher or lifecycle manager) passes the current state at call time. The composer stays stateless.
+
 ```typescript
 export class AgentPromptComposer {
   constructor(
@@ -61,12 +63,13 @@ export class AgentPromptComposer {
     private readonly fileAdapter: FileAdapter,
     private readonly systemAdapter: SystemAdapter,
     private readonly injector: Injector,
-    private readonly store: StoreAdapter<unknown>,
   ) {}
 
-  async compose(agent: AgentEntity): Promise<string> { ... }
+  async compose(agent: AgentEntity, state: unknown): Promise<string> { ... }
 }
 ```
+
+The caller passes `this.store.getState()` when calling `compose()`. The composer never holds a store reference.
 
 ### 2.2 Extract Lifecycle Manager — `src/core/agent-lifecycle-manager.ts`
 
@@ -192,6 +195,7 @@ The options interface should reflect the new construction. Remove dependencies t
 - `AgentDispatcher` directly contains context policy resolution logic → REJECT
 - Any extracted component depends on `AgentDispatcher` (circular dependency) → REJECT
 - External callers (`internals.ts`, `factories.ts`) need to change their calling code → REJECT (the facade API must remain the same)
+- `AgentPromptComposer` holds a reference to `StoreAdapter` → REJECT (state must be passed as a parameter to `compose()`, not stored as a dependency)
 
 ---
 
@@ -217,4 +221,5 @@ The options interface should reflect the new construction. Remove dependencies t
 - [ ] All existing tests pass unchanged
 - [ ] New unit tests exist for each extracted component
 - [ ] No circular dependencies between new files
+- [ ] `AgentPromptComposer` does NOT hold a `StoreAdapter` reference — state is passed to `compose()`
 - [ ] `agent-dispatcher.ts` is under 150 lines
