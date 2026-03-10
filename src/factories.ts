@@ -198,11 +198,12 @@ export function kernel<TState>(
   const { use } = build(coreContainer)
 
   const agentTuples = flow.agents
-    .filter(a => a.adapter !== undefined)
+    .filter(a => a.adapter !== undefined || a.transport !== undefined || a.agent.defaultTransport !== undefined)
     .map(a => ({
       agent: a.agent,
       model: a.model!,
-      adapter: a.adapter!,
+      adapter: a.adapter,
+      flowTransport: a.transport,
     }))
 
   const dispatcher = new AgentDispatcher({

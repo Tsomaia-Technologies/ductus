@@ -1,5 +1,6 @@
 import { z } from 'zod/v3'
 import { invokeAgent, InvocationOptions } from '../core/agent-invocation.js'
+import { AgentDispatcher, TemplateRenderer } from '../core/agent-dispatcher.js'
 import { ConversationImpl } from '../core/conversation.js'
 import { AgentChunk } from '../interfaces/agent-chunk.js'
 import { AgentTransport, TransportRequest } from '../interfaces/agent-transport.js'
@@ -9,6 +10,10 @@ import { SkillEntity } from '../interfaces/entities/skill-entity.js'
 import { ToolEntity } from '../interfaces/entities/tool-entity.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { BaseEvent } from '../interfaces/event.js'
+import { EventLedger } from '../interfaces/event-ledger.js'
+import { StoreAdapter } from '../interfaces/store-adapter.js'
+import { SystemAdapter } from '../interfaces/system-adapter.js'
+import { FileAdapter } from '../interfaces/file-adapter.js'
 import { AssistantMessage, ToolMessage, UserMessage } from '../interfaces/agentic-message.js'
 
 // ---------------------------------------------------------------------------
@@ -169,7 +174,7 @@ describe('agentic integration', () => {
 
     expect(requests).toHaveLength(3)
 
-    expect(result.tokenUsage).toEqual({ input: 310, output: 150 })
+    expect(result.tokenUsage).toEqual({ input: 310, output: 150, total: 460 })
   })
 
   // ---------------------------------------------------------------------------
@@ -280,5 +285,206 @@ describe('agentic integration', () => {
 
     expect(result.conversation.length).toBeGreaterThan(0)
     expect(result.conversation.messages.length).toBeGreaterThan(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Dispatcher transport resolution
+// ---------------------------------------------------------------------------
+
+describe('dispatcher transport resolution', () => {
+  function stubLedger(): EventLedger {
+    return {
+      async *readEvents() {},
+      async readLastEvent() { return null },
+      async appendEvent() {},
+      async dispose() {},
+    }
+  }
+
+  function stubStore(): StoreAdapter<Record<string, never>> {
+    const state: Record<string, never> = {}
+    return {
+      getState: () => state,
+      getReducer: () => (s: Record<string, never>) => [s, []] as [Record<string, never>, BaseEvent[]],
+      dispatch: () => [],
+    }
+  }
+
+  const noopRenderer: TemplateRenderer = (t) => t
+
+  function stubSystemAdapter(): SystemAdapter {
+    return {
+      getDefaultEnv: () => ({}),
+      getDefaultCwd: () => '/tmp',
+      getDefaultMaxBuffer: () => 1024,
+      resolveAbsolutePath: (...segs: string[]) => segs.join('/'),
+      execute: async () => ({ stdout: '', stderr: '', exitCode: 0, timedOut: false, cancelled: false }),
+      spawn: () => { throw new Error('not implemented') },
+      terminate: async () => {},
+      prompt: async () => '',
+    }
+  }
+
+  function stubFileAdapter(): FileAdapter {
+    return {
+      exists: async () => false,
+      read: async (_p: string, fallback?: string | null) => fallback ?? null,
+      readJson: async () => null,
+      readLines: async function* () {},
+      readLinesJsonl: async function* () {},
+      readLastLineJsonl: async () => null,
+      write: async () => true,
+      writeJson: async () => true,
+      append: async () => {},
+      appendLine: async () => {},
+      appendLineJsonl: async () => {},
+      createDirectory: async () => true,
+      createDirectoryRecursive: async () => {},
+      delete: async () => true,
+      open: async () => { throw new Error('not implemented') },
+    } as FileAdapter
+  }
+
+  it('flowTransport is used when agent has no defaultTransport', async () => {
+    const flowSendCalls: TransportRequest[] = []
+
+    const flowTransport: AgentTransport = {
+      async *send(req: TransportRequest) {
+        flowSendCalls.push(req)
+        yield text('{"code":"from-flow","files":["a.ts"],"testsRun":true}')
+        yield complete()
+      },
+      async close() {},
+    }
+
+    const agent = buildAgent({
+      name: 'flow-transport-agent',
+      skill: [buildSkill()],
+    })
+
+    const dispatcher = new AgentDispatcher({
+      agents: [{
+        agent,
+        model: testModel,
+        flowTransport,
+      }],
+      ledger: stubLedger(),
+      store: stubStore(),
+      templateRenderer: noopRenderer,
+      injector: mockUse,
+      systemAdapter: stubSystemAdapter(),
+      fileAdapter: stubFileAdapter(),
+      interceptors: [],
+    })
+
+    expect(dispatcher.hasV2Transport('flow-transport-agent')).toBe(true)
+
+    const { output } = await dispatcher.invokeAndParseV2(
+      'flow-transport-agent',
+      'integration-skill',
+      { task: 'test' },
+    )
+
+    expect(flowSendCalls).toHaveLength(1)
+    expect(output).toEqual({ code: 'from-flow', files: ['a.ts'], testsRun: true })
+  })
+
+  it('options.transport (flowTransport) takes priority over agent.defaultTransport', async () => {
+    const flowSendCalls: TransportRequest[] = []
+    const agentDefaultSendCalls: TransportRequest[] = []
+
+    const flowTransport: AgentTransport = {
+      async *send(req: TransportRequest) {
+        flowSendCalls.push(req)
+        yield text('{"code":"from-flow","files":["flow.ts"],"testsRun":true}')
+        yield complete()
+      },
+      async close() {},
+    }
+
+    const agentDefaultTransport: AgentTransport = {
+      async *send(req: TransportRequest) {
+        agentDefaultSendCalls.push(req)
+        yield text('{"code":"from-agent-default","files":["default.ts"],"testsRun":true}')
+        yield complete()
+      },
+      async close() {},
+    }
+
+    const agent = buildAgent({
+      name: 'priority-agent',
+      skill: [buildSkill()],
+      defaultTransport: agentDefaultTransport,
+    })
+
+    const dispatcher = new AgentDispatcher({
+      agents: [{
+        agent,
+        model: testModel,
+        flowTransport,
+      }],
+      ledger: stubLedger(),
+      store: stubStore(),
+      templateRenderer: noopRenderer,
+      injector: mockUse,
+      systemAdapter: stubSystemAdapter(),
+      fileAdapter: stubFileAdapter(),
+      interceptors: [],
+    })
+
+    const { output } = await dispatcher.invokeAndParseV2(
+      'priority-agent',
+      'integration-skill',
+      { task: 'test' },
+    )
+
+    expect(flowSendCalls).toHaveLength(1)
+    expect(agentDefaultSendCalls).toHaveLength(0)
+    expect(output).toEqual({ code: 'from-flow', files: ['flow.ts'], testsRun: true })
+  })
+
+  it('V2-only agent (no adapter, no defaultTransport) works via flowTransport', async () => {
+    const flowSendCalls: TransportRequest[] = []
+
+    const flowTransport: AgentTransport = {
+      async *send(req: TransportRequest) {
+        flowSendCalls.push(req)
+        yield text('{"code":"v2-only","files":["b.ts"],"testsRun":false}')
+        yield complete()
+      },
+      async close() {},
+    }
+
+    const agent = buildAgent({
+      name: 'v2-only-agent',
+      skill: [buildSkill()],
+    })
+
+    const dispatcher = new AgentDispatcher({
+      agents: [{
+        agent,
+        model: testModel,
+        flowTransport,
+      }],
+      ledger: stubLedger(),
+      store: stubStore(),
+      templateRenderer: noopRenderer,
+      injector: mockUse,
+      systemAdapter: stubSystemAdapter(),
+      fileAdapter: stubFileAdapter(),
+      interceptors: [],
+    })
+
+    expect(dispatcher.hasV2Transport('v2-only-agent')).toBe(true)
+
+    const { output } = await dispatcher.invokeAndParseV2(
+      'v2-only-agent',
+      'integration-skill',
+      { task: 'test' },
+    )
+
+    expect(flowSendCalls).toHaveLength(1)
+    expect(output).toEqual({ code: 'v2-only', files: ['b.ts'], testsRun: false })
   })
 })

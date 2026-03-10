@@ -303,6 +303,9 @@ export class AgentDispatcher<TState> {
     let state = this.lifecycle.get(agentName)
     if (!state) {
       const tuple = this.agents.get(agentName)!
+      if (!tuple.adapter) {
+        throw new Error(`Agent '${agentName}' has no V1 adapter. Use invokeAndParseV2 for transport-based agents.`)
+      }
       const adapter = tuple.adapter.create(tuple.agent, tuple.model)
 
       const systemMessage = await this.composeSystemMessage(tuple.agent)
@@ -473,7 +476,9 @@ export class AgentDispatcher<TState> {
       await oldState.adapter.terminate()
     }
 
-    // Create new adapter with composed system message + handoff context
+    if (!tuple.adapter) {
+      throw new Error(`Agent '${agentName}' has no V1 adapter. Cannot replace adapter for transport-based agents.`)
+    }
     const newAdapter = tuple.adapter.create(tuple.agent, tuple.model)
     const systemMessage = await this.composeSystemMessage(tuple.agent)
 
@@ -505,7 +510,7 @@ export class AgentDispatcher<TState> {
 
   hasV2Transport(agentName: string): boolean {
     const tuple = this.agents.get(agentName)
-    return !!tuple?.agent.defaultTransport
+    return !!(tuple?.flowTransport ?? tuple?.agent.defaultTransport)
   }
 
   // ── V2 Invocation Path ────────────────────────────────────────────────
@@ -574,11 +579,9 @@ export class AgentDispatcher<TState> {
       const tuple = this.agents.get(agentName)!
       const systemMessage = await this.composeSystemMessage(tuple.agent)
 
-      let transport: AgentTransport
-      if (tuple.agent.defaultTransport) {
-        transport = tuple.agent.defaultTransport
-      } else {
-        throw new Error(`Agent '${agentName}' has no transport configured. Set defaultTransport on the agent.`)
+      const transport = tuple.flowTransport ?? tuple.agent.defaultTransport
+      if (!transport) {
+        throw new Error(`Agent '${agentName}' has no transport configured. Set defaultTransport on the agent or provide transport in the flow registration.`)
       }
 
       const conversation = ConversationImpl.create(systemMessage)

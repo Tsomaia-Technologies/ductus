@@ -279,7 +279,7 @@ export async function invokeAgent(options: InvocationOptions): Promise<Invocatio
   let conv = options.conversation.append(userMsg)
 
   const resolvedModel = skillConfig?.model ?? agent.defaultModel ?? options.model
-  const resolvedTransport = skillConfig?.transport ?? agent.defaultTransport ?? options.transport
+  const resolvedTransport = skillConfig?.transport ?? options.transport ?? agent.defaultTransport
 
   const maxRetries = skill.maxRetries ?? 0
   let attempt = 0

@@ -8,7 +8,12 @@ import { AgentTransport } from './agent-transport.js'
 export interface AgentTuple {
   agent: AgentEntity
   model: ModelEntity
-  adapter: AdapterEntity
+  adapter?: AdapterEntity
+  /**
+   * Flow-level transport override — takes priority over agent.defaultTransport.
+   * Lives on this deprecated interface until AgentTuple is fully replaced by AgentTupleV2.
+   */
+  flowTransport?: AgentTransport
 }
 
 export interface AgentTupleV2 {
