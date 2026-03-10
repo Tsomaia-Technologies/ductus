@@ -424,6 +424,7 @@ interface ContextPolicy {
     conversation: Conversation,
     limit: number,
     transport: AgentTransport,
+    model?: string,
   ): Promise<Conversation>
 }
 ```
@@ -802,7 +803,7 @@ The framework ships a set of well-known event definitions under `Ductus.events.*
 | Event | Payload | Description |
 |---|---|---|
 | `AgentInvoked` | `{ agent, skill, inputHash }` | Agent started working |
-| `AgentCompleted` | `{ agent, skill, duration, tokenUsage }` | Agent finished successfully |
+| `AgentCompleted` | `{ agent, skill, durationMs, tokenUsage: { input, output, total } }` | Agent finished successfully |
 | `AgentFailed` | `{ agent, skill, error }` | Agent invocation failed |
 | `AgentReplaced` | `{ agent, reason, newAgent }` | Agent hit lifetime limit, replaced via handoff |
 | `AgentStreamChunk` | `{ agent, skill, chunk }` | Raw streaming chunk (real-time observation) |
@@ -812,7 +813,7 @@ The framework ships a set of well-known event definitions under `Ductus.events.*
 | Event | Payload | Description |
 |---|---|---|
 | `SkillInvoked` | `{ agent, skill, inputHash }` | Skill invocation started |
-| `SkillCompleted` | `{ agent, skill, duration }` | Skill completed, output validated |
+| `SkillCompleted` | `{ agent, skill, durationMs }` | Skill completed, output validated |
 | `SkillFailed` | `{ agent, skill, error, retriesExhausted }` | Skill failed after exhausting retries |
 | `SkillRetry` | `{ agent, skill, attempt, maxRetries, error }` | Skill output rejected, retrying |
 
@@ -821,7 +822,7 @@ The framework ships a set of well-known event definitions under `Ductus.events.*
 | Event | Payload | Description |
 |---|---|---|
 | `ToolRequested` | `{ agent, tool, arguments }` | Agent requested tool execution |
-| `ToolCompleted` | `{ agent, tool, duration, resultSummary }` | Tool execution completed |
+| `ToolCompleted` | `{ agent, tool, durationMs, resultSummary }` | Tool execution completed |
 
 ### 11.2 Default Volatility
 
@@ -835,8 +836,8 @@ Observation events flow through the multiplexer like any other event. Any proces
 Ductus.processor('AgentMonitor', async function* (events) {
   for await (const event of events) {
     if (Ductus.events.AgentCompleted.is(event)) {
-      const { agent, skill, duration, tokenUsage } = event.payload
-      console.log(`[${agent}/${skill}] completed in ${duration}ms, ${tokenUsage.total} tokens`)
+      const { agent, skill, durationMs, tokenUsage } = event.payload
+      console.log(`[${agent}/${skill}] completed in ${durationMs}ms, ${tokenUsage.total} tokens`)
     }
     if (Ductus.events.SkillRetry.is(event)) {
       const { agent, skill, attempt, maxRetries, error } = event.payload
