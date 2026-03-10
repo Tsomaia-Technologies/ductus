@@ -1,7 +1,14 @@
 import { SkillBuilder } from './skill-builder.js'
 import { Buildable } from './__internal__.js'
-import { AgentEntity, HandoffConfig, PersonaValue, SystemPromptValue } from '../entities/agent-entity.js'
+import { AgentEntity, HandoffConfig, PersonaValue, SkillConfig, SystemPromptValue } from '../entities/agent-entity.js'
 import { RulesetBuilder } from './ruleset-builder.js'
+import { ToolBuilder } from './tool-builder.js'
+import { ToolEntity } from '../entities/tool-entity.js'
+import { ModelBuilder } from './model-builder.js'
+import { ModelEntity } from '../entities/model-entity.js'
+import { AgentTransport } from '../agent-transport.js'
+import { ContextPolicy, ContextPolicyName } from '../context-policy.js'
+import { BaseEventDefinition, Volatility } from '../event.js'
 
 /**
  * Reference tuple for use in reaction builder .invoke() calls.
@@ -35,6 +42,23 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
   persona(value: PersonaValue): this
 
   skill(skill: SkillBuilder, alias?: string): this
+  skill(skill: SkillBuilder, config: SkillConfig): this
+  skill(skill: SkillBuilder, aliasOrConfig?: string | SkillConfig): this
+
+  tool(tool: ToolBuilder | ToolEntity): this
+
+  defaultModel(model: ModelBuilder | ModelEntity): this
+
+  defaultTransport(transport: AgentTransport): this
+
+  contextPolicy(policy: ContextPolicyName | ContextPolicy): this
+
+  observe(event: BaseEventDefinition, options?: { volatility?: Volatility }): this
+  observe(...events: [BaseEventDefinition, ...BaseEventDefinition[]]): this
+
+  observeSkill(skill: SkillBuilder, ...events: BaseEventDefinition[]): this
+
+  observeAll(options?: { volatility?: Volatility }): this
 
   rule(rule: string): this
 
