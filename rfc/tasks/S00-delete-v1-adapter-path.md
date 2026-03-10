@@ -75,6 +75,16 @@ Remove these methods entirely:
 
 Remove the `lifecycle` map (V1 state). Keep `lifecycleV2`.
 
+Remove these private helpers that are ONLY used by V1 methods:
+- `getFailedSequences()` — only used by `replaceAdapter()`
+- `readAllEvents()` — only used by `replaceAdapter()`
+- `AnnotatedEvent` interface (lines 33-39) — only used by `replaceAdapter()`
+- `AGENT_SUMMARY_PROMPT` constant — only used by `replaceAdapter()`
+- `DEFAULT_HEAD_EVENTS` constant — only used by `replaceAdapter()`
+- `DEFAULT_TAIL_EVENTS` constant — only used by `replaceAdapter()`
+
+**Why explicitly:** These helpers compile fine after V1 deletion because they reference types (`AgentLifecycleState`, `CommittedEvent`) that still exist. `npx tsc` will NOT catch them as dead code. They must be deleted manually.
+
 Remove imports of deleted types: `AgentInterceptor`, `InvocationContext`, `TemplateInterceptor`, `FileAdapter` (if only used by interceptors), `AgentContext`.
 
 ### 2.3 Remove V1 from `src/factories.ts`
@@ -120,6 +130,7 @@ This test file tests the V1 dispatcher path and has been failing since before th
 - The `lifecycle` (V1) map still exists on `AgentDispatcher`
 - `AgentAdapter` or `AdapterEntity` is referenced anywhere in `src/`
 - The `adapter()` factory is still exported from `factories.ts`
+- Dead private helpers remain (`getFailedSequences`, `readAllEvents`, `AnnotatedEvent`, `AGENT_SUMMARY_PROMPT`, `DEFAULT_HEAD_EVENTS`, `DEFAULT_TAIL_EVENTS`) — these will be recreated in S02b under `agent-handoff.ts`
 
 ---
 
