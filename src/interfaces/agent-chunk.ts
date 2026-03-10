@@ -20,6 +20,12 @@ export interface AgentChunkToolCall extends AgentChunkBase {
   toolCall: AgentToolCall
 }
 
+export interface AgentChunkToolResult extends AgentChunkBase {
+  type: 'tool-result'
+  toolCallId: string
+  result: unknown
+}
+
 export interface AgentChunkError extends AgentChunkBase {
   type: 'error'
   reason: string
@@ -44,6 +50,7 @@ export type AgentChunk =
   | AgentChunkReasoning
   | AgentChunkText
   | AgentChunkToolCall
+  | AgentChunkToolResult
   | AgentChunkError
   | AgentChunkUsage
   | AgentChunkData
