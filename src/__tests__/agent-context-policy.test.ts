@@ -1,4 +1,4 @@
-import { resolveContextPolicy, enforceContextPolicy } from '../core/agent-context-policy.js'
+import { resolveContextPolicy, enforceContextPolicy, ContextPolicyDeps } from '../core/agent-context-policy.js'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { AgentLifecycleState } from '../interfaces/agent-lifecycle.js'
 import { ConversationImpl } from '../core/conversation.js'
@@ -7,6 +7,9 @@ import { TruncateContextPolicy } from '../core/context-policies/truncate-context
 import { SummarizeContextPolicy } from '../core/context-policies/summarize-context-policy.js'
 import { SlidingWindowContextPolicy } from '../core/context-policies/sliding-window-context-policy.js'
 import { AgentTransport } from '../interfaces/agent-transport.js'
+import { CommittedEvent } from '../interfaces/event.js'
+import { EventLedger } from '../interfaces/event-ledger.js'
+import { TemplateRenderer } from '../interfaces/template-renderer.js'
 
 function buildAgent(overrides?: Partial<AgentEntity>): AgentEntity {
   return {
@@ -36,6 +39,39 @@ function makeLifecycleState(overrides?: Partial<AgentLifecycleState>): AgentLife
     turnRecords: [],
     currentTurnStartSequence: 0,
     ...overrides,
+  }
+}
+
+function makeEvent(seq: number, type = 'TestEvent', payload: unknown = {}): CommittedEvent {
+  return {
+    type,
+    payload,
+    volatility: 'durable',
+    isCommited: true,
+    eventId: `evt-${seq}`,
+    sequenceNumber: seq,
+    prevHash: 'prev',
+    hash: `hash-${seq}`,
+    timestamp: 1000 + seq,
+  } as CommittedEvent
+}
+
+function makeLedger(events: CommittedEvent[]): EventLedger {
+  return {
+    async *readEvents() { for (const e of events) yield e },
+    async readLastEvent() { return events[events.length - 1] ?? null },
+    async appendEvent() {},
+    async dispose() {},
+  }
+}
+
+const noopRenderer: TemplateRenderer = (t) => t
+
+function makeDeps(events: CommittedEvent[] = [], state: unknown = {}): ContextPolicyDeps {
+  return {
+    ledger: makeLedger(events),
+    getState: () => state,
+    templateRenderer: noopRenderer,
   }
 }
 
@@ -148,30 +184,42 @@ describe('enforceContextPolicy', () => {
     expect(state.conversation.length).toBe(0)
   })
 
-  it('passes model to the policy', async () => {
-    let capturedModel: string | undefined
-    const mockTransport: AgentTransport = {
-      async *send(req) {
-        capturedModel = req.model
-        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
-    }
+  it('passes context from deps to summarize policy', async () => {
+    const events = [makeEvent(1, 'TaskDone', { result: 'ok' })]
 
     let conv = ConversationImpl.create('sys')
     for (let i = 0; i < 100; i++) {
       conv = conv.append({ role: 'user', content: 'x'.repeat(100), timestamp: Date.now() })
     }
 
-    const state = makeLifecycleState({ conversation: conv, transport: mockTransport })
+    const state = makeLifecycleState({ conversation: conv })
 
     await enforceContextPolicy(
       buildAgent({ maxContextTokens: 50, contextPolicy: 'summarize' }),
       state,
-      'gpt-4o',
+      undefined,
+      makeDeps(events, { count: 10 }),
     )
 
-    expect(capturedModel).toBe('gpt-4o')
+    expect(state.conversation.messages[0].role).toBe('assistant')
+    expect(state.conversation.messages[0].content).toContain('TaskDone')
+    expect(state.conversation.messages[0].content).toContain('"count":10')
+  })
+
+  it('summarize falls back to truncation when no deps provided', async () => {
+    let conv = ConversationImpl.create('sys')
+    for (let i = 0; i < 100; i++) {
+      conv = conv.append({ role: 'user', content: 'x'.repeat(100), timestamp: Date.now() })
+    }
+
+    const state = makeLifecycleState({ conversation: conv })
+
+    await enforceContextPolicy(
+      buildAgent({ maxContextTokens: 50, contextPolicy: 'summarize' }),
+      state,
+    )
+
+    expect(state.conversation.length).toBeGreaterThan(0)
+    expect(state.conversation.length).toBeLessThan(100)
   })
 })

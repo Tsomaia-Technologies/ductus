@@ -27,6 +27,8 @@ export class AgentDispatcher<TState> {
   private readonly lifecycleManager: AgentLifecycleManager
   private readonly store: StoreAdapter<TState>
   private readonly injector: Injector
+  private readonly templateRenderer: TemplateRenderer
+  private readonly ledger?: EventLedger
   private lastKnownSequence = 0
 
   constructor(options: AgentDispatcherOptions<TState>) {
@@ -35,6 +37,8 @@ export class AgentDispatcher<TState> {
     }
     this.store = options.store
     this.injector = options.injector
+    this.templateRenderer = options.templateRenderer
+    this.ledger = options.ledger
 
     const promptComposer = new AgentPromptComposer(
       options.templateRenderer,
@@ -69,7 +73,11 @@ export class AgentDispatcher<TState> {
     await this.lifecycleManager.enforceLimits(agentName, state, tuple.agent)
 
     const model = tuple.model?.model ?? tuple.agent.defaultModel?.model
-    await enforceContextPolicy(tuple.agent, state, model)
+    await enforceContextPolicy(tuple.agent, state, model, {
+      ledger: this.ledger,
+      getState: () => this.store.getState(),
+      templateRenderer: this.templateRenderer,
+    })
 
     state.turns++
     state.currentTurnStartSequence = this.lastKnownSequence + 1

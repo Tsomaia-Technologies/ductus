@@ -85,7 +85,7 @@ function makeTurnRecord(
 function defaultParams(overrides?: Record<string, unknown>) {
   return {
     agent: buildAgent(),
-    reason: 'overflow' as HandoffReason,
+    reason: 'scope' as HandoffReason,
     state: {},
     events: [] as CommittedEvent[],
     turnRecords: [] as TurnRecord[],
@@ -150,28 +150,28 @@ describe('renderHandoff', () => {
 
   it('returns undefined when no handoff matches the reason', async () => {
     const handoffs: HandoffConfig[] = [
-      { reason: 'scope', template: 'scope.hbs' },
+      { reason: 'failure', template: 'failure.hbs' },
     ]
     const result = await renderHandoff(defaultParams({
       agent: buildAgent({ handoffs }),
-      reason: 'overflow',
+      reason: 'scope',
     }))
     expect(result).toBeUndefined()
   })
 
-  it('renders template for overflow handoff with file-based template', async () => {
+  it('renders template for scope handoff with file-based template', async () => {
     const files: Record<string, string> = {
-      'handoff.hbs': 'Handoff due to overflow',
+      'handoff.hbs': 'Handoff due to scope',
     }
     const handoffs: HandoffConfig[] = [
-      { reason: 'overflow', template: 'handoff.hbs' },
+      { reason: 'scope', template: 'handoff.hbs' },
     ]
     const result = await renderHandoff(defaultParams({
       agent: buildAgent({ handoffs }),
-      reason: 'overflow',
+      reason: 'scope',
       fileAdapter: stubFileAdapter(files),
     }))
-    expect(result).toBe('Handoff due to overflow')
+    expect(result).toBe('Handoff due to scope')
   })
 
   it('renders template with event context via templateRenderer', async () => {
@@ -185,13 +185,13 @@ describe('renderHandoff', () => {
     }
 
     const handoffs: HandoffConfig[] = [
-      { reason: 'overflow', template: 'handoff.hbs', headEvents: 2, tailEvents: 2 },
+      { reason: 'scope', template: 'handoff.hbs', headEvents: 2, tailEvents: 2 },
     ]
     const events = makeEvents(4)
 
     const result = await renderHandoff(defaultParams({
       agent: buildAgent({ name: 'myAgent', role: 'worker', handoffs }),
-      reason: 'overflow',
+      reason: 'scope',
       events,
       failureCount: 3,
       hallucinationCount: 1,
@@ -201,7 +201,7 @@ describe('renderHandoff', () => {
     }))
 
     expect(result).toBe('rendered: template-content')
-    expect(capturedContext.reason).toBe('overflow')
+    expect(capturedContext.reason).toBe('scope')
     expect(capturedContext.failureCount).toBe(3)
     expect(capturedContext.hallucinationCount).toBe(1)
     expect(capturedContext.state).toEqual({ count: 42 })
@@ -212,7 +212,7 @@ describe('renderHandoff', () => {
   describe('head/tail windowing', () => {
     const files: Record<string, string> = { 'h.hbs': '' }
 
-    function windowParams(eventCount: number, head: number, tail: number, reason: HandoffReason = 'overflow') {
+    function windowParams(eventCount: number, head: number, tail: number, reason: HandoffReason = 'scope') {
       let captured: Record<string, unknown> = {}
       const renderer: TemplateRenderer = (_t, ctx) => {
         captured = ctx
@@ -280,11 +280,11 @@ describe('renderHandoff', () => {
       let captured: Record<string, unknown> = {}
       const renderer: TemplateRenderer = (_t, ctx) => { captured = ctx; return 'ok' }
       const handoffs: HandoffConfig[] = [
-        { reason: 'overflow', template: 'h.hbs' },
+        { reason: 'scope', template: 'h.hbs' },
       ]
       await renderHandoff(defaultParams({
         agent: buildAgent({ handoffs }),
-        reason: 'overflow',
+        reason: 'scope',
         events: makeEvents(5),
         templateRenderer: renderer,
         fileAdapter: stubFileAdapter(files),
@@ -343,7 +343,7 @@ describe('renderHandoff', () => {
       let captured: Record<string, unknown> = {}
       const renderer: TemplateRenderer = (_t, ctx) => { captured = ctx; return 'ok' }
       const handoffs: HandoffConfig[] = [
-        { reason: 'overflow', template: 'h.hbs', headEvents: 2, tailEvents: 2 },
+        { reason: 'scope', template: 'h.hbs', headEvents: 2, tailEvents: 2 },
       ]
 
       const events = makeEvents(10)
@@ -355,7 +355,7 @@ describe('renderHandoff', () => {
 
       await renderHandoff(defaultParams({
         agent: buildAgent({ handoffs }),
-        reason: 'overflow',
+        reason: 'scope',
         events,
         turnRecords,
         templateRenderer: renderer,
@@ -431,12 +431,12 @@ describe('renderHandoff', () => {
   describe('async template resolver', () => {
     it('resolves inline template from async function', async () => {
       const handoffs: HandoffConfig[] = [
-        { reason: 'overflow', template: async () => 'Async handoff template' },
+        { reason: 'scope', template: async () => 'Async handoff template' },
       ]
 
       const result = await renderHandoff(defaultParams({
         agent: buildAgent({ handoffs }),
-        reason: 'overflow',
+        reason: 'scope',
       }))
 
       expect(result).toBe('Async handoff template')
@@ -447,12 +447,12 @@ describe('renderHandoff', () => {
         'async-handoff.hbs': 'Loaded from file via async resolver',
       }
       const handoffs: HandoffConfig[] = [
-        { reason: 'overflow', template: async () => ({ template: 'async-handoff.hbs' }) },
+        { reason: 'scope', template: async () => ({ template: 'async-handoff.hbs' }) },
       ]
 
       const result = await renderHandoff(defaultParams({
         agent: buildAgent({ handoffs }),
-        reason: 'overflow',
+        reason: 'scope',
         fileAdapter: stubFileAdapter(files),
       }))
 

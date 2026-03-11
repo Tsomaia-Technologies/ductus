@@ -12,7 +12,7 @@ export type AgentScope =
   | { type: 'feature' }
   | { type: 'task' | 'turn'; amount: number }
 
-export type HandoffReason = 'overflow' | 'failure' | 'scope'
+export type HandoffReason = 'failure' | 'scope'
 
 export type AsyncTemplateResolver =
   (use: Injector, agent: AgentEntity) => Promise<string | { template: string }>

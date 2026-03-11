@@ -5,6 +5,9 @@ import { SlidingWindowContextPolicy } from '../core/context-policies/sliding-win
 import { SummarizeContextPolicy } from '../core/context-policies/summarize-context-policy.js'
 import { UserMessage } from '../interfaces/agentic-message.js'
 import { AgentTransport } from '../interfaces/agent-transport.js'
+import { CommittedEvent } from '../interfaces/event.js'
+import { ContextPolicyContext } from '../interfaces/context-policy.js'
+import { TemplateRenderer } from '../interfaces/template-renderer.js'
 
 const userMsg = (content: string): UserMessage => ({
   role: 'user' as const,
@@ -25,6 +28,36 @@ function buildConversation(system: string, messages: string[]) {
     conv = conv.append(userMsg(msg))
   }
   return conv
+}
+
+function makeEvent(seq: number, type = 'TestEvent', payload: unknown = {}): CommittedEvent {
+  return {
+    type,
+    payload,
+    volatility: 'durable',
+    isCommited: true,
+    eventId: `evt-${seq}`,
+    sequenceNumber: seq,
+    prevHash: 'prev',
+    hash: `hash-${seq}`,
+    timestamp: 1000 + seq,
+  } as CommittedEvent
+}
+
+async function* eventsIterable(events: CommittedEvent[]): AsyncIterable<CommittedEvent> {
+  for (const e of events) yield e
+}
+
+async function* emptyEvents(): AsyncIterable<CommittedEvent> {}
+
+const noopRenderer: TemplateRenderer = (t) => t
+
+function makeContext(events: CommittedEvent[], state: unknown = {}, renderer?: TemplateRenderer): ContextPolicyContext {
+  return {
+    events: eventsIterable(events),
+    state,
+    templateRenderer: renderer ?? noopRenderer,
+  }
 }
 
 describe('ReplaceContextPolicy', () => {
@@ -117,72 +150,48 @@ describe('SlidingWindowContextPolicy', () => {
 })
 
 describe('SummarizeContextPolicy', () => {
-  it('calls transport.send() and builds summary + preserved messages', async () => {
-    const mockTransport: AgentTransport = {
-      async *send() {
-        yield { type: 'text' as const, content: 'Summary of conversation', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
-    }
-
+  it('builds event-based summary with preserved messages', async () => {
+    const events = [makeEvent(1, 'OrderPlaced', { id: 1 }), makeEvent(2, 'OrderShipped', { id: 1 })]
     const conv = buildConversation('sys', ['msg1', 'msg2', 'msg3', 'msg4'])
     const policy = new SummarizeContextPolicy({ preserveLastN: 2 })
-    const result = await policy.apply(conv, 1000, mockTransport)
+    const ctx = makeContext(events, { count: 42 })
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
 
     expect(result.systemMessage).toBe('sys')
     expect(result.messages[0].role).toBe('assistant')
-    expect(result.messages[0].content).toBe('Summary of conversation')
+    expect(result.messages[0].content).toContain('Context summary:')
+    expect(result.messages[0].content).toContain('OrderPlaced')
+    expect(result.messages[0].content).toContain('OrderShipped')
     expect(result.length).toBe(3)
     expect(result.messages[1].content).toBe('msg3')
     expect(result.messages[2].content).toBe('msg4')
   })
 
-  it('works with preserveLastN = 0', async () => {
-    const mockTransport: AgentTransport = {
-      async *send() {
-        yield { type: 'text' as const, content: 'A summary', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
-    }
-
+  it('works with preserveLastN = 0 and events', async () => {
+    const events = [makeEvent(1), makeEvent(2)]
     const conv = buildConversation('sys', ['a', 'b', 'c'])
     const policy = new SummarizeContextPolicy()
-    const result = await policy.apply(conv, 500, mockTransport)
+    const ctx = makeContext(events)
+    const result = await policy.apply(conv, 500, dummyTransport, undefined, ctx)
 
     expect(result.length).toBe(1)
     expect(result.messages[0].role).toBe('assistant')
-    expect(result.messages[0].content).toBe('A summary')
+    expect(result.messages[0].content).toContain('Total events: 2')
   })
 
   it('returns empty conversation immediately when input has no messages', async () => {
-    const failTransport: AgentTransport = {
-      async *send() {
-        throw new Error('should not be called')
-      },
-      async close() {},
-    }
-
     const conv = ConversationImpl.create('sys')
     const policy = new SummarizeContextPolicy()
-    const result = await policy.apply(conv, 1000, failTransport)
+    const result = await policy.apply(conv, 1000, dummyTransport)
 
     expect(result.length).toBe(0)
     expect(result.systemMessage).toBe('sys')
   })
 
-  it('falls back to truncation when transport throws', async () => {
-    const errorTransport: AgentTransport = {
-      async *send() {
-        throw new Error('transport failure')
-      },
-      async close() {},
-    }
-
+  it('falls back to truncation when no events are provided (no context)', async () => {
     const conv = buildConversation('sys', ['a', 'b', 'c', 'd', 'e'])
     const policy = new SummarizeContextPolicy({ preserveLastN: 2 })
-    const result = await policy.apply(conv, 1000, errorTransport)
+    const result = await policy.apply(conv, 1000, dummyTransport)
 
     expect(result.systemMessage).toBe('sys')
     expect(result.length).toBeGreaterThanOrEqual(2)
@@ -191,124 +200,119 @@ describe('SummarizeContextPolicy', () => {
     expect(contents).toContain('e')
   })
 
-  it('includes targetTokens in the prompt sent to transport', async () => {
-    let capturedPrompt = ''
-    const capturingTransport: AgentTransport = {
-      async *send(request) {
-        const msgs = request.conversation.messages
-        capturedPrompt = msgs[msgs.length - 1].content
-        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
+  it('falls back to truncation when events iterable is empty', async () => {
+    const conv = buildConversation('sys', ['a', 'b', 'c'])
+    const policy = new SummarizeContextPolicy({ preserveLastN: 1 })
+    const ctx: ContextPolicyContext = {
+      events: emptyEvents(),
+      state: {},
+      templateRenderer: noopRenderer,
     }
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
 
-    const conv = buildConversation('sys', ['hello'])
-    const policy = new SummarizeContextPolicy({ targetTokens: 200 })
-    await policy.apply(conv, 1000, capturingTransport)
-
-    expect(capturedPrompt).toContain('200 tokens')
+    expect(result.systemMessage).toBe('sys')
+    expect(result.length).toBeGreaterThanOrEqual(1)
+    const contents = result.messages.map((m) => m.content)
+    expect(contents).toContain('c')
   })
 
-  it('defaults targetTokens to half the limit when not provided', async () => {
-    let capturedPrompt = ''
-    const capturingTransport: AgentTransport = {
-      async *send(request) {
-        const msgs = request.conversation.messages
-        capturedPrompt = msgs[msgs.length - 1].content
-        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
-    }
-
+  it('includes event types and counts in structured summary', async () => {
+    const events = [
+      makeEvent(1, 'UserCreated'),
+      makeEvent(2, 'UserCreated'),
+      makeEvent(3, 'OrderPlaced'),
+    ]
     const conv = buildConversation('sys', ['hello'])
     const policy = new SummarizeContextPolicy()
-    await policy.apply(conv, 800, capturingTransport)
+    const ctx = makeContext(events)
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
 
-    expect(capturedPrompt).toContain('400 tokens')
+    const summary = result.messages[0].content
+    expect(summary).toContain('Total events: 3')
+    expect(summary).toContain('UserCreated: 2')
+    expect(summary).toContain('OrderPlaced: 1')
   })
 
-  it('passes model to transport request instead of hardcoded default', async () => {
-    let capturedModel = ''
-    const capturingTransport: AgentTransport = {
-      async *send(request) {
-        capturedModel = request.model
-        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
-    }
-
+  it('includes state in structured summary', async () => {
+    const events = [makeEvent(1)]
     const conv = buildConversation('sys', ['hello'])
     const policy = new SummarizeContextPolicy()
-    await policy.apply(conv, 1000, capturingTransport, 'gpt-4o')
+    const ctx = makeContext(events, { userCount: 5 })
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
 
-    expect(capturedModel).toBe('gpt-4o')
+    expect(result.messages[0].content).toContain('"userCount":5')
   })
 
-  it('falls back to "default" model when none is provided', async () => {
-    let capturedModel = ''
-    const capturingTransport: AgentTransport = {
-      async *send(request) {
-        capturedModel = request.model
-        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
-    }
-
+  it('includes recent events with sequence numbers', async () => {
+    const events = Array.from({ length: 8 }, (_, i) => makeEvent(i + 1, 'Evt'))
     const conv = buildConversation('sys', ['hello'])
     const policy = new SummarizeContextPolicy()
-    await policy.apply(conv, 1000, capturingTransport)
+    const ctx = makeContext(events)
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
 
-    expect(capturedModel).toBe('default')
+    const summary = result.messages[0].content
+    expect(summary).toContain('Recent events:')
+    expect(summary).toContain('[8] Evt')
+  })
+
+  it('renders summaryTemplate via templateRenderer when provided', async () => {
+    const events = [makeEvent(1, 'TaskDone', { result: 'ok' })]
+    let capturedCtx: Record<string, unknown> = {}
+    const renderer: TemplateRenderer = (_t, ctx) => {
+      capturedCtx = ctx
+      return `Rendered: ${ctx.eventCount} events`
+    }
+    const conv = buildConversation('sys', ['hello'])
+    const policy = new SummarizeContextPolicy({ summaryTemplate: 'my-template' })
+    const ctx = makeContext(events, { x: 1 }, renderer)
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
+
+    expect(result.messages[0].content).toBe('Rendered: 1 events')
+    expect(capturedCtx.eventCount).toBe(1)
+    expect(capturedCtx.state).toEqual({ x: 1 })
+    expect((capturedCtx.eventTypes as string[])).toEqual(['TaskDone'])
+  })
+
+  it('preserveLastN with events produces summary + preserved messages', async () => {
+    const events = [makeEvent(1), makeEvent(2)]
+    const conv = buildConversation('sys', ['a', 'b', 'c', 'd'])
+    const policy = new SummarizeContextPolicy({ preserveLastN: 3 })
+    const ctx = makeContext(events)
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
+
+    expect(result.messages[0].role).toBe('assistant')
+    expect(result.messages[0].content).toContain('Context summary:')
+    expect(result.length).toBe(4)
+    expect(result.messages[1].content).toBe('b')
+    expect(result.messages[2].content).toBe('c')
+    expect(result.messages[3].content).toBe('d')
   })
 
   it('uses empty system message when preserveSystem is false', async () => {
-    const mockTransport: AgentTransport = {
-      async *send() {
-        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
-    }
-
+    const events = [makeEvent(1)]
     const conv = buildConversation('You are helpful.', ['msg1', 'msg2'])
     const policy = new SummarizeContextPolicy({ preserveSystem: false })
-    const result = await policy.apply(conv, 1000, mockTransport)
+    const ctx = makeContext(events)
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
 
     expect(result.systemMessage).toBe('')
-    expect(result.messages[0].content).toBe('Summary')
+    expect(result.messages[0].content).toContain('Context summary:')
   })
 
   it('preserves system message by default', async () => {
-    const mockTransport: AgentTransport = {
-      async *send() {
-        yield { type: 'text' as const, content: 'Summary', timestamp: Date.now() }
-        yield { type: 'complete' as const, timestamp: Date.now() }
-      },
-      async close() {},
-    }
-
+    const events = [makeEvent(1)]
     const conv = buildConversation('You are helpful.', ['msg1', 'msg2'])
     const policy = new SummarizeContextPolicy()
-    const result = await policy.apply(conv, 1000, mockTransport)
+    const ctx = makeContext(events)
+    const result = await policy.apply(conv, 1000, dummyTransport, undefined, ctx)
 
     expect(result.systemMessage).toBe('You are helpful.')
   })
 
   it('uses empty system message in fallback path when preserveSystem is false', async () => {
-    const errorTransport: AgentTransport = {
-      async *send() {
-        throw new Error('transport failure')
-      },
-      async close() {},
-    }
-
     const conv = buildConversation('You are helpful.', ['a', 'b', 'c'])
     const policy = new SummarizeContextPolicy({ preserveSystem: false })
-    const result = await policy.apply(conv, 1000, errorTransport)
+    const result = await policy.apply(conv, 1000, dummyTransport)
 
     expect(result.systemMessage).toBe('')
     expect(result.length).toBeGreaterThan(0)

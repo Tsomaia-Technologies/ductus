@@ -126,10 +126,9 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
    * template, producing structured context for the replacement adapter.
    *
    * Handoff reasons map to limit triggers:
-   * - `overflow` — triggered by maxContextTokens
    * - `failure`  — triggered by maxFailures OR maxRecognizedHallucinations
    *                (all events from failed turns are included automatically)
-   * - `scope`   — triggered by scope() quota
+   * - `scope`    — triggered by scope() quota
    *
    * The template receives: { reason, state, headEvents, tailEvents, failureCount,
    * hallucinationCount, agent }. Each event carries an `isFailed` flag.
@@ -144,8 +143,7 @@ export interface AgentBuilder extends Buildable<AgentEntity> {
    *
    * @example
    * ```typescript
-   * .handoff({ reason: 'overflow', template: 'overflow.mx', headEvents: 5, tailEvents: 50 })
-   * .handoff({ reason: 'failure',  template: 'failure.mx' })
+   * .handoff({ reason: 'failure',  template: 'failure.mx', headEvents: 5, tailEvents: 50 })
    * .handoff({ reason: 'scope',    template: async (use) => use(CMS).loadTemplate('rotation'), agentSummary: true })
    * ```
    */
