@@ -5,7 +5,7 @@ const { pathToFileURL } = require("url");
 const preset = createDefaultPreset();
 const tsCfg = preset.transform?.["^.+\\.tsx?$"]?.[1] || {};
 module.exports = {
-  roots: ["<rootDir>/tests", "<rootDir>/src/__tests__"],
+  roots: ["<rootDir>/src/__tests__"],
   testEnvironment: "node",
   transform: {
     "^.+\\.tsx?$": [
