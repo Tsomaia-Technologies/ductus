@@ -10,8 +10,7 @@ import { AgentPromptComposer } from './agent-prompt-composer.js'
 import { AgentLifecycleManager } from './agent-lifecycle-manager.js'
 import { enforceContextPolicy } from './agent-context-policy.js'
 
-import type { TemplateRenderer } from './agent-prompt-composer.js'
-export type { TemplateRenderer } from './agent-prompt-composer.js'
+import type { TemplateRenderer } from '../interfaces/template-renderer.js'
 
 export interface AgentDispatcherOptions<TState> {
   agents: AgentTuple[]

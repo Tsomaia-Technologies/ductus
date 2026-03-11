@@ -1,5 +1,5 @@
 import { renderHandoff, getFailedSequences, AnnotatedEvent, HandoffDeps } from '../core/agent-handoff.js'
-import { TemplateRenderer } from '../core/agent-prompt-composer.js'
+import { TemplateRenderer } from '../interfaces/template-renderer.js'
 import { AgentEntity, HandoffConfig, HandoffReason } from '../interfaces/entities/agent-entity.js'
 import { CommittedEvent, BaseEvent } from '../interfaces/event.js'
 import { TurnRecord } from '../interfaces/agent-lifecycle.js'

@@ -5,7 +5,7 @@ import { FileAdapter } from '../interfaces/file-adapter.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { identity } from '../utils/common-utils.js'
 
-export type TemplateRenderer = (template: string, context: Record<string, unknown>) => string | Promise<string>
+import { TemplateRenderer } from '../interfaces/template-renderer.js'
 
 export class AgentPromptComposer {
   constructor(

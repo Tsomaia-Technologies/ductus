@@ -6,7 +6,7 @@ import { SystemAdapter } from '../interfaces/system-adapter.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { EventLedger } from '../interfaces/event-ledger.js'
 
-import type { TemplateRenderer } from './agent-prompt-composer.js'
+import type { TemplateRenderer } from '../interfaces/template-renderer.js'
 
 export interface AnnotatedEvent {
   type: string

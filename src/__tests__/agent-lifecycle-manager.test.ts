@@ -1,5 +1,6 @@
 import { AgentLifecycleManager } from '../core/agent-lifecycle-manager.js'
-import { AgentPromptComposer, TemplateRenderer } from '../core/agent-prompt-composer.js'
+import { AgentPromptComposer } from '../core/agent-prompt-composer.js'
+import { TemplateRenderer } from '../interfaces/template-renderer.js'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { AgentTuple, AgentLifecycleState } from '../interfaces/agent-lifecycle.js'
 import { AgentTransport } from '../interfaces/agent-transport.js'

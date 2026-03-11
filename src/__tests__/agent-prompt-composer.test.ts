@@ -1,4 +1,5 @@
-import { AgentPromptComposer, TemplateRenderer } from '../core/agent-prompt-composer.js'
+import { AgentPromptComposer } from '../core/agent-prompt-composer.js'
+import { TemplateRenderer } from '../interfaces/template-renderer.js'
 import { AgentEntity } from '../interfaces/entities/agent-entity.js'
 import { Injector } from '../interfaces/event-generator.js'
 import { SystemAdapter } from '../interfaces/system-adapter.js'

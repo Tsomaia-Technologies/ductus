@@ -11,7 +11,8 @@ import { FlowEntity } from './interfaces/entities/flow-entity.js'
 import { EventDefinition } from './interfaces/event.js'
 import { DuctusKernel } from './core/ductus-kernel.js'
 import { ImmutableRulesetBuilder } from './builders/immutable-ruleset-builder.js'
-import { AgentDispatcher, TemplateRenderer } from './core/agent-dispatcher.js'
+import { AgentDispatcher } from './core/agent-dispatcher.js'
+import type { TemplateRenderer } from './interfaces/template-renderer.js'
 import { DuctusStore } from './core/ductus-store.js'
 import { createReactionAdapter } from './utils/internals.js'
 import { AgentBuilder } from './interfaces/builders/agent-builder.js'
@@ -223,6 +224,14 @@ export function kernel<TState>(
   })
 }
 
+/**
+ * Built-in transport implementations.
+ * Currently empty — implement AgentTransport directly.
+ * Built-in transports (Anthropic, OpenAI, etc.) are future work.
+ * @see AgentTransport interface for the transport contract.
+ */
+const transport = {} as Record<string, unknown>
+
 export default {
   BootEvent,
 
@@ -250,6 +259,8 @@ export default {
   concurrent,
 
   kernel,
+
+  transport,
 
   events: observationEvents,
 

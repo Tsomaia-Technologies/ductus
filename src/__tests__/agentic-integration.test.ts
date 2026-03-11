@@ -1,6 +1,7 @@
 import { z } from 'zod/v3'
 import { invokeAgent, InvocationOptions } from '../core/agent-invocation.js'
-import { AgentDispatcher, TemplateRenderer } from '../core/agent-dispatcher.js'
+import { AgentDispatcher } from '../core/agent-dispatcher.js'
+import { TemplateRenderer } from '../interfaces/template-renderer.js'
 import { ConversationImpl } from '../core/conversation.js'
 import { AgentChunk } from '../interfaces/agent-chunk.js'
 import { AgentTransport, TransportRequest } from '../interfaces/agent-transport.js'
