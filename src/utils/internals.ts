@@ -128,27 +128,20 @@ async function* executePipeline<TState>(
           yield step.event(lastInvokeResult as Parameters<typeof step.event>[0])
           break
 
-        case 'invoke':
+        case 'invoke': {
           lastAgent = step.agent
           lastSkill = step.skill
-          if (dispatcher.hasV2Transport(step.agent.name)) {
-            const v2Result = await dispatcher.invokeAndParseV2(
-              step.agent.name,
-              step.skill.name,
-              lastInvokeResult,
-            )
-            lastInvokeResult = v2Result.output
-            for (const obsEvent of v2Result.observationEvents) {
-              yield obsEvent
-            }
-          } else {
-            lastInvokeResult = await dispatcher.invokeAndParse(
-              step.agent.name,
-              step.skill.name,
-              lastInvokeResult,
-            )
+          const v2Result = await dispatcher.invokeAndParseV2(
+            step.agent.name,
+            step.skill.name,
+            lastInvokeResult,
+          )
+          lastInvokeResult = v2Result.output
+          for (const obsEvent of v2Result.observationEvents) {
+            yield obsEvent
           }
           break
+        }
 
         case 'case':
           try {

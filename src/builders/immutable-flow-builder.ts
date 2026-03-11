@@ -3,7 +3,6 @@ import { FlowBuilder } from '../interfaces/builders/flow-builder.js'
 import { ReducerBuilder } from '../interfaces/builders/reducer-builder.js'
 import { AgentBuilder } from '../interfaces/builders/agent-builder.js'
 import { ModelBuilder } from '../interfaces/builders/model-builder.js'
-import { AdapterBuilder } from '../interfaces/builders/adapter-builder.js'
 import { ReactionBuilder } from '../interfaces/builders/reaction-builder.js'
 import { ProcessorBuilder } from '../interfaces/builders/processor-builder.js'
 import { FlowEntity, FlowAgentRegistration } from '../interfaces/entities/flow-entity.js'
@@ -13,7 +12,6 @@ import { AgentTransport } from '../interfaces/agent-transport.js'
 interface FlowAgentEntry {
   agent: AgentBuilder
   model?: ModelBuilder
-  adapter?: AdapterBuilder
   modelEntity?: ModelEntity
   transport?: AgentTransport
 }
@@ -47,22 +45,14 @@ export class ImmutableFlowBuilder<TState> implements FlowBuilder<TState> {
 
   agent(
     agent: AgentBuilder,
-    modelOrOverrides?: ModelBuilder | { model?: ModelBuilder | ModelEntity; transport?: AgentTransport },
-    adapter?: AdapterBuilder,
+    modelOrOverrides?: { model?: ModelBuilder | ModelEntity; transport?: AgentTransport },
   ): this {
-    if (adapter !== undefined) {
-      return this.clone({
-        agents: [...this.params.agents, { agent, model: modelOrOverrides as ModelBuilder, adapter }],
-      })
-    }
-
-    if (modelOrOverrides && !isBuildable(modelOrOverrides)) {
-      const overrides = modelOrOverrides as { model?: ModelBuilder | ModelEntity; transport?: AgentTransport }
-      const resolvedModel = overrides.model && isBuildable(overrides.model)
+    if (modelOrOverrides) {
+      const resolvedModel = modelOrOverrides.model && isBuildable(modelOrOverrides.model)
         ? undefined
-        : (overrides.model as ModelEntity | undefined)
-      const modelBuilder = overrides.model && isBuildable(overrides.model)
-        ? (overrides.model as unknown as ModelBuilder)
+        : (modelOrOverrides.model as ModelEntity | undefined)
+      const modelBuilder = modelOrOverrides.model && isBuildable(modelOrOverrides.model)
+        ? (modelOrOverrides.model as unknown as ModelBuilder)
         : undefined
 
       return this.clone({
@@ -70,7 +60,7 @@ export class ImmutableFlowBuilder<TState> implements FlowBuilder<TState> {
           agent,
           model: modelBuilder,
           modelEntity: resolvedModel,
-          transport: overrides.transport,
+          transport: modelOrOverrides.transport,
         }],
       })
     }
@@ -105,7 +95,6 @@ export class ImmutableFlowBuilder<TState> implements FlowBuilder<TState> {
         }
         if (a.model) registration.model = build(a.model)
         if (a.modelEntity) registration.model = a.modelEntity
-        if (a.adapter) registration.adapter = build(a.adapter)
         if (a.transport) registration.transport = a.transport
         return registration
       }),

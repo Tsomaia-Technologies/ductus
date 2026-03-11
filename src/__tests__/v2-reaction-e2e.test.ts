@@ -378,17 +378,13 @@ describe('V2 invocation unit tests', () => {
     })
 
     const dispatcher = new AgentDispatcher({
-      agents: [{ agent, model: testModel, flowTransport }],
-      ledger: stubLedger(),
+      agents: [{ agent, model: testModel, transport: flowTransport }],
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
-
-    expect(dispatcher.hasV2Transport('dispatcher-e2e-agent')).toBe(true)
 
     const { output, observationEvents } = await dispatcher.invokeAndParseV2(
       'dispatcher-e2e-agent',
@@ -438,14 +434,12 @@ describe('V2 invocation unit tests', () => {
     })
 
     const dispatcher = new AgentDispatcher({
-      agents: [{ agent, model: testModel, flowTransport }],
-      ledger: stubLedger(),
+      agents: [{ agent, model: testModel, transport: flowTransport }],
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
 
     const { output } = await dispatcher.invokeAndParseV2(
@@ -576,14 +570,12 @@ describe('V2 reaction pipeline via createReactionAdapter', () => {
     })
 
     const dispatcher = new AgentDispatcher({
-      agents: [{ agent, model: testModel, flowTransport }],
-      ledger: stubLedger(),
+      agents: [{ agent, model: testModel, transport: flowTransport }],
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
 
     const reactionEntity: ReactionEntity = {

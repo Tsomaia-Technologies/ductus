@@ -6,7 +6,6 @@ import { ImmutableReactionBuilder } from './builders/immutable-reaction-builder.
 import { ImmutableReducerBuilder } from './builders/immutable-reducer-builder.js'
 import { ImmutableFlowBuilder } from './builders/immutable-flow-builder.js'
 import { ImmutableModelBuilder } from './builders/immutable-model-builder.js'
-import { ImmutableCliAdapterBuilder } from './builders/immutable-cli-adapter-builder.js'
 import { ImmutableToolBuilder } from './builders/immutable-tool-builder.js'
 import { FlowEntity } from './interfaces/entities/flow-entity.js'
 import { EventDefinition } from './interfaces/event.js'
@@ -33,7 +32,6 @@ import { AsyncEntity } from './interfaces/entities/async-entity.js'
 import { build } from './interfaces/builders/__internal__.js'
 import { ContainerBuilder } from './interfaces/builders/container-builder.js'
 import { ImmutableContainerBuilder } from './builders/immutable-container-builder.js'
-import { CliAdapterBuilder } from './interfaces/builders/cli-adapter-builder.js'
 import { event, signal } from './utils/event-utils.js'
 import {
   _enum,
@@ -119,10 +117,6 @@ function processor<TState>(
     .processor(gen)
 }
 
-function adapter(type: 'cli'): CliAdapterBuilder {
-  return new ImmutableCliAdapterBuilder()
-}
-
 function tool(name: string): ToolBuilder {
   return new ImmutableToolBuilder().name(name)
 }
@@ -198,17 +192,15 @@ export function kernel<TState>(
   const { use } = build(coreContainer)
 
   const agentTuples = flow.agents
-    .filter(a => a.adapter !== undefined || a.transport !== undefined || a.agent.defaultTransport !== undefined)
+    .filter(a => a.transport !== undefined || a.agent.defaultTransport !== undefined)
     .map(a => ({
       agent: a.agent,
-      model: a.model!,
-      adapter: a.adapter,
-      flowTransport: a.transport,
+      model: a.model,
+      transport: a.transport,
     }))
 
   const dispatcher = new AgentDispatcher({
     agents: agentTuples,
-    ledger,
     store,
     templateRenderer,
     injector: use,
@@ -245,7 +237,6 @@ export default {
   ruleset,
   skill,
   processor,
-  adapter,
   tool,
   async,
 

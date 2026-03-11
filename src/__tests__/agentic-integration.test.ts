@@ -390,18 +390,14 @@ describe('dispatcher transport resolution', () => {
       agents: [{
         agent,
         model: testModel,
-        flowTransport,
+        transport: flowTransport,
       }],
-      ledger: stubLedger(),
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
-
-    expect(dispatcher.hasV2Transport('flow-transport-agent')).toBe(true)
 
     const { output } = await dispatcher.invokeAndParseV2(
       'flow-transport-agent',
@@ -445,15 +441,13 @@ describe('dispatcher transport resolution', () => {
       agents: [{
         agent,
         model: testModel,
-        flowTransport,
+        transport: flowTransport,
       }],
-      ledger: stubLedger(),
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
 
     const { output } = await dispatcher.invokeAndParseV2(
@@ -488,18 +482,14 @@ describe('dispatcher transport resolution', () => {
       agents: [{
         agent,
         model: testModel,
-        flowTransport,
+        transport: flowTransport,
       }],
-      ledger: stubLedger(),
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
-
-    expect(dispatcher.hasV2Transport('v2-only-agent')).toBe(true)
 
     const { output } = await dispatcher.invokeAndParseV2(
       'v2-only-agent',
@@ -594,14 +584,12 @@ describe('V2 lifecycle limits', () => {
     })
 
     const dispatcher = new AgentDispatcher({
-      agents: [{ agent, model: testModel, flowTransport }],
-      ledger: stubLedger(),
+      agents: [{ agent, model: testModel, transport: flowTransport }],
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
 
     // Call 1: success — conversation grows to 2 messages (user + assistant)
@@ -643,14 +631,12 @@ describe('V2 lifecycle limits', () => {
     })
 
     const dispatcher = new AgentDispatcher({
-      agents: [{ agent, model: testModel, flowTransport }],
-      ledger: stubLedger(),
+      agents: [{ agent, model: testModel, transport: flowTransport }],
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
 
     // Turn 1: fresh conversation, transport sees 1 message (user only)
@@ -697,14 +683,12 @@ describe('V2 lifecycle limits', () => {
     })
 
     const dispatcher = new AgentDispatcher({
-      agents: [{ agent, model: testModel, flowTransport }],
-      ledger: stubLedger(),
+      agents: [{ agent, model: testModel, transport: flowTransport }],
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
 
     // Invocation 1: assertion fails once (assertCallCount 1), then passes (assertCallCount 2)
@@ -742,14 +726,12 @@ describe('V2 lifecycle limits', () => {
     })
 
     const dispatcher = new AgentDispatcher({
-      agents: [{ agent, model: testModel, flowTransport }],
-      ledger: stubLedger(),
+      agents: [{ agent, model: testModel, transport: flowTransport }],
       store: stubStore(),
       templateRenderer: noopRenderer,
       injector: mockUse,
       systemAdapter: stubSystemAdapter(),
       fileAdapter: stubFileAdapter(),
-      interceptors: [],
     })
 
     await dispatcher.invokeAndParseV2('safe-agent', 'integration-skill', { task: 'a' })
