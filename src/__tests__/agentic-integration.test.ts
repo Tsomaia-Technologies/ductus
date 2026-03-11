@@ -399,7 +399,7 @@ describe('dispatcher transport resolution', () => {
       fileAdapter: stubFileAdapter(),
     })
 
-    const { output } = await dispatcher.invokeAndParseV2(
+    const { output } = await dispatcher.invokeAndParse(
       'flow-transport-agent',
       'integration-skill',
       { task: 'test' },
@@ -450,7 +450,7 @@ describe('dispatcher transport resolution', () => {
       fileAdapter: stubFileAdapter(),
     })
 
-    const { output } = await dispatcher.invokeAndParseV2(
+    const { output } = await dispatcher.invokeAndParse(
       'priority-agent',
       'integration-skill',
       { task: 'test' },
@@ -461,20 +461,20 @@ describe('dispatcher transport resolution', () => {
     expect(output).toEqual({ code: 'from-flow', files: ['flow.ts'], testsRun: true })
   })
 
-  it('V2-only agent (no adapter, no defaultTransport) works via flowTransport', async () => {
+  it('agent without defaultTransport works via flowTransport', async () => {
     const flowSendCalls: TransportRequest[] = []
 
     const flowTransport: AgentTransport = {
       async *send(req: TransportRequest) {
         flowSendCalls.push(req)
-        yield text('{"code":"v2-only","files":["b.ts"],"testsRun":false}')
+        yield text('{"code":"transport-only","files":["b.ts"],"testsRun":false}')
         yield complete()
       },
       async close() {},
     }
 
     const agent = buildAgent({
-      name: 'v2-only-agent',
+      name: 'transport-only-agent',
       skill: [buildSkill()],
     })
 
@@ -491,22 +491,22 @@ describe('dispatcher transport resolution', () => {
       fileAdapter: stubFileAdapter(),
     })
 
-    const { output } = await dispatcher.invokeAndParseV2(
-      'v2-only-agent',
+    const { output } = await dispatcher.invokeAndParse(
+      'transport-only-agent',
       'integration-skill',
       { task: 'test' },
     )
 
     expect(flowSendCalls).toHaveLength(1)
-    expect(output).toEqual({ code: 'v2-only', files: ['b.ts'], testsRun: false })
+    expect(output).toEqual({ code: 'transport-only', files: ['b.ts'], testsRun: false })
   })
 })
 
 // ---------------------------------------------------------------------------
-// V2 lifecycle limits (enforceLifecycleLimitsV2)
+// Lifecycle limits (enforceLifecycleLimits)
 // ---------------------------------------------------------------------------
 
-describe('V2 lifecycle limits', () => {
+describe('lifecycle limits', () => {
   function stubLedger(): EventLedger {
     return {
       async *readEvents() {},
@@ -593,20 +593,20 @@ describe('V2 lifecycle limits', () => {
     })
 
     // Call 1: success — conversation grows to 2 messages (user + assistant)
-    await dispatcher.invokeAndParseV2('failure-agent', 'integration-skill', { task: 'a' })
+    await dispatcher.invokeAndParse('failure-agent', 'integration-skill', { task: 'a' })
     expect(requests[0].conversation.length).toBe(1)
 
     // Calls 2 & 3: failures accumulate (failures becomes 2)
     await expect(
-      dispatcher.invokeAndParseV2('failure-agent', 'integration-skill', { task: 'b' }),
+      dispatcher.invokeAndParse('failure-agent', 'integration-skill', { task: 'b' }),
     ).rejects.toThrow('simulated failure')
     await expect(
-      dispatcher.invokeAndParseV2('failure-agent', 'integration-skill', { task: 'c' }),
+      dispatcher.invokeAndParse('failure-agent', 'integration-skill', { task: 'c' }),
     ).rejects.toThrow('simulated failure')
 
-    // Call 4: enforceLifecycleLimitsV2 resets (failures=2 >= maxFailures=2)
+    // Call 4: enforceLifecycleLimits resets (failures=2 >= maxFailures=2)
     // After reset, conversation is fresh — transport should see only the new user message
-    await dispatcher.invokeAndParseV2('failure-agent', 'integration-skill', { task: 'd' })
+    await dispatcher.invokeAndParse('failure-agent', 'integration-skill', { task: 'd' })
 
     const lastRequest = requests[requests.length - 1]
     expect(lastRequest.conversation.length).toBe(1)
@@ -640,16 +640,16 @@ describe('V2 lifecycle limits', () => {
     })
 
     // Turn 1: fresh conversation, transport sees 1 message (user only)
-    await dispatcher.invokeAndParseV2('scope-agent', 'integration-skill', { task: 'a' })
+    await dispatcher.invokeAndParse('scope-agent', 'integration-skill', { task: 'a' })
     expect(requests[0].conversation.length).toBe(1)
 
     // Turn 2: conversation has history, transport sees 3 messages (prior user+assistant + new user)
-    await dispatcher.invokeAndParseV2('scope-agent', 'integration-skill', { task: 'b' })
+    await dispatcher.invokeAndParse('scope-agent', 'integration-skill', { task: 'b' })
     expect(requests[1].conversation.length).toBe(3)
 
-    // Turn 3: enforceLifecycleLimitsV2 resets (turns=2 >= amount=2)
+    // Turn 3: enforceLifecycleLimits resets (turns=2 >= amount=2)
     // After reset, conversation is fresh — transport sees only the new user message
-    await dispatcher.invokeAndParseV2('scope-agent', 'integration-skill', { task: 'c' })
+    await dispatcher.invokeAndParse('scope-agent', 'integration-skill', { task: 'c' })
     expect(requests[2].conversation.length).toBe(1)
   })
 
@@ -692,16 +692,16 @@ describe('V2 lifecycle limits', () => {
     })
 
     // Invocation 1: assertion fails once (assertCallCount 1), then passes (assertCallCount 2)
-    // assertionFailures=1, stateV2.hallucinations becomes 1
-    await dispatcher.invokeAndParseV2('hallucination-agent', 'integration-skill', { task: 'a' })
+    // assertionFailures=1, state.hallucinations becomes 1
+    await dispatcher.invokeAndParse('hallucination-agent', 'integration-skill', { task: 'a' })
 
     // Invocation 2: assertion fails once (assertCallCount 3), then passes (assertCallCount 4)
-    // assertionFailures=1, stateV2.hallucinations becomes 2
-    await dispatcher.invokeAndParseV2('hallucination-agent', 'integration-skill', { task: 'b' })
+    // assertionFailures=1, state.hallucinations becomes 2
+    await dispatcher.invokeAndParse('hallucination-agent', 'integration-skill', { task: 'b' })
 
-    // Invocation 3: enforceLifecycleLimitsV2 fires (hallucinations=2 >= maxRecognizedHallucinations=2)
+    // Invocation 3: enforceLifecycleLimits fires (hallucinations=2 >= maxRecognizedHallucinations=2)
     // Conversation is reset — transport should see only 1 message (the new user msg)
-    await dispatcher.invokeAndParseV2('hallucination-agent', 'integration-skill', { task: 'c' })
+    await dispatcher.invokeAndParse('hallucination-agent', 'integration-skill', { task: 'c' })
     const lastRequest = requests[requests.length - 1]
     expect(lastRequest.conversation.length).toBe(1)
   })
@@ -734,9 +734,9 @@ describe('V2 lifecycle limits', () => {
       fileAdapter: stubFileAdapter(),
     })
 
-    await dispatcher.invokeAndParseV2('safe-agent', 'integration-skill', { task: 'a' })
-    await dispatcher.invokeAndParseV2('safe-agent', 'integration-skill', { task: 'b' })
-    await dispatcher.invokeAndParseV2('safe-agent', 'integration-skill', { task: 'c' })
+    await dispatcher.invokeAndParse('safe-agent', 'integration-skill', { task: 'a' })
+    await dispatcher.invokeAndParse('safe-agent', 'integration-skill', { task: 'b' })
+    await dispatcher.invokeAndParse('safe-agent', 'integration-skill', { task: 'c' })
 
     // Conversation should accumulate across all 3 turns — no reset
     expect(requests[0].conversation.length).toBe(1)

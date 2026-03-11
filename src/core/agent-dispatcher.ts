@@ -6,7 +6,7 @@ import { SystemAdapter } from '../interfaces/system-adapter.js'
 import { identity } from '../utils/common-utils.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
 
-import { AgentLifecycleStateV2, AgentTupleV2 } from '../interfaces/agent-lifecycle.js'
+import { AgentLifecycleState, AgentTuple } from '../interfaces/agent-lifecycle.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
 import { invokeAgent, AssertionExhaustedError } from './agent-invocation.js'
 import { ConversationImpl } from './conversation.js'
@@ -25,7 +25,7 @@ import { SlidingWindowContextPolicy } from './context-policies/sliding-window-co
 export type TemplateRenderer = (template: string, context: Record<string, any>) => string | Promise<string>
 
 export interface AgentDispatcherOptions<TState> {
-  agents: AgentTupleV2[]
+  agents: AgentTuple[]
   store: StoreAdapter<TState>
   templateRenderer: TemplateRenderer
   systemAdapter: SystemAdapter
@@ -34,8 +34,8 @@ export interface AgentDispatcherOptions<TState> {
 }
 
 export class AgentDispatcher<TState> {
-  private readonly agents: Map<string, AgentTupleV2> = new Map()
-  private readonly lifecycleV2: Map<string, AgentLifecycleStateV2> = new Map()
+  private readonly agents: Map<string, AgentTuple> = new Map()
+  private readonly lifecycle: Map<string, AgentLifecycleState> = new Map()
   private readonly templateRenderer: TemplateRenderer
   private readonly store: StoreAdapter<TState>
   private readonly injector: Injector
@@ -55,14 +55,14 @@ export class AgentDispatcher<TState> {
   }
 
   async terminateAll(): Promise<void> {
-    for (const [name, state] of this.lifecycleV2) {
+    for (const [name, state] of this.lifecycle) {
       try {
         await state.transport.close()
       } catch (err) {
         console.warn(`Failed to close transport for agent ${name}:`, err)
       }
     }
-    this.lifecycleV2.clear()
+    this.lifecycle.clear()
   }
 
   // ── Prompt Composition ────────────────────────────────────────────────
@@ -168,9 +168,9 @@ export class AgentDispatcher<TState> {
     })
   }
 
-  // ── V2 Invocation Path ────────────────────────────────────────────────
+  // ── Invocation ──────────────────────────────────────────────────────
 
-  async invokeAndParseV2(agentName: string, skillName: string, input: unknown): Promise<{
+  async invokeAndParse(agentName: string, skillName: string, input: unknown): Promise<{
     output: unknown
     observationEvents: BaseEvent[]
   }> {
@@ -179,13 +179,13 @@ export class AgentDispatcher<TState> {
     const skill = tuple.agent.skill.find(s => s.name === skillName)
     if (!skill) throw new Error(`Skill '${skillName}' not found on agent '${agentName}'.`)
 
-    const stateV2 = await this.getOrCreateLifecycleStateV2(agentName)
+    const state = await this.getOrCreateLifecycleState(agentName)
 
-    await this.enforceLifecycleLimitsV2(agentName, stateV2, tuple.agent)
-    await this.enforceContextPolicy(agentName, tuple.agent, stateV2)
+    await this.enforceLifecycleLimits(agentName, state, tuple.agent)
+    await this.enforceContextPolicy(agentName, tuple.agent, state)
 
-    stateV2.turns++
-    stateV2.currentTurnStartSequence = this.lastKnownSequence + 1
+    state.turns++
+    state.currentTurnStartSequence = this.lastKnownSequence + 1
 
     const observationEvents: BaseEvent[] = []
     let turnFailed = false
@@ -195,21 +195,21 @@ export class AgentDispatcher<TState> {
         agent: tuple.agent,
         skill,
         input,
-        conversation: stateV2.conversation,
-        transport: stateV2.transport,
+        conversation: state.conversation,
+        transport: state.transport,
         model: tuple.model ?? tuple.agent.defaultModel,
         getState: () => this.store.getState(),
         use: this.injector,
         onEvent: (event) => observationEvents.push(event),
       })
 
-      stateV2.conversation = result.conversation
-      stateV2.tokensUsed += result.tokenUsage.input + result.tokenUsage.output
-      stateV2.hallucinations += result.assertionFailures
+      state.conversation = result.conversation
+      state.tokensUsed += result.tokenUsage.input + result.tokenUsage.output
+      state.hallucinations += result.assertionFailures
 
-      stateV2.turnRecords.push({
-        turnNumber: stateV2.turns,
-        startSequence: stateV2.currentTurnStartSequence,
+      state.turnRecords.push({
+        turnNumber: state.turns,
+        startSequence: state.currentTurnStartSequence,
         endSequence: this.lastKnownSequence,
         failed: false,
       })
@@ -217,14 +217,14 @@ export class AgentDispatcher<TState> {
       return { output: result.output, observationEvents }
     } catch (err) {
       turnFailed = true
-      stateV2.failures++
+      state.failures++
       if (err instanceof AssertionExhaustedError) {
-        stateV2.hallucinations += err.assertionFailures
+        state.hallucinations += err.assertionFailures
       }
 
-      stateV2.turnRecords.push({
-        turnNumber: stateV2.turns,
-        startSequence: stateV2.currentTurnStartSequence,
+      state.turnRecords.push({
+        turnNumber: state.turns,
+        startSequence: state.currentTurnStartSequence,
         endSequence: this.lastKnownSequence,
         failed: turnFailed,
       })
@@ -233,8 +233,8 @@ export class AgentDispatcher<TState> {
     }
   }
 
-  private async getOrCreateLifecycleStateV2(agentName: string): Promise<AgentLifecycleStateV2> {
-    let state = this.lifecycleV2.get(agentName)
+  private async getOrCreateLifecycleState(agentName: string): Promise<AgentLifecycleState> {
+    let state = this.lifecycle.get(agentName)
     if (!state) {
       const tuple = this.agents.get(agentName)!
       const systemMessage = await this.composeSystemMessage(tuple.agent)
@@ -256,14 +256,14 @@ export class AgentDispatcher<TState> {
         turnRecords: [],
         currentTurnStartSequence: 0,
       }
-      this.lifecycleV2.set(agentName, state)
+      this.lifecycle.set(agentName, state)
     }
     return state
   }
 
-  private async enforceLifecycleLimitsV2(
+  private async enforceLifecycleLimits(
     agentName: string,
-    state: AgentLifecycleStateV2,
+    state: AgentLifecycleState,
     agentConfig: AgentEntity,
   ): Promise<void> {
     const maxFailures = agentConfig.maxFailures ?? Infinity
@@ -291,7 +291,7 @@ export class AgentDispatcher<TState> {
   private async enforceContextPolicy(
     agentName: string,
     agentConfig: AgentEntity,
-    state: AgentLifecycleStateV2,
+    state: AgentLifecycleState,
   ): Promise<void> {
     if (agentConfig.maxContextTokens === undefined) return
     if (state.conversation.tokenEstimate < agentConfig.maxContextTokens) return

@@ -3,7 +3,7 @@ import { ModelEntity } from './entities/model-entity.js'
 import { Conversation } from './conversation.js'
 import { AgentTransport } from './agent-transport.js'
 
-export interface AgentTupleV2 {
+export interface AgentTuple {
   agent: AgentEntity
   model?: ModelEntity
   transport?: AgentTransport
@@ -16,7 +16,7 @@ export interface TurnRecord {
   failed: boolean
 }
 
-export interface AgentLifecycleStateV2 {
+export interface AgentLifecycleState {
   tokensUsed: number
   failures: number
   hallucinations: number

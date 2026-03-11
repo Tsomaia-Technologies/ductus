@@ -150,8 +150,8 @@ function stubFileAdapter(): FileAdapter {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('V2 invocation unit tests', () => {
-  it('full V2 path: trigger → invoke → tool loop → assertion → observation events', async () => {
+describe('invocation unit tests', () => {
+  it('full path: trigger → invoke → tool loop → assertion → observation events', async () => {
     let toolExecuted = false
 
     const lookupTool: ToolEntity = {
@@ -270,7 +270,7 @@ describe('V2 invocation unit tests', () => {
     })
   })
 
-  it('V2 path with assertion failure and retry', async () => {
+  it('path with assertion failure and retry', async () => {
     let assertCallCount = 0
 
     const skill = buildSkill({
@@ -336,7 +336,7 @@ describe('V2 invocation unit tests', () => {
     expect(result.tokenUsage).toEqual({ input: 110, output: 65, total: 175 })
   })
 
-  it('full V2 path via dispatcher invokeAndParseV2', async () => {
+  it('full path via dispatcher invokeAndParse', async () => {
     let toolExecuted = false
 
     const lookupTool: ToolEntity = {
@@ -386,7 +386,7 @@ describe('V2 invocation unit tests', () => {
       fileAdapter: stubFileAdapter(),
     })
 
-    const { output, observationEvents } = await dispatcher.invokeAndParseV2(
+    const { output, observationEvents } = await dispatcher.invokeAndParse(
       'dispatcher-e2e-agent',
       'e2e-skill',
       { query: 'test' },
@@ -401,7 +401,7 @@ describe('V2 invocation unit tests', () => {
     expect(types).toContain('Ductus/ToolCompleted')
   })
 
-  it('dispatcher V2 path with assertion failure triggers retry and accumulates hallucinations', async () => {
+  it('dispatcher path with assertion failure triggers retry and accumulates hallucinations', async () => {
     let assertCallCount = 0
 
     const skill = buildSkill({
@@ -442,7 +442,7 @@ describe('V2 invocation unit tests', () => {
       fileAdapter: stubFileAdapter(),
     })
 
-    const { output } = await dispatcher.invokeAndParseV2(
+    const { output } = await dispatcher.invokeAndParse(
       'retry-dispatcher-agent',
       'e2e-skill',
       { query: 'retry-test' },
@@ -451,7 +451,7 @@ describe('V2 invocation unit tests', () => {
     expect(output).toEqual({ result: 'correct', source: 'good' })
   })
 
-  it('V2 path with multiple tools and parallel tool calls', async () => {
+  it('path with multiple tools and parallel tool calls', async () => {
     const toolCallLog: string[] = []
 
     const searchTool: ToolEntity = {
@@ -527,8 +527,8 @@ describe('V2 invocation unit tests', () => {
 const TriggerEvent = event('test/Triggered', { query: z.string() })
 const ResultEvent = event('test/Result', { result: z.string(), source: z.string() })
 
-describe('V2 reaction pipeline via createReactionAdapter', () => {
-  it('routes trigger → executePipeline → invokeV2 → tool loop → emit result', async () => {
+describe('reaction pipeline via createReactionAdapter', () => {
+  it('routes trigger → executePipeline → invoke → tool loop → emit result', async () => {
     let toolExecuted = false
 
     const lookupTool: ToolEntity = {

@@ -131,13 +131,13 @@ async function* executePipeline<TState>(
         case 'invoke': {
           lastAgent = step.agent
           lastSkill = step.skill
-          const v2Result = await dispatcher.invokeAndParseV2(
+          const result = await dispatcher.invokeAndParse(
             step.agent.name,
             step.skill.name,
             lastInvokeResult,
           )
-          lastInvokeResult = v2Result.output
-          for (const obsEvent of v2Result.observationEvents) {
+          lastInvokeResult = result.output
+          for (const obsEvent of result.observationEvents) {
             yield obsEvent
           }
           break

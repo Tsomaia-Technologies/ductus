@@ -6,9 +6,7 @@ import { ConversationImpl } from '../conversation.js'
 /**
  * Clears all messages and returns a fresh conversation with only the system message.
  *
- * In the V1 adapter model, context replacement terminated the adapter and created
- * a new one with handoff context. In V2 (transport-based), there is no adapter to
- * terminate — the policy simply resets the conversation. Handoff context, if needed,
+ * The policy simply resets the conversation. Handoff context, if needed,
  * is handled separately by the dispatcher's lifecycle management.
  */
 export class ReplaceContextPolicy implements ContextPolicy {
