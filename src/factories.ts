@@ -221,6 +221,7 @@ export function kernel<TState>(
     store,
     injector: use,
     canceller,
+    onShutdown: () => dispatcher.terminateAll(),
   })
 }
 

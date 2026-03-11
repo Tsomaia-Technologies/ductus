@@ -137,7 +137,7 @@ describe('kernel E2E: agentic stack', () => {
         if (!parsed.reason) throw new Error('reason required')
       })
 
-    const { transport, requests } = createMockTransport([
+    const { transport, requests, closeCalled } = createMockTransport([
       [
         usage(100, 50),
         toolCallChunk('tc-1', 'RunTests', '{"files":["src/index.ts"]}'),
@@ -216,6 +216,8 @@ describe('kernel E2E: agentic stack', () => {
     expect(committedTypes).toContain('test/TaskReviewed')
 
     await kernel.shutdown()
+
+    expect(closeCalled.value).toBe(true)
   }, 15_000)
 
   // ---------------------------------------------------------------------------

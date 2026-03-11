@@ -22,6 +22,7 @@ export interface KernelOptions<TState> {
   store: StoreAdapter<TState>
   canceller?: CancellationToken
   shouldTakeSnapshot?: (state: DeeplyReadonly<TState>, event: CommittedEvent) => boolean
+  onShutdown?: () => Promise<void>
 }
 
 export class DuctusKernel<TState> {
@@ -46,6 +47,7 @@ export class DuctusKernel<TState> {
   private isShuttingDown = false
   private isShutDownStarted = false
   private readonly intentProcessor: IntentProcessor
+  private readonly onShutdown?: () => Promise<void>
 
   constructor(options: KernelOptions<TState>) {
     const {
@@ -57,6 +59,7 @@ export class DuctusKernel<TState> {
       injector,
       canceller,
       shouldTakeSnapshot,
+      onShutdown,
     } = options
     this.multiplexer = multiplexer
     this.sequencer = sequencer
@@ -67,6 +70,7 @@ export class DuctusKernel<TState> {
     this.use = injector
     this.canceller = new Canceller({ base: canceller })
     this.shouldTakeSnapshot = shouldTakeSnapshot
+    this.onShutdown = onShutdown
     this.intentProcessor = new IntentProcessor(
       this.multiplexer,
       this.sequencer,
@@ -134,6 +138,7 @@ export class DuctusKernel<TState> {
     } catch (e: any) {
       console.warn(`Ductus Framework Warning: ${e.message}`)
     } finally {
+      await this.onShutdown?.()
       await this.ledger.dispose()
     }
   }
