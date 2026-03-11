@@ -3,6 +3,7 @@ import { Injector } from '../interfaces/event-generator.js'
 import { StoreAdapter } from '../interfaces/store-adapter.js'
 import { SystemAdapter } from '../interfaces/system-adapter.js'
 import { FileAdapter } from '../interfaces/file-adapter.js'
+import { EventLedger } from '../interfaces/event-ledger.js'
 import { AgentTuple } from '../interfaces/agent-lifecycle.js'
 import { invokeAgent, AssertionExhaustedError } from './agent-invocation.js'
 import { AgentPromptComposer } from './agent-prompt-composer.js'
@@ -19,6 +20,7 @@ export interface AgentDispatcherOptions<TState> {
   systemAdapter: SystemAdapter
   fileAdapter: FileAdapter
   injector: Injector
+  ledger?: EventLedger
 }
 
 export class AgentDispatcher<TState> {
@@ -45,6 +47,13 @@ export class AgentDispatcher<TState> {
       this.agents,
       promptComposer,
       () => this.store.getState(),
+      {
+        templateRenderer: options.templateRenderer,
+        fileAdapter: options.fileAdapter,
+        systemAdapter: options.systemAdapter,
+        injector: options.injector,
+        ledger: options.ledger,
+      },
     )
   }
 
