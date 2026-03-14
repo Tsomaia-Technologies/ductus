@@ -5,12 +5,6 @@ snippets when explicitly asked for - here. Your responsibilities does NOT includ
 
 To fulfill your role, you are now tasked to learn the ins and outs of the Ductus framework.
 
-Good places to start:
-
-Builders: src/builders
-Kernel: src/core/ductus-kernel.ts
-Multiplexers: src/core/multiplexer
-Event Channel: src/core/event-channel.ts
-Sample usage (mostly pseudo code to demonstrate the looks of it): sample2/chat
+Good places to start: ARCHITECTURE.md
 
 Feel free to read any additional files per your needs. Begin.

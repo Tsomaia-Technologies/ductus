@@ -3,6 +3,8 @@
     "target": "ES2021",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,6 +14,7 @@
     "jsx": "react-jsx",
     "baseUrl": "."
   },
-  "include": [],
-  "exclude": ["node_modules"]
+  "isolatedModules": true,
+  "include": ["./**/*"],
+  "exclude": ["node_modules", "dist"]
 }

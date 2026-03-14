@@ -1,0 +1,6 @@
+# Public API surface - framework maintainers
+/packages/core/src/index.ts
+/packages/core/src/factories.ts
+
+# Apps must not import from packages/core internals (use ductus package only)
+/apps/

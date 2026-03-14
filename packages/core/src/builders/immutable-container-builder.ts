@@ -2,7 +2,6 @@ import { ContainerBuilder, ContainerEntry, ServiceFactory } from '../interfaces/
 import { InferInjectable, Injectable, Token, Type } from '../interfaces/event-generator.js'
 import { build, BUILD } from '../interfaces/builders/__internal__.js'
 import { ContainerEntity } from '../interfaces/entities/container-entity.js'
-import Container from '../../sample2/static/container.js'
 
 type RegistryNode = {
   type: Injectable

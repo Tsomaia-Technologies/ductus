@@ -9,11 +9,11 @@ When writing or modifying code in this project:
 
 - Use `.js` extensions in all import paths (ESM): `import { X } from './foo.js'`
 - Builders use clone-on-write: every method returns a new instance, never mutates `this`
-- Builders implement `Buildable<T>` with `[BUILD]()` from `src/interfaces/builders/__internal__.ts`
+- Builders implement `Buildable<T>` with `[BUILD]()` from `packages/core/src/interfaces/builders/__internal__.ts`
 - Use `isBuildable()` and `build()` from `__internal__.ts` when accepting Builder-or-Entity params
 - Named exports only on interfaces and entities — no default exports
 - Use `unknown` instead of `any` in new code
-- Events: `event()` for durable, `signal()` for volatile, from `src/utils/event-utils.ts`
-- Schema helpers: `string()`, `number()`, `object()`, etc. from `src/utils/schema-utils.ts`
+- Events: `event()` for durable, `signal()` for volatile, from `packages/core/src/utils/event-utils.ts`
+- Schema helpers: `string()`, `number()`, `object()`, etc. from `packages/core/src/utils/schema-utils.ts`
 - No comments that narrate what code does. Comments only for non-obvious intent or constraints.
-- Run `npx tsc --noEmit` after changes to verify type correctness
+- Run `pnpm exec tsc --noEmit` in packages/core after framework changes; `pnpm build` builds the framework

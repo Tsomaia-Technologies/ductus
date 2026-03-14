@@ -5,33 +5,32 @@ Ductus is an event sourcing framework built on async generators in TypeScript. I
 ## Directory Map
 
 ```
-src/
-  interfaces/           Type definitions and builder interfaces
-    builders/           Fluent builder interfaces (SkillBuilder, AgentBuilder, etc.)
-    entities/           Entity data shapes (SkillEntity, AgentEntity, etc.)
-    coordination/       Cluster and scaling interfaces
-  builders/             Immutable builder implementations
-  core/                 Runtime (kernel, dispatcher, multiplexers, coordination)
-  events/               Event definitions
-  utils/                Shared utilities (event factories, schema, guards)
-  factories.ts          Ductus.* DSL entry point
-  index.ts              Public export surface
+packages/core/           Ductus framework (published as "ductus")
+  src/
+    interfaces/         Type definitions and builder interfaces
+    builders/           Immutable builder implementations
+    core/               Runtime (kernel, dispatcher, multiplexers, coordination)
+    events/             Event definitions
+    utils/              Shared utilities (event factories, schema, guards)
+    factories.ts        Ductus.* DSL entry point
+    index.ts            Public export surface
+apps/
+  sample/               Example app (legacy API, needs update)
+  sample2/              Chat demo app (legacy API, needs update)
 rfc/                    RFC specifications and implementation plan
   tasks/                Task briefs for RFC 0001 implementation
-  prompts/              Agent prompts for engineer and reviewer roles
-sample2/tests/          Integration tests
 ```
 
 ## Code Conventions
 
 - **ESM imports with `.js` extensions:** `import { X } from './foo.js'`
 - **Clone-on-write builders:** every builder method returns a new instance. Never mutate `this`.
-- **`BUILD` symbol:** builders implement `Buildable<T>` from `src/interfaces/builders/__internal__.ts`. The `[BUILD]()` method produces the final entity.
+- **`BUILD` symbol:** builders implement `Buildable<T>` from `packages/core/src/interfaces/builders/__internal__.ts`. The `[BUILD]()` method produces the final entity.
 - **`isBuildable()` and `build()`:** use these from `__internal__.ts` when accepting `Builder | Entity` parameters.
 - **Named exports only** on interfaces and entities. No default exports.
 - **`unknown` over `any`** in new code.
-- **Events:** durable via `event()`, volatile via `signal()` from `src/utils/event-utils.ts`. Framework events use `Ductus/` type prefix.
-- **Schema:** `Schema = ZodSchema`. Payload shapes use helpers from `src/utils/schema-utils.ts`.
+- **Events:** durable via `event()`, volatile via `signal()` from `packages/core/src/utils/event-utils.ts`. Framework events use `Ductus/` type prefix.
+- **Schema:** `Schema = ZodSchema`. Payload shapes use helpers from `packages/core/src/utils/schema-utils.ts`.
 - **No narrating comments.** Comments only for non-obvious intent, trade-offs, or constraints.
 
 ## Active Work

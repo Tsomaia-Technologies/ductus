@@ -1,0 +1,18 @@
+
+> ductus-sample@ build /Users/torniketsomaia/projects/@tsomaia.tech/ductus/apps/sample
+> tsc
+
+main.ts(2,3): error TS2724: '"ductus"' has no exported member named 'DefaultDependencyContainer'. Did you mean 'DependencyContainer'?
+main.ts(4,3): error TS2614: Module '"ductus"' has no exported member 'DuctusMultiplexer'. Did you mean to use 'import DuctusMultiplexer from "ductus"' instead?
+main.ts(34,34): error TS2558: Expected 0 type arguments, but got 1.
+main.ts(39,35): error TS2558: Expected 1 type arguments, but got 2.
+processors/consumer-one-processor.ts(5,46): error TS2314: Generic type 'EventProcessor' requires 1 type argument(s).
+processors/consumer-one-processor.ts(6,26): error TS2315: Type 'InputEventStream' is not generic.
+processors/consumer-one-processor.ts(6,58): error TS2315: Type 'OutputEventStream' is not generic.
+processors/consumer-two-processor.ts(5,46): error TS2314: Generic type 'EventProcessor' requires 1 type argument(s).
+processors/consumer-two-processor.ts(6,26): error TS2315: Type 'InputEventStream' is not generic.
+processors/consumer-two-processor.ts(6,58): error TS2315: Type 'OutputEventStream' is not generic.
+processors/timer-processor.ts(5,40): error TS2314: Generic type 'EventProcessor' requires 1 type argument(s).
+processors/timer-processor.ts(6,21): error TS2315: Type 'OutputEventStream' is not generic.
+types.ts(1,39): error TS2307: Cannot find module '../src/index.js' or its corresponding type declarations.
+ ELIFECYCLE  Command failed with exit code 2.
