@@ -1,5 +1,5 @@
 {
-  "name": "ductus",
+  "name": "ductus-monorepo",
   "private": true,
   "packageManager": "pnpm@9.14.2",
   "scripts": {
